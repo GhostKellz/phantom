@@ -49,19 +49,54 @@ const phantom = phantom_dep.module("phantom");
 
 ## 👾 Example Usage
 
+### Basic Application
 ```zig
 const phantom = @import("phantom");
 
 pub fn main() !void {
-    var app = try phantom.App.init(.{ .title = "👻 Phantom Demo" });
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+    
+    // Initialize runtime
+    phantom.runtime.initRuntime(allocator);
+    defer phantom.runtime.deinitRuntime();
+    
+    // Create app
+    var app = try phantom.App.init(allocator, phantom.AppConfig{
+        .title = "👻 My Phantom App",
+        .tick_rate_ms = 50,
+    });
     defer app.deinit();
     
-    app.addWidget(phantom.widgets.List(.{ .items = &[_][]const u8{"Zig", "Async", "Phantom"} }));
-    app.addWidget(phantom.widgets.ProgressBar(.{ .progress = 42 }));
-
+    // Add widgets
+    const text = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "Hello, Phantom! 👻",
+        phantom.Style.withFg(phantom.Color.bright_cyan).withBold()
+    );
+    try app.addWidget(&text.widget);
+    
+    const list = try phantom.widgets.List.init(allocator);
+    try list.addItemText("Option 1");
+    try list.addItemText("Option 2");
+    try list.addItemText("Option 3");
+    try app.addWidget(&list.widget);
+    
+    // Run
     try app.run();
 }
 ```
+
+### Current Widget Library
+- **Text**: Styled text display with alignment
+- **Block**: Bordered containers with optional titles
+- **List**: Selectable item lists with keyboard navigation
+
+### Available Styling
+- **Colors**: Basic terminal colors + bright variants
+- **Attributes**: Bold, italic, underline, strikethrough
+- **Backgrounds**: All colors available as backgrounds
 
 ---
 
@@ -75,15 +110,29 @@ pub fn main() !void {
 
 ## 🗺️ Roadmap
 
-* [x] Async event loop with zsync
-* [x] Core widgets: List, Table, Progress, Input, Tabs
-* [x] Styled/colorized output
-* [ ] Mouse support and focus
-* [ ] Markdown/emoji rendering
-* [ ] Custom layout engine (flex, grid)
-* [ ] Async modals, popups, overlay support
-* [ ] Snapshot testing
-* [ ] WASM + Ghostty support
+### ✅ Completed (v0.1.0 MVP)
+* [x] **Project Setup**: Pure Zig v0.15+ with zsync integration
+* [x] **Core Terminal Interface**: Raw mode, screen buffers, ANSI output
+* [x] **Event System**: Keyboard input, event loops, handlers
+* [x] **Widget Framework**: Base widget trait with vtable system
+* [x] **Core Widgets**: Text, Block (borders), List (selectable)
+* [x] **Style System**: Colors, attributes (bold, italic, underline)
+* [x] **Geometry Types**: Rect, Position, Size with operations
+* [x] **Double Buffering**: Efficient diff-based rendering
+* [x] **App Framework**: Main application loop and lifecycle
+
+### 🚧 In Progress
+* [ ] **Layout Engine**: Flex, Grid layouts with constraints
+* [ ] **Mouse Support**: Click, drag, scroll events
+* [ ] **More Widgets**: Progress bars, Tables, Input boxes, Tabs
+* [ ] **Advanced Styling**: Gradients, themes, dynamic colors
+
+### 📋 Planned (v0.2.0+)
+* [ ] **Async Integration**: Full zsync async event loops
+* [ ] **Modal/Popup System**: Overlay widgets and focus management
+* [ ] **Layout Constraints**: Rattatui-style constraint system
+* [ ] **Terminal Detection**: Proper size detection and capabilities
+* [ ] **Testing Framework**: Snapshot testing for TUI components
 
 ---
 

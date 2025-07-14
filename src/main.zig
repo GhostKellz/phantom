@@ -2,14 +2,49 @@ const std = @import("std");
 const phantom = @import("phantom");
 
 pub fn main() !void {
-    // Prints to stderr, ignoring potential errors.
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
-    try phantom.bufferedPrint();
+    // Initialize allocator
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
+
+    // Initialize Phantom runtime
+    phantom.runtime.initRuntime(allocator);
+    defer phantom.runtime.deinitRuntime();
+
+    // Create app
+    var app = try phantom.App.init(allocator, phantom.AppConfig{
+        .title = "👻 Phantom TUI Demo",
+        .tick_rate_ms = 50,
+    });
+    defer app.deinit();
+
+    // Create a simple text widget
+    const hello_text = try phantom.widgets.Text.initWithStyle(allocator, "Welcome to Phantom TUI! 👻", phantom.Style.withFg(phantom.Color.bright_cyan).withBold());
+    try app.addWidget(&hello_text.widget);
+
+    // Create a list widget
+    const list = try phantom.widgets.List.init(allocator);
+    try list.addItemText("🚀 Feature 1: Pure Zig");
+    try list.addItemText("⚡ Feature 2: Async with zsync");
+    try list.addItemText("🧱 Feature 3: Rich widgets");
+    try list.addItemText("🌈 Feature 4: Styled output");
+    try list.addItemText("🖱️  Feature 5: Input handling");
+    try app.addWidget(&list.widget);
+
+    // Print startup message
+    std.debug.print("Starting Phantom TUI Demo...\n", .{});
+    std.debug.print("Use arrow keys or j/k to navigate the list\n", .{});
+    std.debug.print("Press Ctrl+C or Escape to exit\n", .{});
+
+    // Run the app
+    try app.run();
+
+    std.debug.print("Phantom TUI Demo ended. Goodbye! 👻\n", .{});
 }
 
 test "simple test" {
     var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // Try commenting this out and see if zig detects the memory leak!
+    defer list.deinit();
     try list.append(42);
     try std.testing.expectEqual(@as(i32, 42), list.pop());
 }
@@ -18,7 +53,6 @@ test "fuzz example" {
     const Context = struct {
         fn testOne(context: @This(), input: []const u8) anyerror!void {
             _ = context;
-            // Try passing `--fuzz` to `zig build test` and see if it manages to fail this test case!
             try std.testing.expect(!std.mem.eql(u8, "canyoufindme", input));
         }
     };

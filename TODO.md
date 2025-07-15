@@ -1,106 +1,186 @@
-PHANTOM TODO.md — TUI Framework for Zig
-🏁 MVP / v0.1.0 Milestones
+# Phantom TUI v0.2.0 - Final TODO List
 
-Project setup & build.zig
+## Overview
+This TODO list contains the remaining tasks to complete Phantom TUI v0.2.0. The core framework is 95% complete with all major features implemented. These are the final polish items needed before release.
 
-Pure Zig, Zig v0.15+ only
+## Current Status
+- ✅ All core widgets implemented (Button, Input, TextArea, List, Table, etc.)
+- ✅ Modal dialogs and context menus complete
+- ✅ Notification system working
+- ✅ Animation system with easing functions
+- ✅ Theme system with 6 built-in themes
+- ✅ Unicode support and efficient rendering
+- ✅ Mouse support across all widgets
+- ✅ Syntax highlighting for 15+ languages
+- ✅ Streaming text for AI responses
+- ✅ Comprehensive demo and integration guide
+- 🔄 Clipboard integration (90% complete, needs compilation fixes)
 
-    Optional zsync async runtime
+---
 
-Async Event Loop
+## 🚨 CRITICAL - Must Fix for v0.2.0 Release
 
-zsync-powered non-blocking input/timer loop
+### 1. Fix Clipboard Compilation Errors
+**Priority: CRITICAL**
+**File: `/src/clipboard.zig`**
+**Issue**: Uses `std.ChildProcess.exec` which doesn't exist in current Zig
+**Solution**: Replace with proper Zig subprocess handling
 
-    Signal handling (resize, ctrl-c, etc)
+```zig
+// Current broken code around lines 60-80:
+const result = std.ChildProcess.exec(.{
+    .allocator = self.allocator,
+    .argv = &[_][]const u8{ "xclip", "-selection", "clipboard" },
+    .stdin_behavior = .Pipe,
+});
 
-Core Widgets
+// Needs to be replaced with:
+var child = std.ChildProcess.init(&[_][]const u8{ "xclip", "-selection", "clipboard" }, self.allocator);
+// ... proper subprocess handling
+```
 
-List
+### 2. Complete TextArea Clipboard Integration
+**Priority: HIGH**
+**File: `/src/widgets/textarea.zig`**
+**Missing**: Keyboard shortcuts and helper methods
 
-Table
+**Add to `handleEvent` function around line 450:**
+```zig
+.ctrl_c => {
+    self.copyToClipboard();
+    return true;
+},
+.ctrl_v => {
+    self.pasteFromClipboard();
+    return true;
+},
+.ctrl_x => {
+    self.cutToClipboard();
+    return true;
+},
+.ctrl_a => {
+    self.selectAll();
+    return true;
+},
+```
 
-Progress bar
+**Add these methods to TextArea struct:**
+```zig
+pub fn setClipboardManager(self: *TextArea, manager: *clipboard.ClipboardManager) void
+pub fn copyToClipboard(self: *TextArea) void
+pub fn pasteFromClipboard(self: *TextArea) void
+pub fn cutToClipboard(self: *TextArea) void
+pub fn getSelectedText(self: *TextArea) []const u8
+pub fn selectAll(self: *TextArea) void
+```
 
-Input box
+### 3. Fix Build System
+**Priority: HIGH**
+**File: `/build.zig`**
+**Issue**: Ensure clipboard.zig is included in build
 
-Tabs
+---
 
-Modal/Popup
+## 🔧 MEDIUM Priority - Important for Polish
 
-Tree
+### 4. Add Clipboard Error Handling
+**Priority: MEDIUM**
+**File: `/src/clipboard.zig`**
+**Task**: Add graceful fallbacks when clipboard tools aren't available
 
-    Markdown/emoji renderer (basic)
+### 5. Update Demo with Clipboard Examples
+**Priority: MEDIUM**
+**File: `/examples/comprehensive_demo.zig`**
+**Task**: Add clipboard functionality demonstration
 
-Layout Engine
+### 6. Test All Widget Compilation
+**Priority: MEDIUM**
+**Task**: Run `zig build` and fix any remaining compilation issues
 
-Flex (direction/align/justify)
+---
 
-Grid (rows/cols)
+## 📝 LOW Priority - Nice to Have
 
-    Absolute/float/stack
+### 7. Write Clipboard Unit Tests
+**Priority: LOW**
+**File**: Create `/src/clipboard_test.zig`
+**Task**: Add comprehensive tests for clipboard functionality
 
-Rendering Engine
+### 8. Update Documentation
+**Priority: LOW**
+**File: `/PHANTOM_INTEGRATION.md`**
+**Task**: Add clipboard usage examples and API documentation
 
-Styled output (color, gradients, bold, underline)
+### 9. Cross-Platform Optimization
+**Priority: LOW**
+**File: `/src/clipboard.zig`**
+**Task**: Improve Windows and macOS clipboard implementations
 
-Unicode/nerd font/symbol support
+### 10. Performance Optimization
+**Priority: LOW**
+**Task**: Profile and optimize clipboard operations for better performance
 
-    Double-buffered redraw (flicker free)
+---
 
-Input Handling
+## 🎯 Success Criteria for v0.2.0
 
-Keyboard shortcuts, hotkeys
+- [ ] `zig build` completes without errors
+- [ ] All widgets compile and work
+- [ ] Clipboard copy/paste works on Linux, macOS, and Windows
+- [ ] Input and TextArea widgets support Ctrl+C/V/X shortcuts
+- [ ] Demo runs and showcases all features
+- [ ] PHANTOM_INTEGRATION.md is complete and accurate
 
-Mouse events & focus switching
+---
 
-    Async event hooks
+## 🔍 Files That Need Attention
 
-Extensibility
+### Critical Files:
+- `/src/clipboard.zig` - Main clipboard implementation (BROKEN)
+- `/src/widgets/textarea.zig` - Missing clipboard shortcuts
+- `/build.zig` - May need clipboard.zig inclusion
 
-Custom widget/plugin API
+### Reference Files (Working):
+- `/src/widgets/input.zig` - Has working clipboard integration
+- `/src/widgets/button.zig` - Example of proper widget structure
+- `/examples/comprehensive_demo.zig` - Shows how to use widgets
 
-    Async widget update hooks
+---
 
-Testing & Examples
+## 💡 Implementation Notes
 
-Snapshot test harness
+### For Clipboard Fixes:
+1. Look at how other Zig projects handle subprocess calls
+2. Consider using `std.process.Child` instead of `std.ChildProcess.exec`
+3. Add proper error handling for missing system tools
+4. Test on multiple platforms
 
-Example: dashboard, chat, logs
+### For TextArea Integration:
+1. Copy the working patterns from `input.zig`
+2. Adapt for multi-line text handling
+3. Handle selection across multiple lines
+4. Ensure proper text formatting
 
-        Example: interactive file browser
+### For Build System:
+1. Check if clipboard.zig needs explicit inclusion
+2. Verify all imports are correct
+3. Test on clean build environment
 
-🪄 Stretch Goals
+---
 
-WASM/Browser support (via Ghostty or native web terminal)
+## 🚀 Ready for Release After These Fixes
 
-Animation API (progress, transitions)
+Once these TODOs are complete, Phantom TUI v0.2.0 will be production-ready with:
+- Complete widget ecosystem
+- Full clipboard integration
+- Modern TUI features (animations, themes, Unicode)
+- Cross-platform compatibility
+- Ready for ZEKE integration
 
-Accessibility (screen readers, keyboard nav)
+**Estimated completion time: 2-4 hours of focused work**
 
-Themes and dynamic color schemes
+---
 
-Async modals and overlay stacking
-
-Rich input widgets (autocomplete, date picker, etc)
-
-Integrated async shell/task runner
-
-    Real-world dashboard demos
-
-📚 Docs & Developer UX
-
-Complete README with badges, install, usage, and async guide
-
-Inline Zig doc comments for all pub APIs
-
-    Docs on extending, testing, async workflows
-
-Focus:
-
-    Clean, idiomatic Zig
-
-    Next-gen async (zsync)
-
-    Fully testable, composable widgets
-
-    Rattatui parity, with ghostly upgrades!
+*Last updated: 2025-01-15*
+*Framework completion: 95%*
+*Ready for: Final polish and release*

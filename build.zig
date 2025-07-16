@@ -159,6 +159,62 @@ pub fn build(b: *std.Build) void {
     const pkg_demo_step = b.step("demo-pkg", "Run the package manager demo");
     pkg_demo_step.dependOn(&run_pkg_demo.step);
 
+    // Ghostty Performance Demo  
+    const ghostty_demo = b.addExecutable(.{
+        .name = "ghostty_performance_demo",
+        .root_source_file = b.path("examples/ghostty_performance_demo.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    ghostty_demo.root_module.addImport("phantom", mod);
+    b.installArtifact(ghostty_demo);
+
+    const run_ghostty_demo = b.addRunArtifact(ghostty_demo);
+    const ghostty_demo_step = b.step("demo-ghostty", "Run the Ghostty NVIDIA performance demo");
+    ghostty_demo_step.dependOn(&run_ghostty_demo.step);
+
+    // ZION CLI Demo
+    const zion_demo = b.addExecutable(.{
+        .name = "zion_cli_demo", 
+        .root_source_file = b.path("examples/zion_cli_demo.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    zion_demo.root_module.addImport("phantom", mod);
+    b.installArtifact(zion_demo);
+
+    const run_zion_demo = b.addRunArtifact(zion_demo);
+    const zion_demo_step = b.step("demo-zion", "Run the ZION CLI interactive demo");
+    zion_demo_step.dependOn(&run_zion_demo.step);
+
+    // Reaper AUR Demo
+    const reaper_demo = b.addExecutable(.{
+        .name = "reaper_aur_demo",
+        .root_source_file = b.path("examples/reaper_aur_demo.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    reaper_demo.root_module.addImport("phantom", mod);
+    b.installArtifact(reaper_demo);
+
+    const run_reaper_demo = b.addRunArtifact(reaper_demo);
+    const reaper_demo_step = b.step("demo-reaper", "Run the Reaper AUR dependencies demo");
+    reaper_demo_step.dependOn(&run_reaper_demo.step);
+
+    // Crypto Package Demo
+    const crypto_demo = b.addExecutable(.{
+        .name = "crypto_package_demo",
+        .root_source_file = b.path("examples/crypto_package_demo.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    crypto_demo.root_module.addImport("phantom", mod);
+    b.installArtifact(crypto_demo);
+
+    const run_crypto_demo = b.addRunArtifact(crypto_demo);
+    const crypto_demo_step = b.step("demo-crypto", "Run the crypto/blockchain package demo");
+    crypto_demo_step.dependOn(&run_crypto_demo.step);
+
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
     // The Zig build system is entirely implemented in userland, which means

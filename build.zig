@@ -145,6 +145,20 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 
+    // Package Manager Demo
+    const pkg_demo = b.addExecutable(.{
+        .name = "simple_package_demo",
+        .root_source_file = b.path("examples/simple_package_demo.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    pkg_demo.root_module.addImport("phantom", mod);
+    b.installArtifact(pkg_demo);
+
+    const run_pkg_demo = b.addRunArtifact(pkg_demo);
+    const pkg_demo_step = b.step("demo-pkg", "Run the package manager demo");
+    pkg_demo_step.dependOn(&run_pkg_demo.step);
+
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
     // The Zig build system is entirely implemented in userland, which means

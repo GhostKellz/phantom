@@ -17,6 +17,7 @@ pub const TextArea = @import("textarea.zig").TextArea;
 // Data display widgets
 pub const ProgressBar = @import("progress.zig").ProgressBar;
 pub const Table = @import("table.zig").Table;
+pub const TaskMonitor = @import("task_monitor.zig").TaskMonitor;
 
 // Advanced widgets
 pub const StreamingText = @import("streaming_text.zig").StreamingText;
@@ -35,6 +36,7 @@ test {
     _ = @import("textarea.zig");
     _ = @import("progress.zig");
     _ = @import("table.zig");
+    _ = @import("task_monitor.zig");
     _ = @import("streaming_text.zig");
     _ = @import("code_block.zig");
 }

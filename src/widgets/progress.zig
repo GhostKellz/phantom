@@ -6,6 +6,7 @@ const Cell = @import("../terminal.zig").Cell;
 const Event = @import("../event.zig").Event;
 const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
+const emoji = @import("../emoji.zig");
 
 const Rect = geometry.Rect;
 const Style = style.Style;
@@ -14,25 +15,31 @@ const Style = style.Style;
 pub const ProgressBar = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
-    
+
     // Progress state
     value: f64 = 0.0,
     max_value: f64 = 100.0,
-    
+
     // Text labels
     label: ?[]const u8 = null,
     show_percentage: bool = true,
     show_value: bool = false,
-    
+    show_emoji: bool = true,
+    show_eta: bool = false,
+
+    // Timing for ETA calculation
+    start_time: i64 = 0,
+
     // Styling
     bar_style: Style,
     fill_style: Style,
     text_style: Style,
-    
+    progress_style: emoji.ProgressStyle = .blocks,
+
     // Characters
     fill_char: u21 = '█',
     empty_char: u21 = '░',
-    
+
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
 
@@ -49,8 +56,9 @@ pub const ProgressBar = struct {
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
             .bar_style = Style.default(),
-            .fill_style = Style.default().withFg(style.Color.green),
+            .fill_style = Style.withFg(style.Color.green),
             .text_style = Style.default(),
+            .start_time = std.time.milliTimestamp(),
         };
         return progress;
     }
@@ -73,16 +81,24 @@ pub const ProgressBar = struct {
         return (self.value / self.max_value) * 100.0;
     }
 
-    pub fn setLabel(self: *ProgressBar, label: ?[]const u8) !void {
-        if (self.label) |old_label| {
-            self.allocator.free(old_label);
-        }
-        
-        if (label) |new_label| {
-            self.label = try self.allocator.dupe(u8, new_label);
-        } else {
-            self.label = null;
-        }
+    pub fn getETA(self: *const ProgressBar) i64 {
+        if (self.value <= 0.0) return -1; // Unknown
+
+        const elapsed = std.time.milliTimestamp() - self.start_time;
+        const progress_ratio = self.value / self.max_value;
+
+        if (progress_ratio <= 0.0) return -1;
+
+        const total_estimated = @as(f64, @floatFromInt(elapsed)) / progress_ratio;
+        const remaining = total_estimated - @as(f64, @floatFromInt(elapsed));
+
+        return @as(i64, @intFromFloat(@max(0.0, remaining)));
+    }
+
+    pub fn setProgressStyle(self: *ProgressBar, progress_style: emoji.ProgressStyle) void {
+        self.progress_style = progress_style;
+        self.fill_char = progress_style.getFilledChar();
+        self.empty_char = progress_style.getEmptyChar();
     }
 
     pub fn setShowPercentage(self: *ProgressBar, show: bool) void {
@@ -91,6 +107,14 @@ pub const ProgressBar = struct {
 
     pub fn setShowValue(self: *ProgressBar, show: bool) void {
         self.show_value = show;
+    }
+
+    pub fn setShowEmoji(self: *ProgressBar, show: bool) void {
+        self.show_emoji = show;
+    }
+
+    pub fn setShowETA(self: *ProgressBar, show: bool) void {
+        self.show_eta = show;
     }
 
     pub fn setBarStyle(self: *ProgressBar, bar_style: Style) void {
@@ -141,11 +165,11 @@ pub const ProgressBar = struct {
 
         // Calculate progress percentage
         const percentage = self.getPercentage();
-        
+
         // Calculate bar area (leave space for text if needed)
         var bar_area = area;
         var text_area: ?Rect = null;
-        
+
         if (self.label != null or self.show_percentage or self.show_value) {
             if (area.height >= 2) {
                 // Text on top, bar below
@@ -159,29 +183,29 @@ pub const ProgressBar = struct {
                 }
             }
         }
-        
+
         // Render text
         if (text_area) |text_rect| {
             // Clear text area
             buffer.fill(text_rect, Cell.withStyle(self.text_style));
-            
+
             // Build text string
             var text_buffer = std.ArrayList(u8).init(self.allocator);
             defer text_buffer.deinit();
-            
+
             if (self.label) |label| {
                 text_buffer.appendSlice(label) catch {};
                 if (self.show_percentage or self.show_value) {
                     text_buffer.appendSlice(" ") catch {};
                 }
             }
-            
+
             if (self.show_percentage) {
                 const percentage_str = std.fmt.allocPrint(self.allocator, "{d:.1}%", .{percentage}) catch "";
                 defer self.allocator.free(percentage_str);
                 text_buffer.appendSlice(percentage_str) catch {};
             }
-            
+
             if (self.show_value) {
                 if (self.show_percentage) {
                     text_buffer.appendSlice(" ") catch {};
@@ -190,21 +214,22 @@ pub const ProgressBar = struct {
                 defer self.allocator.free(value_str);
                 text_buffer.appendSlice(value_str) catch {};
             }
-            
+
             // Render text
             const text_len = @min(text_buffer.items.len, text_rect.width);
             if (text_len > 0) {
                 buffer.writeText(text_rect.x, text_rect.y, text_buffer.items[0..text_len], self.text_style);
             }
         }
-        
+
         // Render progress bar
         if (bar_area.width > 0 and bar_area.height > 0) {
             // Calculate fill width
-            const fill_width = if (self.max_value > 0.0) 
+            const fill_width = if (self.max_value > 0.0)
                 @as(u16, @intFromFloat(@round((self.value / self.max_value) * @as(f64, @floatFromInt(bar_area.width)))))
-            else 0;
-            
+            else
+                0;
+
             // Fill progress bar
             var y = bar_area.y;
             while (y < bar_area.y + bar_area.height) : (y += 1) {

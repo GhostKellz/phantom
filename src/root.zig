@@ -24,6 +24,9 @@ pub const Size = @import("geometry.zig").Size;
 pub const Color = @import("style.zig").Color;
 pub const Style = @import("style.zig").Style;
 
+// Modern UI utilities
+pub const emoji = @import("emoji.zig");
+
 // Async runtime
 pub const runtime = @import("runtime.zig");
 

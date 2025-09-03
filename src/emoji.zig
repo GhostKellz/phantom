@@ -243,7 +243,7 @@ pub fn truncateText(allocator: std.mem.Allocator, text: []const u8, max_width: u
     }
 
     // Simple truncation - could be improved with proper Unicode handling
-    var result = std.ArrayList(u8).init(allocator);
+    var result = std.ArrayList(u8){};
     var width: usize = 0;
     var i: usize = 0;
 
@@ -271,10 +271,10 @@ pub fn truncateText(allocator: std.mem.Allocator, text: []const u8, max_width: u
     }
 
     if (i < text.len) {
-        try result.appendSlice("…");
+        try result.appendSlice(allocator, "…");
     }
 
-    return result.toOwnedSlice();
+    return result.toOwnedSlice(allocator);
 }
 
 test "emoji display width calculation" {

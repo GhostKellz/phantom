@@ -104,7 +104,7 @@ pub const TaskMonitor = struct {
         monitor.* = TaskMonitor{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .tasks = std.ArrayList(Task).init(allocator),
+            .tasks = std.ArrayList(Task){},
             .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
             .task_style = Style.default(),
             .progress_style = Style.withFg(style.Color.green),
@@ -117,7 +117,7 @@ pub const TaskMonitor = struct {
     /// Add a new task to monitor
     pub fn addTask(self: *TaskMonitor, id: []const u8, name: []const u8) !void {
         const task = try Task.init(self.allocator, id, name);
-        try self.tasks.append(task);
+        try self.tasks.append(self.allocator, task);
     }
 
     /// Update task progress (0.0 to 100.0)
@@ -209,17 +209,17 @@ pub const TaskMonitor = struct {
             const active_count = self.getActiveCount();
             const overall_progress = self.getOverallProgress();
 
-            var header_buf = std.ArrayList(u8).init(self.allocator);
-            defer header_buf.deinit();
+            var header_buf = std.ArrayList(u8){};
+            defer header_buf.deinit(self.allocator);
 
             if (self.show_emoji) {
-                header_buf.appendSlice("📋 ") catch {};
+                header_buf.appendSlice(self.allocator, "📋 ") catch {};
             }
 
             const header_text = std.fmt.allocPrint(self.allocator, "Tasks: {}/{} active • {d:.1}% complete", .{ active_count, self.tasks.items.len, overall_progress }) catch "Tasks";
             defer self.allocator.free(header_text);
 
-            header_buf.appendSlice(header_text) catch {};
+            header_buf.appendSlice(self.allocator, header_text) catch {};
 
             // Clear header line
             buffer.fill(Rect.init(area.x, y, area.width, 1), Cell.withStyle(self.header_style));
@@ -257,23 +257,23 @@ pub const TaskMonitor = struct {
         // Clear line
         buffer.fill(Rect.init(x, y, width, 1), Cell.withStyle(self.task_style));
 
-        var line_buf = std.ArrayList(u8).init(self.allocator);
-        defer line_buf.deinit();
+        var line_buf = std.ArrayList(u8){};
+        defer line_buf.deinit(self.allocator);
 
         // Status emoji
         if (self.show_emoji) {
-            line_buf.appendSlice(task.getStatusEmoji()) catch {};
-            line_buf.appendSlice(" ") catch {};
+            line_buf.appendSlice(self.allocator, task.getStatusEmoji()) catch {};
+            line_buf.appendSlice(self.allocator, " ") catch {};
         }
 
         // Task name
-        line_buf.appendSlice(task.name) catch {};
+        line_buf.appendSlice(self.allocator, task.name) catch {};
 
         // Progress
         if (self.show_progress and task.status == .running) {
             const progress_text = std.fmt.allocPrint(self.allocator, " ({d:.1}%)", .{task.progress}) catch "";
             defer self.allocator.free(progress_text);
-            line_buf.appendSlice(progress_text) catch {};
+            line_buf.appendSlice(self.allocator, progress_text) catch {};
         }
 
         // Time
@@ -282,7 +282,7 @@ pub const TaskMonitor = struct {
             const elapsed_sec = @divFloor(elapsed, 1000);
             const time_text = std.fmt.allocPrint(self.allocator, " [{d}s]", .{elapsed_sec}) catch "";
             defer self.allocator.free(time_text);
-            line_buf.appendSlice(time_text) catch {};
+            line_buf.appendSlice(self.allocator, time_text) catch {};
         }
 
         // Choose style
@@ -310,15 +310,15 @@ pub const TaskMonitor = struct {
         if (lines_used < max_height) {
             buffer.fill(Rect.init(x, current_y, width, 1), Cell.withStyle(self.task_style));
 
-            var name_buf = std.ArrayList(u8).init(self.allocator);
-            defer name_buf.deinit();
+            var name_buf = std.ArrayList(u8){};
+            defer name_buf.deinit(self.allocator);
 
             if (self.show_emoji) {
-                name_buf.appendSlice(task.getStatusEmoji()) catch {};
-                name_buf.appendSlice(" ") catch {};
+                name_buf.appendSlice(self.allocator, task.getStatusEmoji()) catch {};
+                name_buf.appendSlice(self.allocator, " ") catch {};
             }
 
-            name_buf.appendSlice(task.name) catch {};
+            name_buf.appendSlice(self.allocator, task.name) catch {};
 
             const task_style = switch (task.status) {
                 .completed => self.completed_style,
@@ -400,7 +400,7 @@ pub const TaskMonitor = struct {
         for (self.tasks.items) |*task| {
             task.deinit(self.allocator);
         }
-        self.tasks.deinit();
+        self.tasks.deinit(self.allocator);
 
         self.allocator.destroy(self);
     }

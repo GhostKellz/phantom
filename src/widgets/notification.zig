@@ -149,7 +149,7 @@ pub const NotificationSystem = struct {
     pub fn init(allocator: std.mem.Allocator) NotificationSystem {
         return NotificationSystem{
             .allocator = allocator,
-            .notifications = std.ArrayList(Notification).init(allocator),
+            .notifications = std.ArrayList(Notification){},
         };
     }
     

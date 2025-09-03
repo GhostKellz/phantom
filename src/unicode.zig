@@ -141,7 +141,7 @@ pub const UnicodeWidth = struct {
 pub const TextWrap = struct {
     /// Wrap text to fit within a given width
     pub fn wrapText(allocator: std.mem.Allocator, text: []const u8, width: u16) !std.ArrayList([]const u8) {
-        var lines = std.ArrayList([]const u8).init(allocator);
+        var lines = std.ArrayList([]const u8){};
         
         if (width == 0) {
             try lines.append(try allocator.dupe(u8, ""));

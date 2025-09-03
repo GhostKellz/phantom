@@ -41,19 +41,19 @@ pub const App = struct {
             .terminal = terminal,
             .event_loop = event_loop,
             .config = config,
-            .widgets = std.ArrayList(*Widget).init(allocator),
+            .widgets = std.ArrayList(*Widget){},
         };
     }
 
     pub fn deinit(self: *App) void {
-        self.widgets.deinit();
+        self.widgets.deinit(self.allocator);
         self.event_loop.deinit();
         self.terminal.deinit();
     }
 
     /// Add a widget to the application
     pub fn addWidget(self: *App, widget: *Widget) !void {
-        try self.widgets.append(widget);
+        try self.widgets.append(self.allocator, widget);
         self.needs_redraw = true;
     }
 

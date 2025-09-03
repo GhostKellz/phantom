@@ -150,8 +150,8 @@ pub const CodeBlock = struct {
             .allocator = allocator,
             .code = try allocator.dupe(u8, code),
             .language = language,
-            .lines = std.ArrayList([]const u8).init(allocator),
-            .tokens = std.ArrayList(Token).init(allocator),
+            .lines = std.ArrayList([]const u8){},
+            .tokens = std.ArrayList(Token){},
             .line_number_style = Style.default().withFg(style.Color.yellow),
             .theme = Theme{},
         };
@@ -226,13 +226,13 @@ pub const CodeBlock = struct {
         var lines_iter = std.mem.split(u8, self.code, "\n");
         while (lines_iter.next()) |line| {
             const owned_line = try self.allocator.dupe(u8, line);
-            try self.lines.append(owned_line);
+            try self.lines.append(self.allocator, owned_line);
         }
         
         // Ensure at least one line exists
         if (self.lines.items.len == 0) {
             const empty_line = try self.allocator.dupe(u8, "");
-            try self.lines.append(empty_line);
+            try self.lines.append(self.allocator, empty_line);
         }
     }
 
@@ -258,7 +258,7 @@ pub const CodeBlock = struct {
     }
 
     fn tokenizeNone(self: *CodeBlock) !void {
-        try self.tokens.append(Token{
+        try self.tokens.append(self.allocator, Token{
             .text = self.code,
             .type = .text,
             .style = self.theme.getStyle(.text),
@@ -411,7 +411,7 @@ pub const CodeBlock = struct {
 
     fn tokenizeMarkdown(self: *CodeBlock) !void {
         // Simple markdown tokenization
-        try self.tokens.append(Token{
+        try self.tokens.append(self.allocator, Token{
             .text = self.code,
             .type = .text,
             .style = self.theme.getStyle(.text),
@@ -440,7 +440,7 @@ pub const CodeBlock = struct {
                     comment_end += 1;
                 }
                 
-                try self.tokens.append(Token{
+                try self.tokens.append(self.allocator, Token{
                     .text = self.code[i..comment_end],
                     .type = .comment,
                     .style = self.theme.getStyle(.comment),
@@ -470,7 +470,7 @@ pub const CodeBlock = struct {
                     comment_end += 1;
                 }
                 
-                try self.tokens.append(Token{
+                try self.tokens.append(self.allocator, Token{
                     .text = self.code[i..comment_end],
                     .type = .comment,
                     .style = self.theme.getStyle(.comment),
@@ -502,7 +502,7 @@ pub const CodeBlock = struct {
                     string_end += 1; // Include closing quote
                 }
                 
-                try self.tokens.append(Token{
+                try self.tokens.append(self.allocator, Token{
                     .text = self.code[i..string_end],
                     .type = .string,
                     .style = self.theme.getStyle(.string),
@@ -531,7 +531,7 @@ pub const CodeBlock = struct {
                     number_end += 1;
                 }
                 
-                try self.tokens.append(Token{
+                try self.tokens.append(self.allocator, Token{
                     .text = self.code[i..number_end],
                     .type = .number,
                     .style = self.theme.getStyle(.number),
@@ -549,7 +549,7 @@ pub const CodeBlock = struct {
                     try self.addGenericToken(self.code[token_start..i], keywords, types);
                 }
                 
-                try self.tokens.append(Token{
+                try self.tokens.append(self.allocator, Token{
                     .text = self.code[i..i + 1],
                     .type = if (std.mem.indexOfScalar(u8, "+-*/%=<>!&|^~?:", c) != null) .operator else .delimiter,
                     .style = self.theme.getStyle(if (std.mem.indexOfScalar(u8, "+-*/%=<>!&|^~?:", c) != null) .operator else .delimiter),
@@ -599,7 +599,7 @@ pub const CodeBlock = struct {
                     }
                 }
                 
-                try self.tokens.append(Token{
+                try self.tokens.append(self.allocator, Token{
                     .text = word,
                     .type = token_type,
                     .style = self.theme.getStyle(token_type),
@@ -614,7 +614,7 @@ pub const CodeBlock = struct {
                 }
                 
                 if (i > start) {
-                    try self.tokens.append(Token{
+                    try self.tokens.append(self.allocator, Token{
                         .text = text[start..i],
                         .type = .text,
                         .style = self.theme.getStyle(.text),
@@ -796,9 +796,9 @@ pub const CodeBlock = struct {
         for (self.lines.items) |line| {
             self.allocator.free(line);
         }
-        self.lines.deinit();
+        self.lines.deinit(self.allocator);
         
-        self.tokens.deinit();
+        self.tokens.deinit(self.allocator);
         self.allocator.free(self.code);
         self.allocator.destroy(self);
     }

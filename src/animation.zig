@@ -206,17 +206,17 @@ pub const Animation = struct {
     pub fn init(allocator: std.mem.Allocator, duration_ms: u64) Animation {
         return Animation{
             .allocator = allocator,
-            .keyframes = std.ArrayList(Keyframe).init(allocator),
+            .keyframes = std.ArrayList(Keyframe){},
             .duration_ms = duration_ms,
         };
     }
     
     pub fn deinit(self: *Animation) void {
-        self.keyframes.deinit();
+        self.keyframes.deinit(self.allocator);
     }
     
     pub fn addKeyframe(self: *Animation, keyframe: Keyframe) !void {
-        try self.keyframes.append(keyframe);
+        try self.keyframes.append(self.allocator, keyframe);
         
         // Sort keyframes by time
         std.sort.block(Keyframe, self.keyframes.items, {}, struct {
@@ -409,16 +409,16 @@ pub const AnimationManager = struct {
     pub fn init(allocator: std.mem.Allocator) AnimationManager {
         return AnimationManager{
             .allocator = allocator,
-            .animations = std.ArrayList(*Animation).init(allocator),
+            .animations = std.ArrayList(*Animation){},
         };
     }
     
     pub fn deinit(self: *AnimationManager) void {
-        self.animations.deinit();
+        self.animations.deinit(self.allocator);
     }
     
     pub fn addAnimation(self: *AnimationManager, animation: *Animation) !void {
-        try self.animations.append(animation);
+        try self.animations.append(self.allocator, animation);
     }
     
     pub fn removeAnimation(self: *AnimationManager, animation: *Animation) void {

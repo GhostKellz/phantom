@@ -439,8 +439,8 @@ pub const ClipboardEvent = struct {
 /// Utility functions for clipboard integration
 pub const ClipboardUtils = struct {
     /// Sanitize text for clipboard (remove null bytes, etc.)
-    pub fn sanitizeText(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
-        var sanitized = std.ArrayList(u8).init(allocator);
+    pub fn sanitizeText(_: std.mem.Allocator, text: []const u8) ![]u8 {
+        var sanitized = std.ArrayList(u8){};
         defer sanitized.deinit();
         
         for (text) |char| {
@@ -453,13 +453,13 @@ pub const ClipboardUtils = struct {
     }
     
     /// Convert line endings to platform-specific format
-    pub fn normalizeLineEndings(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
+    pub fn normalizeLineEndings(_: std.mem.Allocator, text: []const u8) ![]u8 {
         const line_ending = switch (builtin.os.tag) {
             .windows => "\r\n",
             else => "\n",
         };
         
-        var result = std.ArrayList(u8).init(allocator);
+        var result = std.ArrayList(u8){};
         defer result.deinit();
         
         var i: usize = 0;
@@ -484,8 +484,8 @@ pub const ClipboardUtils = struct {
     }
     
     /// Escape special characters for shell commands
-    pub fn escapeForShell(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
-        var result = std.ArrayList(u8).init(allocator);
+    pub fn escapeForShell(_: std.mem.Allocator, text: []const u8) ![]u8 {
+        var result = std.ArrayList(u8){};
         defer result.deinit();
         
         for (text) |char| {

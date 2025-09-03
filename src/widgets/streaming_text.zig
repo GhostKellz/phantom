@@ -65,9 +65,9 @@ pub const StreamingText = struct {
         streaming_text.* = StreamingText{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .text = std.ArrayList(u8).init(allocator),
-            .lines = std.ArrayList([]const u8).init(allocator),
-            .chunk_buffer = std.ArrayList(u8).init(allocator),
+            .text = std.ArrayList(u8){},
+            .lines = std.ArrayList([]const u8){},
+            .chunk_buffer = std.ArrayList(u8){},
             .text_style = Style.default(),
             .streaming_style = Style.default().withFg(style.Color.cyan),
             .cursor_style = Style.default().withFg(style.Color.white).withBg(style.Color.blue),
@@ -201,7 +201,7 @@ pub const StreamingText = struct {
             var lines_iter = std.mem.split(u8, self.text.items, "\n");
             while (lines_iter.next()) |line| {
                 const owned_line = try self.allocator.dupe(u8, line);
-                try self.lines.append(owned_line);
+                try self.lines.append(self.allocator, owned_line);
             }
         } else {
             // Word wrapping
@@ -216,7 +216,7 @@ pub const StreamingText = struct {
         // Ensure at least one line exists
         if (self.lines.items.len == 0) {
             const empty_line = try self.allocator.dupe(u8, "");
-            try self.lines.append(empty_line);
+            try self.lines.append(self.allocator, empty_line);
         }
     }
 
@@ -241,7 +241,7 @@ pub const StreamingText = struct {
             }
             
             const wrapped_line = try self.allocator.dupe(u8, line[start..break_point]);
-            try self.lines.append(wrapped_line);
+            try self.lines.append(self.allocator, wrapped_line);
             
             start = break_point;
             if (start < line.len and line[start] == ' ') {
@@ -414,10 +414,10 @@ pub const StreamingText = struct {
         for (self.lines.items) |line| {
             self.allocator.free(line);
         }
-        self.lines.deinit();
+        self.lines.deinit(self.allocator);
         
-        self.text.deinit();
-        self.chunk_buffer.deinit();
+        self.text.deinit(self.allocator);
+        self.chunk_buffer.deinit(self.allocator);
         self.allocator.destroy(self);
     }
 };

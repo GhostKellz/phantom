@@ -221,8 +221,7 @@ pub const Terminal = struct {
 
     fn writeAnsi(self: *Terminal, data: []const u8) !void {
         _ = self;
-        const stdout = std.fs.File.stdout().deprecatedWriter();
-        try stdout.writeAll(data);
+        try std.fs.File.stdout().writeAll(data);
     }
 };
 

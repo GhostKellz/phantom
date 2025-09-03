@@ -149,16 +149,16 @@ pub const EventLoop = struct {
     pub fn init(allocator: std.mem.Allocator) EventLoop {
         return EventLoop{
             .allocator = allocator,
-            .handlers = std.ArrayList(EventHandler).init(allocator),
+            .handlers = std.ArrayList(EventHandler){},
         };
     }
 
     pub fn deinit(self: *EventLoop) void {
-        self.handlers.deinit();
+        self.handlers.deinit(self.allocator);
     }
 
     pub fn addHandler(self: *EventLoop, handler: EventHandler) !void {
-        try self.handlers.append(handler);
+        try self.handlers.append(self.allocator, handler);
     }
 
     pub fn removeHandler(self: *EventLoop, handler: EventHandler) void {
@@ -195,7 +195,7 @@ pub const EventLoop = struct {
             }
 
             // Sleep for tick interval
-            std.time.sleep(self.tick_interval_ms * 1_000_000); // Convert ms to ns
+            std.Thread.sleep(self.tick_interval_ms * 1_000_000); // Convert ms to ns
         }
     }
 

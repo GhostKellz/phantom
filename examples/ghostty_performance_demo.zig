@@ -160,7 +160,7 @@ pub fn main() !void {
         if (!app.running) break;
 
         // Small delay to prevent spinning
-        std.time.sleep(16_000_000); // ~60 FPS update loop
+        std.Thread.sleep(16_000_000); // ~60 FPS update loop
     }
 
     std.log.info("👻 Ghostty Performance Monitor terminated gracefully\n", .{});

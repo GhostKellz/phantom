@@ -206,9 +206,9 @@ pub const BlockchainPackageBrowser = struct {
         browser.* = BlockchainPackageBrowser{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .packages = std.ArrayList(BlockchainPackage).init(allocator),
-            .filtered_packages = std.ArrayList(usize).init(allocator),
-            .search_query = std.ArrayList(u8).init(allocator),
+            .packages = std.ArrayList(BlockchainPackage){},
+            .filtered_packages = std.ArrayList(usize){},
+            .search_query = std.ArrayList(u8){},
             .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
             .package_style = Style.withFg(style.Color.white),
             .selected_style = Style.withFg(style.Color.bright_yellow).withBold(),
@@ -233,7 +233,7 @@ pub const BlockchainPackageBrowser = struct {
             .category = .consensus,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.bitcoin);
+                try networks.append(self.allocator, .bitcoin);
                 break :blk networks;
             },
             .repository_url = "https://github.com/zigbitcoin/consensus",
@@ -249,7 +249,7 @@ pub const BlockchainPackageBrowser = struct {
             .category = .consensus,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.ethereum);
+                try networks.append(self.allocator, .ethereum);
                 break :blk networks;
             },
             .is_audited = true,
@@ -265,8 +265,8 @@ pub const BlockchainPackageBrowser = struct {
             .category = .cryptography,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.bitcoin);
-                try networks.append(.ethereum);
+                try networks.append(self.allocator, .bitcoin);
+                try networks.append(self.allocator, .ethereum);
                 break :blk networks;
             },
             .is_audited = true,
@@ -281,7 +281,7 @@ pub const BlockchainPackageBrowser = struct {
             .category = .cryptography,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.solana);
+                try networks.append(self.allocator, .solana);
                 try networks.append(.cardano);
                 break :blk networks;
             },
@@ -297,7 +297,7 @@ pub const BlockchainPackageBrowser = struct {
             .category = .cryptography,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.ethereum);
+                try networks.append(self.allocator, .ethereum);
                 try networks.append(.polygon);
                 break :blk networks;
             },
@@ -314,7 +314,7 @@ pub const BlockchainPackageBrowser = struct {
             .category = .networking,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.ethereum);
+                try networks.append(self.allocator, .ethereum);
                 try networks.append(.polkadot);
                 break :blk networks;
             },
@@ -330,7 +330,7 @@ pub const BlockchainPackageBrowser = struct {
             .category = .networking,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.solana);
+                try networks.append(self.allocator, .solana);
                 try networks.append(.avalanche);
                 break :blk networks;
             },
@@ -378,7 +378,7 @@ pub const BlockchainPackageBrowser = struct {
             .category = .rpc,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.ethereum);
+                try networks.append(self.allocator, .ethereum);
                 try networks.append(.polygon);
                 try networks.append(.arbitrum);
                 break :blk networks;
@@ -395,7 +395,7 @@ pub const BlockchainPackageBrowser = struct {
             .category = .rpc,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.solana);
+                try networks.append(self.allocator, .solana);
                 break :blk networks;
             },
             .is_audited = false,
@@ -411,8 +411,8 @@ pub const BlockchainPackageBrowser = struct {
             .category = .wallet,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.bitcoin);
-                try networks.append(.ethereum);
+                try networks.append(self.allocator, .bitcoin);
+                try networks.append(self.allocator, .ethereum);
                 break :blk networks;
             },
             .is_audited = true,
@@ -443,7 +443,7 @@ pub const BlockchainPackageBrowser = struct {
             .category = .defi,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.ethereum);
+                try networks.append(self.allocator, .ethereum);
                 try networks.append(.polygon);
                 break :blk networks;
             },
@@ -459,7 +459,7 @@ pub const BlockchainPackageBrowser = struct {
             .category = .defi,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.ethereum);
+                try networks.append(self.allocator, .ethereum);
                 try networks.append(.avalanche);
                 break :blk networks;
             },
@@ -476,7 +476,7 @@ pub const BlockchainPackageBrowser = struct {
             .category = .nft,
             .networks = blk: {
                 var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.ethereum);
+                try networks.append(self.allocator, .ethereum);
                 try networks.append(.polygon);
                 break :blk networks;
             },
@@ -697,10 +697,10 @@ pub const BlockchainPackageBrowser = struct {
         
         // Networks
         var network_text = std.ArrayList(u8).init(self.allocator);
-        defer network_text.deinit();
+        defer network_text.deinit(self.allocator);
         
         for (pkg.networks.items, 0..) |network, i| {
-            if (i > 0) network_text.appendSlice(", ") catch break;
+            if (i > 0) network_text.appendSlice(self.allocator, ", ") catch break;
             network_text.appendSlice(network.getIcon()) catch break;
         }
         
@@ -936,12 +936,12 @@ pub const BlockchainPackageBrowser = struct {
             if (pkg.description) |d| self.allocator.free(d);
             if (pkg.repository_url) |u| self.allocator.free(u);
             if (pkg.documentation_url) |u| self.allocator.free(u);
-            pkg.networks.deinit();
-            pkg.dependencies.deinit();
+            pkg.networks.deinit(self.allocator);
+            pkg.dependencies.deinit(self.allocator);
         }
-        self.packages.deinit();
-        self.filtered_packages.deinit();
-        self.search_query.deinit();
+        self.packages.deinit(self.allocator);
+        self.filtered_packages.deinit(self.allocator);
+        self.search_query.deinit(self.allocator);
         
         self.allocator.destroy(self);
     }

@@ -190,13 +190,13 @@ pub const ProgressBar = struct {
             buffer.fill(text_rect, Cell.withStyle(self.text_style));
 
             // Build text string
-            var text_buffer = std.ArrayList(u8).init(self.allocator);
+            var text_buffer = std.ArrayList(u8){};
             defer text_buffer.deinit();
 
             if (self.label) |label| {
                 text_buffer.appendSlice(label) catch {};
                 if (self.show_percentage or self.show_value) {
-                    text_buffer.appendSlice(" ") catch {};
+                    text_buffer.appendSlice(self.allocator, " ") catch {};
                 }
             }
 
@@ -208,7 +208,7 @@ pub const ProgressBar = struct {
 
             if (self.show_value) {
                 if (self.show_percentage) {
-                    text_buffer.appendSlice(" ") catch {};
+                    text_buffer.appendSlice(self.allocator, " ") catch {};
                 }
                 const value_str = std.fmt.allocPrint(self.allocator, "({d:.1}/{d:.1})", .{ self.value, self.max_value }) catch "";
                 defer self.allocator.free(value_str);

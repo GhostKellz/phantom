@@ -168,10 +168,10 @@ pub const UniversalPackageBrowser = struct {
         browser.* = UniversalPackageBrowser{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .packages = std.ArrayList(Package).init(allocator),
-            .filtered_packages = std.ArrayList(usize).init(allocator),
-            .repositories = std.ArrayList(Repository).init(allocator),
-            .search_input = std.ArrayList(u8).init(allocator),
+            .packages = std.ArrayList(Package){},
+            .filtered_packages = std.ArrayList(usize){},
+            .repositories = std.ArrayList(Repository){},
+            .search_input = std.ArrayList(u8){},
             .search_options = SearchOptions{},
             .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
             .package_style = Style.withFg(style.Color.white),
@@ -286,7 +286,7 @@ pub const UniversalPackageBrowser = struct {
 
     /// Add a repository to the list
     pub fn addRepository(self: *UniversalPackageBrowser, repo: Repository) !void {
-        try self.repositories.append(repo);
+        try self.repositories.append(self.allocator, repo);
     }
 
     /// Search packages across all enabled repositories
@@ -302,8 +302,8 @@ pub const UniversalPackageBrowser = struct {
             if (pkg.description) |d| self.allocator.free(d);
             if (pkg.maintainer) |m| self.allocator.free(m);
             if (pkg.url) |u| self.allocator.free(u);
-            pkg.tags.deinit();
-            pkg.dependencies.deinit();
+            pkg.tags.deinit(self.allocator);
+            pkg.dependencies.deinit(self.allocator);
         }
         self.packages.clearRetainingCapacity();
         
@@ -368,7 +368,7 @@ pub const UniversalPackageBrowser = struct {
                 .dependencies = std.ArrayList([]const u8).init(self.allocator),
             };
             
-            try self.packages.append(pkg);
+            try self.packages.append(self.allocator, pkg);
         }
     }
 
@@ -401,7 +401,7 @@ pub const UniversalPackageBrowser = struct {
                 .dependencies = std.ArrayList([]const u8).init(self.allocator),
             };
             
-            try self.packages.append(pkg);
+            try self.packages.append(self.allocator, pkg);
         }
     }
 
@@ -427,7 +427,7 @@ pub const UniversalPackageBrowser = struct {
                 .dependencies = std.ArrayList([]const u8).init(self.allocator),
             };
             
-            try self.packages.append(pkg);
+            try self.packages.append(self.allocator, pkg);
         }
     }
 
@@ -449,7 +449,7 @@ pub const UniversalPackageBrowser = struct {
                 .dependencies = std.ArrayList([]const u8).init(self.allocator),
             };
             
-            try self.packages.append(pkg);
+            try self.packages.append(self.allocator, pkg);
         }
     }
 
@@ -475,7 +475,7 @@ pub const UniversalPackageBrowser = struct {
                 .dependencies = std.ArrayList([]const u8).init(self.allocator),
             };
             
-            try self.packages.append(pkg);
+            try self.packages.append(self.allocator, pkg);
         }
     }
 
@@ -735,7 +735,7 @@ pub const UniversalPackageBrowser = struct {
                 // Word wrap description
                 const words = std.mem.split(u8, desc, " ");
                 var line = std.ArrayList(u8).init(self.allocator);
-                defer line.deinit();
+                defer line.deinit(self.allocator);
                 
                 var word_iter = words;
                 while (word_iter.next()) |word| {
@@ -946,10 +946,10 @@ pub const UniversalPackageBrowser = struct {
             if (pkg.description) |d| self.allocator.free(d);
             if (pkg.maintainer) |m| self.allocator.free(m);
             if (pkg.url) |u| self.allocator.free(u);
-            pkg.tags.deinit();
-            pkg.dependencies.deinit();
+            pkg.tags.deinit(self.allocator);
+            pkg.dependencies.deinit(self.allocator);
         }
-        self.packages.deinit();
+        self.packages.deinit(self.allocator);
         
         // Free repositories
         for (self.repositories.items) |*repo| {
@@ -957,10 +957,10 @@ pub const UniversalPackageBrowser = struct {
             self.allocator.free(repo.url);
             if (repo.api_endpoint) |endpoint| self.allocator.free(endpoint);
         }
-        self.repositories.deinit();
+        self.repositories.deinit(self.allocator);
         
-        self.filtered_packages.deinit();
-        self.search_input.deinit();
+        self.filtered_packages.deinit(self.allocator);
+        self.search_input.deinit(self.allocator);
         
         if (self.status_message) |msg| {
             self.allocator.free(msg);

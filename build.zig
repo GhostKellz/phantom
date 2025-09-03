@@ -148,9 +148,11 @@ pub fn build(b: *std.Build) void {
     // Package Manager Demo
     const pkg_demo = b.addExecutable(.{
         .name = "simple_package_demo",
-        .root_source_file = b.path("examples/simple_package_demo.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/simple_package_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     pkg_demo.root_module.addImport("phantom", mod);
     b.installArtifact(pkg_demo);
@@ -162,9 +164,11 @@ pub fn build(b: *std.Build) void {
     // Ghostty Performance Demo  
     const ghostty_demo = b.addExecutable(.{
         .name = "ghostty_performance_demo",
-        .root_source_file = b.path("examples/ghostty_performance_demo.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/ghostty_performance_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     ghostty_demo.root_module.addImport("phantom", mod);
     b.installArtifact(ghostty_demo);
@@ -176,9 +180,11 @@ pub fn build(b: *std.Build) void {
     // ZION CLI Demo
     const zion_demo = b.addExecutable(.{
         .name = "zion_cli_demo", 
-        .root_source_file = b.path("examples/zion_cli_demo.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/zion_cli_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     zion_demo.root_module.addImport("phantom", mod);
     b.installArtifact(zion_demo);
@@ -190,9 +196,11 @@ pub fn build(b: *std.Build) void {
     // Reaper AUR Demo
     const reaper_demo = b.addExecutable(.{
         .name = "reaper_aur_demo",
-        .root_source_file = b.path("examples/reaper_aur_demo.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/reaper_aur_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     reaper_demo.root_module.addImport("phantom", mod);
     b.installArtifact(reaper_demo);
@@ -204,9 +212,11 @@ pub fn build(b: *std.Build) void {
     // Crypto Package Demo
     const crypto_demo = b.addExecutable(.{
         .name = "crypto_package_demo",
-        .root_source_file = b.path("examples/crypto_package_demo.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/crypto_package_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     crypto_demo.root_module.addImport("phantom", mod);
     b.installArtifact(crypto_demo);

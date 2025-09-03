@@ -23,10 +23,10 @@ const TextLine = struct {
     content: std.ArrayList(u8),
     wrapped_lines: std.ArrayList([]const u8),
     
-    pub fn init(allocator: std.mem.Allocator) TextLine {
+    pub fn init(_: std.mem.Allocator) TextLine {
         return TextLine{
-            .content = std.ArrayList(u8).init(allocator),
-            .wrapped_lines = std.ArrayList([]const u8).init(allocator),
+            .content = std.ArrayList(u8){},
+            .wrapped_lines = std.ArrayList([]const u8){},
         };
     }
     
@@ -120,7 +120,7 @@ pub const TextArea = struct {
 
     pub fn init(allocator: std.mem.Allocator) !*TextArea {
         const textarea = try allocator.create(TextArea);
-        var lines = std.ArrayList(TextLine).init(allocator);
+        var lines = std.ArrayList(TextLine){};
         try lines.append(TextLine.init(allocator));
         
         textarea.* = TextArea{
@@ -172,7 +172,7 @@ pub const TextArea = struct {
     }
 
     pub fn getText(self: *const TextArea) ![]const u8 {
-        var result = std.ArrayList(u8).init(self.allocator);
+        var result = std.ArrayList(u8){};
         
         for (self.lines.items, 0..) |line, i| {
             try result.appendSlice(line.content.items);

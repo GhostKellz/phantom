@@ -98,8 +98,8 @@ pub fn main() !void {
     defer app.deinit();
 
     // Create sample Reaper package with realistic dependencies
-    const reaper_package = try createReaperPackage(allocator);
-    defer freePackage(allocator, reaper_package);
+    var reaper_package = try createReaperPackage(allocator);
+    defer freePackage(allocator, &reaper_package);
     
     // Print out demo information
     std.log.info("📦 Created sample REAPER package with {d} dependencies\n", .{reaper_package.dependencies.items.len});
@@ -112,22 +112,22 @@ pub fn main() !void {
 
     // Simple demo showing package analysis
     std.log.info("🔍 Analyzing package dependencies...\n", .{});
-    std.time.sleep(1_000_000_000); // 1 second
+    std.Thread.sleep(1_000_000_000); // 1 second
     
     std.log.info("📊 Dependency analysis complete!\n", .{});
     for (reaper_package.dependencies.items, 0..) |dep, i| {
         std.log.info("  {d}. {s} [{s}] - {s}\n", .{ i + 1, dep.dependency_type.getIcon(), dep.repo, dep.name });
-        std.time.sleep(100_000_000); // 100ms between items
+        std.Thread.sleep(100_000_000); // 100ms between items
     }
 
     std.log.info("🎶 Reaper AUR analysis completed!\n", .{});
 }
 
 fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
-    var dependencies = std.ArrayList(AURDependencies.PackageDependency).init(allocator);
+    var dependencies = std.ArrayList(AURDependencies.PackageDependency){};
     
     // Runtime dependencies
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "glibc",
         .version_constraint = ">=2.17",
         .dependency_type = .depends,
@@ -137,7 +137,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
         .install_size = 12000,
     });
     
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "alsa-lib",
         .dependency_type = .depends,
         .status = .installed,
@@ -146,7 +146,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
         .install_size = 1500,
     });
     
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "jack2",
         .dependency_type = .depends,
         .status = .available,
@@ -155,7 +155,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
         .install_size = 850,
     });
     
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "libx11",
         .dependency_type = .depends,
         .status = .installed,
@@ -164,7 +164,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
         .install_size = 2200,
     });
     
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "gtk3",
         .dependency_type = .depends,
         .status = .installed,
@@ -174,7 +174,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
     });
     
     // Optional dependencies
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "wine",
         .dependency_type = .optdepends,
         .status = .available,
@@ -183,7 +183,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
         .install_size = 45000,
     });
     
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "vst-bridge",
         .dependency_type = .optdepends,
         .status = .missing,
@@ -192,7 +192,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
         .install_size = 120,
     });
     
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "pulseaudio",
         .dependency_type = .optdepends,
         .status = .installed,
@@ -201,7 +201,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
         .install_size = 3200,
     });
     
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "pipewire",
         .dependency_type = .optdepends,
         .status = .available,
@@ -211,7 +211,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
     });
     
     // Build dependencies
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "unzip",
         .dependency_type = .makedepends,
         .status = .installed,
@@ -220,7 +220,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
         .install_size = 150,
     });
     
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "p7zip",
         .dependency_type = .makedepends,
         .status = .installed,
@@ -230,7 +230,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
     });
     
     // Audio production optional deps
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "ardour",
         .dependency_type = .optdepends,
         .status = .available,
@@ -239,7 +239,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
         .install_size = 45000,
     });
     
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "linvst",
         .dependency_type = .optdepends,
         .status = .missing,
@@ -248,7 +248,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
         .install_size = 200,
     });
     
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "yabridge",
         .dependency_type = .optdepends,
         .status = .available,
@@ -258,7 +258,7 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
     });
     
     // Conflicting packages
-    try dependencies.append(AURDependencies.PackageDependency{
+    try dependencies.append(allocator, AURDependencies.PackageDependency{
         .name = "reaper-bin",
         .dependency_type = .conflicts,
         .status = .missing,
@@ -278,10 +278,9 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
     };
 }
 
-fn freePackage(allocator: std.mem.Allocator, package: AURDependencies.Package) void {
+fn freePackage(allocator: std.mem.Allocator, package: *AURDependencies.Package) void {
     // Note: In this demo, strings are literals, not allocated memory
-    _ = allocator;
-    package.dependencies.deinit();
+    package.dependencies.deinit(allocator);
 }
 
 

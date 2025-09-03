@@ -123,7 +123,7 @@ pub const ContextMenu = struct {
         menu.* = ContextMenu{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .items = std.ArrayList(MenuItem).init(allocator),
+            .items = std.ArrayList(MenuItem){},
             .item_style = Style.default().withFg(style.Color.white).withBg(style.Color.black),
             .selected_style = Style.default().withFg(style.Color.white).withBg(style.Color.blue),
             .disabled_style = Style.default().withFg(style.Color.bright_black).withBg(style.Color.black),
@@ -141,7 +141,7 @@ pub const ContextMenu = struct {
         if (item.shortcut) |shortcut| {
             owned_item.shortcut = try self.allocator.dupe(u8, shortcut);
         }
-        try self.items.append(owned_item);
+        try self.items.append(self.allocator, owned_item);
     }
 
     pub fn addSeparator(self: *ContextMenu) !void {
@@ -470,7 +470,7 @@ pub const ContextMenu = struct {
                 self.allocator.free(shortcut);
             }
         }
-        self.items.deinit();
+        self.items.deinit(self.allocator);
         
         self.allocator.destroy(self);
     }

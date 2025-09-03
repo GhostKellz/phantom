@@ -92,18 +92,18 @@ pub const Attributes = packed struct {
     }
 
     pub fn ansiCodes(self: Attributes, allocator: std.mem.Allocator) ![]const u8 {
-        var codes = std.ArrayList(u8).init(allocator);
-        defer codes.deinit();
+        var codes = std.ArrayList(u8){};
+        defer codes.deinit(allocator);
 
-        if (self.bold) try codes.appendSlice("\x1b[1m");
-        if (self.italic) try codes.appendSlice("\x1b[3m");
-        if (self.underline) try codes.appendSlice("\x1b[4m");
-        if (self.strikethrough) try codes.appendSlice("\x1b[9m");
-        if (self.dim) try codes.appendSlice("\x1b[2m");
-        if (self.reverse) try codes.appendSlice("\x1b[7m");
-        if (self.blink) try codes.appendSlice("\x1b[5m");
+        if (self.bold) try codes.appendSlice(allocator, "\x1b[1m");
+        if (self.italic) try codes.appendSlice(allocator, "\x1b[3m");
+        if (self.underline) try codes.appendSlice(allocator, "\x1b[4m");
+        if (self.strikethrough) try codes.appendSlice(allocator, "\x1b[9m");
+        if (self.dim) try codes.appendSlice(allocator, "\x1b[2m");
+        if (self.reverse) try codes.appendSlice(allocator, "\x1b[7m");
+        if (self.blink) try codes.appendSlice(allocator, "\x1b[5m");
 
-        return codes.toOwnedSlice();
+        return codes.toOwnedSlice(allocator);
     }
 };
 
@@ -151,28 +151,28 @@ pub const Style = struct {
 
     /// Generate ANSI escape codes for this style
     pub fn ansiCodes(self: Style, allocator: std.mem.Allocator) ![]const u8 {
-        var codes = std.ArrayList(u8).init(allocator);
-        defer codes.deinit();
+        var codes = std.ArrayList(u8){};
+        defer codes.deinit(allocator);
 
         // Reset first
-        try codes.appendSlice("\x1b[0m");
+        try codes.appendSlice(allocator, "\x1b[0m");
 
         // Foreground color
         if (self.fg) |fg| {
-            try codes.appendSlice(fg.ansiCode(false));
+            try codes.appendSlice(allocator, fg.ansiCode(false));
         }
 
         // Background color
         if (self.bg) |bg| {
-            try codes.appendSlice(bg.ansiCode(true));
+            try codes.appendSlice(allocator, bg.ansiCode(true));
         }
 
         // Attributes
         const attr_codes = try self.attributes.ansiCodes(allocator);
         defer allocator.free(attr_codes);
-        try codes.appendSlice(attr_codes);
+        try codes.appendSlice(allocator, attr_codes);
 
-        return codes.toOwnedSlice();
+        return codes.toOwnedSlice(allocator);
     }
 };
 

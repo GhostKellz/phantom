@@ -103,7 +103,7 @@ pub const Dialog = struct {
             .title = try allocator.dupe(u8, title),
             .message = try allocator.dupe(u8, message),
             .dialog_type = dialog_type,
-            .buttons = std.ArrayList(DialogButton).init(allocator),
+            .buttons = std.ArrayList(DialogButton){},
             .title_style = Style.default().withFg(style.Color.bright_white).withBold(),
             .message_style = Style.default().withFg(style.Color.white),
             .button_style = Style.default().withFg(style.Color.white).withBg(style.Color.blue),
@@ -142,7 +142,7 @@ pub const Dialog = struct {
     pub fn addButton(self: *Dialog, button: DialogButton) !void {
         var owned_button = button;
         owned_button.text = try self.allocator.dupe(u8, button.text);
-        try self.buttons.append(owned_button);
+        try self.buttons.append(self.allocator, owned_button);
     }
 
     pub fn clearButtons(self: *Dialog) void {
@@ -567,7 +567,7 @@ pub const Dialog = struct {
         for (self.buttons.items) |button| {
             self.allocator.free(button.text);
         }
-        self.buttons.deinit();
+        self.buttons.deinit(self.allocator);
         
         self.allocator.destroy(self);
     }

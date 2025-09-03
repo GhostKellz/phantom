@@ -87,24 +87,24 @@ pub const Table = struct {
         table.* = Table{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .columns = std.ArrayList(Column).init(allocator),
-            .rows = std.ArrayList(Row).init(allocator),
+            .columns = std.ArrayList(Column){},
+            .rows = std.ArrayList(Row){},
             .header_style = Style.default().withBold(),
             .row_style = Style.default(),
             .selected_style = Style.default().withBg(style.Color.blue),
             .border_style = Style.default(),
-            .calculated_widths = std.ArrayList(u16).init(allocator),
+            .calculated_widths = std.ArrayList(u16){},
         };
         return table;
     }
 
     pub fn addColumn(self: *Table, column: Column) !void {
-        try self.columns.append(column);
-        try self.calculated_widths.append(0);
+        try self.columns.append(self.allocator, column);
+        try self.calculated_widths.append(self.allocator, 0);
     }
 
     pub fn addRow(self: *Table, row: Row) !void {
-        try self.rows.append(row);
+        try self.rows.append(self.allocator, row);
         if (self.selectable and self.selected_row == null and self.rows.items.len > 0) {
             self.selected_row = 0;
         }
@@ -460,9 +460,9 @@ pub const Table = struct {
 
     fn deinit(widget: *Widget) void {
         const self: *Table = @fieldParentPtr("widget", widget);
-        self.columns.deinit();
-        self.rows.deinit();
-        self.calculated_widths.deinit();
+        self.columns.deinit(self.allocator);
+        self.rows.deinit(self.allocator);
+        self.calculated_widths.deinit(self.allocator);
         self.allocator.destroy(self);
     }
 };

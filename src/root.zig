@@ -32,7 +32,7 @@ pub const runtime = @import("runtime.zig");
 
 // For compatibility with existing code
 pub fn bufferedPrint() !void {
-    const stdout_file = std.fs.File.stdout().deprecatedWriter();
+    const stdout_file = std.fs.File.stdout().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
     try stdout.print("Phantom TUI Framework initialized!\n", .{});

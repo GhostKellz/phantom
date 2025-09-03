@@ -50,7 +50,7 @@ pub const DirtyRegionManager = struct {
     pub fn init(allocator: std.mem.Allocator, screen_size: geometry.Size) DirtyRegionManager {
         return DirtyRegionManager{
             .allocator = allocator,
-            .dirty_rects = std.ArrayList(DirtyRect).init(allocator),
+            .dirty_rects = std.ArrayList(DirtyRect){},
             .screen_size = screen_size,
         };
     }

@@ -47,7 +47,7 @@ pub const List = struct {
         list.* = List{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .items = std.ArrayList(ListItem).init(allocator),
+            .items = std.ArrayList(ListItem){},
             .selected_index = null,
             .scroll_offset = 0,
             .item_style = Style.default(),
@@ -57,7 +57,7 @@ pub const List = struct {
     }
 
     pub fn addItem(self: *List, item: ListItem) !void {
-        try self.items.append(item);
+        try self.items.append(self.allocator, item);
 
         // Select first item if none selected
         if (self.selected_index == null and self.items.items.len > 0) {
@@ -211,7 +211,7 @@ pub const List = struct {
             self.allocator.free(item.text);
         }
 
-        self.items.deinit();
+        self.items.deinit(self.allocator);
         self.allocator.destroy(self);
     }
 };

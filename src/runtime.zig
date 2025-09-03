@@ -31,12 +31,12 @@ pub const Runtime = struct {
     pub fn init(allocator: std.mem.Allocator) Runtime {
         return Runtime{
             .allocator = allocator,
-            .tasks = std.ArrayList(Task).init(allocator),
+            .tasks = std.ArrayList(Task){},
         };
     }
 
     pub fn deinit(self: *Runtime) void {
-        self.tasks.deinit();
+        self.tasks.deinit(self.allocator);
     }
 
     pub fn spawn(self: *Runtime, comptime func: anytype, args: anytype) !Task {
@@ -46,7 +46,7 @@ pub const Runtime = struct {
         const task = Task.init(self.next_task_id);
         self.next_task_id += 1;
 
-        try self.tasks.append(task);
+        try self.tasks.append(self.allocator, task);
 
         // TODO: Actually spawn async task with zsync
         return task;

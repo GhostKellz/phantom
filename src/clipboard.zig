@@ -456,7 +456,7 @@ pub const ClipboardUtils = struct {
             }
         }
         
-        return sanitized.toOwnedSlice();
+        return try sanitized.toOwnedSlice();
     }
     
     /// Convert line endings to platform-specific format
@@ -487,7 +487,7 @@ pub const ClipboardUtils = struct {
             i += 1;
         }
         
-        return result.toOwnedSlice();
+        return try result.toOwnedSlice();
     }
     
     /// Escape special characters for shell commands
@@ -505,7 +505,7 @@ pub const ClipboardUtils = struct {
             }
         }
         
-        return result.toOwnedSlice();
+        return try result.toOwnedSlice();
     }
 };
 

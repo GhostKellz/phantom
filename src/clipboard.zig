@@ -161,7 +161,8 @@ pub const Clipboard = struct {
         if (xclip_result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (xclip_child.stdout) |stdout| {
-                    const output = try stdout.reader().readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    var buffer: [8192]u8 = undefined;
+                    const output = try stdout.reader(&buffer).readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -177,7 +178,8 @@ pub const Clipboard = struct {
         if (xsel_result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (xsel_child.stdout) |stdout| {
-                    const output = try stdout.reader().readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    var buffer: [8192]u8 = undefined;
+                    const output = try stdout.reader(&buffer).readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -248,7 +250,8 @@ pub const Clipboard = struct {
         if (result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
-                    const output = try stdout.reader().readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    var buffer: [8192]u8 = undefined;
+                    const output = try stdout.reader(&buffer).readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -301,7 +304,8 @@ pub const Clipboard = struct {
         if (result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
-                    const output = try stdout.reader().readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    var buffer: [8192]u8 = undefined;
+                    const output = try stdout.reader(&buffer).readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -452,11 +456,11 @@ pub const ClipboardUtils = struct {
         
         for (text) |char| {
             if (char != 0 and char != '\r') {
-                try sanitized.append(char);
+                try sanitized.append(allocator, char);
             }
         }
         
-        return try sanitized.toOwnedSlice();
+        return try sanitized.toOwnedSlice(allocator);
     }
     
     /// Convert line endings to platform-specific format
@@ -472,22 +476,22 @@ pub const ClipboardUtils = struct {
         var i: usize = 0;
         while (i < text.len) {
             if (text[i] == '\n') {
-                try result.appendSlice(line_ending);
+                try result.appendSlice(allocator, line_ending);
             } else if (text[i] == '\r') {
                 // Skip \r if followed by \n
                 if (i + 1 < text.len and text[i + 1] == '\n') {
-                    try result.appendSlice(line_ending);
+                    try result.appendSlice(allocator, line_ending);
                     i += 1; // Skip the \n
                 } else {
-                    try result.appendSlice(line_ending);
+                    try result.appendSlice(allocator, line_ending);
                 }
             } else {
-                try result.append(text[i]);
+                try result.append(allocator, text[i]);
             }
             i += 1;
         }
         
-        return try result.toOwnedSlice();
+        return try result.toOwnedSlice(allocator);
     }
     
     /// Escape special characters for shell commands
@@ -498,14 +502,14 @@ pub const ClipboardUtils = struct {
         for (text) |char| {
             switch (char) {
                 '"', '\'', '\\', '$', '`', '!', '&', '|', ';', '<', '>', '(', ')', '{', '}', '[', ']', '*', '?' => {
-                    try result.append('\\');
-                    try result.append(char);
+                    try result.append(allocator, '\\');
+                    try result.append(allocator, char);
                 },
-                else => try result.append(char),
+                else => try result.append(allocator, char),
             }
         }
         
-        return try result.toOwnedSlice();
+        return try result.toOwnedSlice(allocator);
     }
 };
 

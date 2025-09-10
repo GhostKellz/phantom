@@ -162,7 +162,8 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (xclip_child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const output = try stdout.reader(&buffer).readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    const reader = stdout.reader(&buffer);
+                    const output = try reader.readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -179,7 +180,8 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (xsel_child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const output = try stdout.reader(&buffer).readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    const reader = stdout.reader(&buffer);
+                    const output = try reader.readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -251,7 +253,8 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const output = try stdout.reader(&buffer).readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    const reader = stdout.reader(&buffer);
+                    const output = try reader.readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -305,7 +308,8 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const output = try stdout.reader(&buffer).readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    const reader = stdout.reader(&buffer);
+                    const output = try reader.readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -452,7 +456,7 @@ pub const ClipboardUtils = struct {
     /// Sanitize text for clipboard (remove null bytes, etc.)
     pub fn sanitizeText(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
         var sanitized = std.ArrayList(u8){};
-        defer sanitized.deinit();
+        defer sanitized.deinit(allocator);
         
         for (text) |char| {
             if (char != 0 and char != '\r') {
@@ -471,7 +475,7 @@ pub const ClipboardUtils = struct {
         };
         
         var result = std.ArrayList(u8){};
-        defer result.deinit();
+        defer result.deinit(allocator);
         
         var i: usize = 0;
         while (i < text.len) {
@@ -497,7 +501,7 @@ pub const ClipboardUtils = struct {
     /// Escape special characters for shell commands
     pub fn escapeForShell(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
         var result = std.ArrayList(u8){};
-        defer result.deinit();
+        defer result.deinit(allocator);
         
         for (text) |char| {
             switch (char) {

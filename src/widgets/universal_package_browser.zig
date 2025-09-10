@@ -221,7 +221,8 @@ pub const UniversalPackageBrowser = struct {
         defer file.close();
         
         var buffer: [8192]u8 = undefined;
-        const content = try file.reader(&buffer).readAllAlloc(self.allocator, 1024 * 1024); // 1MB max
+        const reader = file.reader(&buffer);
+        const content = try reader.readAllAlloc(self.allocator, 1024 * 1024); // 1MB max
         defer self.allocator.free(content);
         
         var lines = std.mem.splitSequence(u8, content, "\n");

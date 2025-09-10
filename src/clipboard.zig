@@ -161,7 +161,7 @@ pub const Clipboard = struct {
         if (xclip_result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (xclip_child.stdout) |stdout| {
-                    const output = stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize)) catch return ClipboardError.SystemError;
+                    const output = try stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -177,7 +177,7 @@ pub const Clipboard = struct {
         if (xsel_result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (xsel_child.stdout) |stdout| {
-                    const output = stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize)) catch return ClipboardError.SystemError;
+                    const output = try stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -248,7 +248,7 @@ pub const Clipboard = struct {
         if (result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
-                    const output = stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize)) catch return ClipboardError.SystemError;
+                    const output = try stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -301,7 +301,7 @@ pub const Clipboard = struct {
         if (result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
-                    const output = stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize)) catch return ClipboardError.SystemError;
+                    const output = try stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }

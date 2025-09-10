@@ -158,7 +158,7 @@ pub const NotificationSystem = struct {
             self.allocator.free(notification.title);
             self.allocator.free(notification.message);
         }
-        self.notifications.deinit();
+        self.notifications.deinit(self.allocator);
     }
     
     pub fn show(self: *NotificationSystem, title: []const u8, message: []const u8, notification_type: NotificationType) !u32 {
@@ -176,7 +176,7 @@ pub const NotificationSystem = struct {
             self.allocator.free(oldest.message);
         }
         
-        try self.notifications.append(notification);
+        try self.notifications.append(self.allocator, notification);
         return id;
     }
     
@@ -215,7 +215,7 @@ pub const NotificationSystem = struct {
             self.allocator.free(notification.title);
             self.allocator.free(notification.message);
         }
-        self.notifications.clearAndFree();
+        self.notifications.clearAndFree(self.allocator);
     }
     
     pub fn update(self: *NotificationSystem) void {

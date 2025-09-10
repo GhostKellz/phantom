@@ -129,19 +129,19 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const title = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "👻 PHANTOM TUI FRAMEWORK - COMPREHENSIVE DEMO", 
-            phantom.Style.withFg(phantom.Color.bright_magenta).withBold()
+            phantom.Style.default().withFg(phantom.Color.bright_magenta).withBold()
         );
         try app.addWidget(&title.widget);
 
         const subtitle = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "The Next-Gen TUI Framework for Zig - All Widgets Showcase ⚡", 
-            phantom.Style.withFg(phantom.Color.bright_cyan)
+            phantom.Style.default().withFg(phantom.Color.bright_cyan)
         );
         try app.addWidget(&subtitle.widget);
 
         const features = try phantom.widgets.List.init(allocator);
-        features.setSelectedStyle(phantom.Style.withFg(phantom.Color.white).withBg(phantom.Color.bright_blue).withBold());
+        features.setSelectedStyle(phantom.Style.default().withFg(phantom.Color.white).withBg(phantom.Color.bright_blue).withBold());
         
         try features.addItemText("✅ Text & Styling - Rich text with colors, bold, italic");
         try features.addItemText("✅ Lists & Tables - Selectable, scrollable data display");
@@ -162,36 +162,36 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const button_title = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "🔘 BUTTON WIDGETS DEMO", 
-            phantom.Style.withFg(phantom.Color.bright_green).withBold()
+            phantom.Style.default().withFg(phantom.Color.bright_green).withBold()
         );
         try app.addWidget(&button_title.widget);
 
         // Create navigation buttons
         const prev_button = try phantom.widgets.Button.init(allocator, "← Previous Page");
-        prev_button.setHoverStyle(phantom.Style.withFg(phantom.Color.white).withBg(phantom.Color.red));
+        prev_button.setHoverStyle(phantom.Style.default().withFg(phantom.Color.white).withBg(phantom.Color.red));
         prev_button.setOnClick(onPrevClick);
         try app.addWidget(&prev_button.widget);
 
         const next_button = try phantom.widgets.Button.init(allocator, "Next Page →");
-        next_button.setHoverStyle(phantom.Style.withFg(phantom.Color.white).withBg(phantom.Color.green));
+        next_button.setHoverStyle(phantom.Style.default().withFg(phantom.Color.white).withBg(phantom.Color.green));
         next_button.setOnClick(onNextClick);
         try app.addWidget(&next_button.widget);
 
         // Create progress control buttons
         const progress_inc = try phantom.widgets.Button.init(allocator, "Progress +10%");
-        progress_inc.setHoverStyle(phantom.Style.withFg(phantom.Color.white).withBg(phantom.Color.blue));
+        progress_inc.setHoverStyle(phantom.Style.default().withFg(phantom.Color.white).withBg(phantom.Color.blue));
         progress_inc.setOnClick(onProgressIncrement);
         try app.addWidget(&progress_inc.widget);
 
         const progress_dec = try phantom.widgets.Button.init(allocator, "Progress -10%");
-        progress_dec.setHoverStyle(phantom.Style.withFg(phantom.Color.white).withBg(phantom.Color.yellow));
+        progress_dec.setHoverStyle(phantom.Style.default().withFg(phantom.Color.white).withBg(phantom.Color.yellow));
         progress_dec.setOnClick(onProgressDecrement);
         try app.addWidget(&progress_dec.widget);
 
         const button_info = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "Click buttons with mouse or use Enter/Space when focused", 
-            phantom.Style.withFg(phantom.Color.bright_yellow)
+            phantom.Style.default().withFg(phantom.Color.bright_yellow)
         );
         try app.addWidget(&button_info.widget);
     }
@@ -201,7 +201,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const input_title = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "📝 INPUT WIDGETS DEMO", 
-            phantom.Style.withFg(phantom.Color.bright_blue).withBold()
+            phantom.Style.default().withFg(phantom.Color.bright_blue).withBold()
         );
         try app.addWidget(&input_title.widget);
 
@@ -227,7 +227,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const input_info = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "Type text, use arrows to navigate, Enter to submit", 
-            phantom.Style.withFg(phantom.Color.bright_yellow)
+            phantom.Style.default().withFg(phantom.Color.bright_yellow)
         );
         try app.addWidget(&input_info.widget);
     }
@@ -237,7 +237,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const textarea_title = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "📄 TEXTAREA WIDGETS DEMO", 
-            phantom.Style.withFg(phantom.Color.bright_magenta).withBold()
+            phantom.Style.default().withFg(phantom.Color.bright_magenta).withBold()
         );
         try app.addWidget(&textarea_title.widget);
 
@@ -252,7 +252,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const textarea_info = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "Multi-line editing: Enter for new line, Ctrl+S to submit", 
-            phantom.Style.withFg(phantom.Color.bright_yellow)
+            phantom.Style.default().withFg(phantom.Color.bright_yellow)
         );
         try app.addWidget(&textarea_info.widget);
     }
@@ -262,7 +262,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const progress_title = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "📊 PROGRESS BAR WIDGETS DEMO", 
-            phantom.Style.withFg(phantom.Color.bright_cyan).withBold()
+            phantom.Style.default().withFg(phantom.Color.bright_cyan).withBold()
         );
         try app.addWidget(&progress_title.widget);
 
@@ -277,15 +277,15 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         // Create styled progress bar
         const styled_progress = try phantom.widgets.ProgressBar.init(allocator);
         try styled_progress.setLabel("Download");
-        styled_progress.setFillStyle(phantom.Style.withFg(phantom.Color.bright_green));
-        styled_progress.setBarStyle(phantom.Style.withFg(phantom.Color.bright_black));
+        styled_progress.setFillStyle(phantom.Style.default().withFg(phantom.Color.bright_green));
+        styled_progress.setBarStyle(phantom.Style.default().withFg(phantom.Color.bright_black));
         styled_progress.setValue(75.0);
         try app.addWidget(&styled_progress.widget);
 
         const progress_info = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "Use button controls to adjust progress values", 
-            phantom.Style.withFg(phantom.Color.bright_yellow)
+            phantom.Style.default().withFg(phantom.Color.bright_yellow)
         );
         try app.addWidget(&progress_info.widget);
     }
@@ -295,7 +295,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const table_title = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "📋 TABLE WIDGETS DEMO", 
-            phantom.Style.withFg(phantom.Color.bright_red).withBold()
+            phantom.Style.default().withFg(phantom.Color.bright_red).withBold()
         );
         try app.addWidget(&table_title.widget);
 
@@ -316,7 +316,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const table_info = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "Navigate with arrows or j/k, columns auto-resize", 
-            phantom.Style.withFg(phantom.Color.bright_yellow)
+            phantom.Style.default().withFg(phantom.Color.bright_yellow)
         );
         try app.addWidget(&table_info.widget);
     }
@@ -326,7 +326,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const streaming_title = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "🌊 STREAMING TEXT WIDGETS DEMO", 
-            phantom.Style.withFg(phantom.Color.bright_green).withBold()
+            phantom.Style.default().withFg(phantom.Color.bright_green).withBold()
         );
         try app.addWidget(&streaming_title.widget);
 
@@ -348,7 +348,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const streaming_info = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "Scroll with arrows/j/k, perfect for AI chat interfaces", 
-            phantom.Style.withFg(phantom.Color.bright_yellow)
+            phantom.Style.default().withFg(phantom.Color.bright_yellow)
         );
         try app.addWidget(&streaming_info.widget);
     }
@@ -358,7 +358,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const code_title = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "💻 CODE BLOCK WIDGETS DEMO", 
-            phantom.Style.withFg(phantom.Color.bright_blue).withBold()
+            phantom.Style.default().withFg(phantom.Color.bright_blue).withBold()
         );
         try app.addWidget(&code_title.widget);
 
@@ -395,7 +395,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
         const code_info = try phantom.widgets.Text.initWithStyle(
             allocator, 
             "Syntax highlighting for Zig, Rust, Python, JS, and more!", 
-            phantom.Style.withFg(phantom.Color.bright_yellow)
+            phantom.Style.default().withFg(phantom.Color.bright_yellow)
         );
         try app.addWidget(&code_info.widget);
     }
@@ -404,7 +404,7 @@ fn createDemoWidgets(allocator: std.mem.Allocator, app: *phantom.App) !void {
     const nav_info = try phantom.widgets.Text.initWithStyle(
         allocator, 
         "🎮 Navigation: ←→ arrows to change pages | 🚪 Exit: Ctrl+C or ESC", 
-        phantom.Style.withFg(phantom.Color.white).withBg(phantom.Color.blue)
+        phantom.Style.default().withFg(phantom.Color.white).withBg(phantom.Color.blue)
     );
     try app.addWidget(&nav_info.widget);
 }

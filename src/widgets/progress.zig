@@ -56,7 +56,7 @@ pub const ProgressBar = struct {
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
             .bar_style = Style.default(),
-            .fill_style = Style.withFg(style.Color.green),
+            .fill_style = Style.default().withFg(style.Color.green),
             .text_style = Style.default(),
             .start_time = std.time.milliTimestamp(),
         };
@@ -191,10 +191,10 @@ pub const ProgressBar = struct {
 
             // Build text string
             var text_buffer = std.ArrayList(u8){};
-            defer text_buffer.deinit();
+            defer text_buffer.deinit(self.allocator);
 
             if (self.label) |label| {
-                text_buffer.appendSlice(label) catch {};
+                text_buffer.appendSlice(self.allocator, label) catch {};
                 if (self.show_percentage or self.show_value) {
                     text_buffer.appendSlice(self.allocator, " ") catch {};
                 }
@@ -203,7 +203,7 @@ pub const ProgressBar = struct {
             if (self.show_percentage) {
                 const percentage_str = std.fmt.allocPrint(self.allocator, "{d:.1}%", .{percentage}) catch "";
                 defer self.allocator.free(percentage_str);
-                text_buffer.appendSlice(percentage_str) catch {};
+                text_buffer.appendSlice(self.allocator, percentage_str) catch {};
             }
 
             if (self.show_value) {
@@ -212,7 +212,7 @@ pub const ProgressBar = struct {
                 }
                 const value_str = std.fmt.allocPrint(self.allocator, "({d:.1}/{d:.1})", .{ self.value, self.max_value }) catch "";
                 defer self.allocator.free(value_str);
-                text_buffer.appendSlice(value_str) catch {};
+                text_buffer.appendSlice(self.allocator, value_str) catch {};
             }
 
             // Render text

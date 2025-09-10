@@ -149,7 +149,7 @@ pub const Dialog = struct {
         for (self.buttons.items) |button| {
             self.allocator.free(button.text);
         }
-        self.buttons.clearAndFree();
+        self.buttons.clearAndFree(self.allocator);
     }
 
     pub fn setInputWidget(self: *Dialog, input_widget: *@import("input.zig").Input) void {

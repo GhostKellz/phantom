@@ -265,7 +265,7 @@ pub fn truncateText(allocator: std.mem.Allocator, text: []const u8, max_width: u
 
         if (width + char_width > max_width) break;
 
-        try result.appendSlice(text[i .. i + char_len]);
+        try result.appendSlice(allocator, text[i .. i + char_len]);
         width += char_width;
         i += char_len;
     }

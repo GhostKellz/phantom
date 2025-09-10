@@ -144,7 +144,7 @@ pub const TextWrap = struct {
         var lines = std.ArrayList([]const u8){};
         
         if (width == 0) {
-            try lines.append(try allocator.dupe(u8, ""));
+            try lines.append(allocator, try allocator.dupe(u8, ""));
             return lines;
         }
         
@@ -171,7 +171,7 @@ pub const TextWrap = struct {
                 // Try to break at the last space
                 if (last_space) |space_pos| {
                     const wrapped_line = try allocator.dupe(u8, line[start..space_pos]);
-                    try lines.append(wrapped_line);
+                    try lines.append(allocator, wrapped_line);
                     start = space_pos + 1; // Skip the space
                     current_width = try UnicodeWidth.stringWidth(line[start..iter.i]);
                     last_space = null;
@@ -180,7 +180,7 @@ pub const TextWrap = struct {
                     const prev_i = iter.i - std.unicode.utf8ByteSequenceLength(codepoint) catch 1;
                     if (prev_i > start) {
                         const wrapped_line = try allocator.dupe(u8, line[start..prev_i]);
-                        try lines.append(wrapped_line);
+                        try lines.append(allocator, wrapped_line);
                         start = prev_i;
                         current_width = char_width;
                     } else {
@@ -202,10 +202,10 @@ pub const TextWrap = struct {
         // Add the remaining text
         if (start < line.len) {
             const wrapped_line = try allocator.dupe(u8, line[start..]);
-            try lines.append(wrapped_line);
+            try lines.append(allocator, wrapped_line);
         } else if (line.len == 0) {
             // Empty line
-            try lines.append(try allocator.dupe(u8, ""));
+            try lines.append(allocator, try allocator.dupe(u8, ""));
         }
     }
 };

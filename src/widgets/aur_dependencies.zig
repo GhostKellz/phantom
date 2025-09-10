@@ -68,12 +68,12 @@ pub const PackageStatus = enum {
     
     pub fn getStyle(self: PackageStatus) Style {
         return switch (self) {
-            .installed => Style.withFg(style.Color.bright_green),
-            .available => Style.withFg(style.Color.white),
-            .missing => Style.withFg(style.Color.bright_red),
-            .outdated => Style.withFg(style.Color.bright_yellow),
-            .building => Style.withFg(style.Color.bright_cyan),
-            .failed => Style.withFg(style.Color.bright_red).withBold(),
+            .installed => Style.default().withFg(style.Color.bright_green),
+            .available => Style.default().withFg(style.Color.white),
+            .missing => Style.default().withFg(style.Color.bright_red),
+            .outdated => Style.default().withFg(style.Color.bright_yellow),
+            .building => Style.default().withFg(style.Color.bright_cyan),
+            .failed => Style.default().withFg(style.Color.bright_red).withBold(),
         };
     }
 };
@@ -197,11 +197,11 @@ pub const AURDependencies = struct {
             .expanded_nodes = std.ArrayList(bool){},
             .search_query = std.ArrayList(u8){},
             .filtered_dependencies = std.ArrayList(usize){},
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
-            .package_style = Style.withFg(style.Color.bright_white).withBold(),
-            .dependency_style = Style.withFg(style.Color.white),
-            .selected_style = Style.withFg(style.Color.bright_yellow).withBold(),
-            .info_style = Style.withFg(style.Color.bright_black),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
+            .package_style = Style.default().withFg(style.Color.bright_white).withBold(),
+            .dependency_style = Style.default().withFg(style.Color.white),
+            .selected_style = Style.default().withFg(style.Color.bright_yellow).withBold(),
+            .info_style = Style.default().withFg(style.Color.bright_black),
         };
         
         return widget;
@@ -247,13 +247,13 @@ pub const AURDependencies = struct {
                 .repo = try self.allocator.dupe(u8, dep.repo),
                 .install_size = dep.install_size,
             };
-            try self.current_package.?.dependencies.append(owned_dep);
+            try self.current_package.?.dependencies.append(self.allocator, owned_dep);
         }
         
         // Initialize expanded nodes
         self.expanded_nodes.clearRetainingCapacity();
         for (0..self.current_package.?.dependencies.items.len) |_| {
-            try self.expanded_nodes.append(true); // Expand all by default
+            try self.expanded_nodes.append(self.allocator, true); // Expand all by default
         }
         
         // Update filtered list
@@ -305,7 +305,7 @@ pub const AURDependencies = struct {
                     if (std.mem.indexOf(u8, dep.name, self.search_query.items) == null) continue;
                 }
                 
-                self.filtered_dependencies.append(i) catch break;
+                self.filtered_dependencies.append(self.allocator, i) catch break;
             }
         }
         
@@ -497,7 +497,7 @@ pub const AURDependencies = struct {
         const type_icon = dep.dependency_type.getIcon();
         buffer.writeText(current_x, y, status_icon, dep.status.getStyle());
         current_x += 2;
-        buffer.writeText(current_x, y, type_icon, Style.withFg(dep.dependency_type.getColor()));
+        buffer.writeText(current_x, y, type_icon, Style.default().withFg(dep.dependency_type.getColor()));
         current_x += 2;
         
         // Package name and version
@@ -614,10 +614,10 @@ pub const AURDependencies = struct {
             self.allocator.free(repo);
         }
         
-        self.dependency_tree.deinit();
-        self.expanded_nodes.deinit();
-        self.search_query.deinit();
-        self.filtered_dependencies.deinit();
+        self.dependency_tree.deinit(self.allocator);
+        self.expanded_nodes.deinit(self.allocator);
+        self.search_query.deinit(self.allocator);
+        self.filtered_dependencies.deinit(self.allocator);
         self.allocator.destroy(self);
     }
 };
@@ -630,9 +630,9 @@ test "AURDependencies widget creation" {
 
     // Create test package
     var deps = std.ArrayList(PackageDependency){};
-    defer deps.deinit();
+    defer deps.deinit(allocator);
     
-    try deps.append(PackageDependency{
+    try deps.append(allocator, PackageDependency{
         .name = "glibc",
         .dependency_type = .depends,
         .status = .installed,

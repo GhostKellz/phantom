@@ -1,6 +1,9 @@
 # 👻 Phantom TUI Integration Guide
 
-This guide helps you integrate Phantom TUI into your Zig projects, specifically designed for terminal applications like ZEKE (AI assistant) and other interactive CLI tools.
+**Version**: 0.3.3  
+**Zig Compatibility**: 0.16+  
+
+This guide helps you integrate Phantom TUI into your Zig projects. Phantom v0.3.3 is production-ready with a polished API, comprehensive widget library, and full Zig 0.16+ compatibility.
 
 ## 🚀 Quick Start
 
@@ -8,7 +11,7 @@ This guide helps you integrate Phantom TUI into your Zig projects, specifically 
 
 #### Method 1: Using `zig fetch` (Recommended)
 ```bash
-zig fetch --save https://github.com/ghostkellz/phantom
+zig fetch --save https://github.com/ghostkellz/phantom/archive/v0.3.3.tar.gz
 ```
 
 #### Method 2: Manual `build.zig.zon` Setup
@@ -16,11 +19,11 @@ zig fetch --save https://github.com/ghostkellz/phantom
 .{
     .name = "your-project",
     .version = "0.1.0",
+    .minimum_zig_version = "0.16.0-dev.164+bc7955306",
     .dependencies = .{
         .phantom = .{
-            .url = "https://github.com/ghostkellz/phantom/archive/main.tar.gz",
-            // Update hash when fetching
-            .hash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+            .url = "https://github.com/ghostkellz/phantom/archive/v0.3.3.tar.gz",
+            .hash = "phantom-0.3.3-[HASH_PROVIDED_BY_ZIG_FETCH]",
         },
     },
 }
@@ -80,11 +83,11 @@ pub fn main() !void {
     });
     defer app.deinit();
 
-    // Add some widgets
+    // Add some widgets (Note: v0.3.3 uses instance methods)
     const title = try phantom.widgets.Text.initWithStyle(
         allocator, 
         "🤖 AI Assistant", 
-        phantom.Style.withFg(phantom.Color.bright_cyan).withBold()
+        phantom.Style.default().withFg(phantom.Color.bright_cyan).withBold()
     );
     try app.addWidget(&title.widget);
 
@@ -93,26 +96,38 @@ pub fn main() !void {
 }
 ```
 
-## 🧩 Available Widgets
+## 🧩 Available Widgets (v0.3.3)
 
-### Core Widgets
-- **Text**: Styled text display with alignment
-- **List**: Selectable, scrollable item lists
-- **Block**: Container with borders and styling
-- **Container**: Layout container for other widgets
+### Core Display Widgets
+- **Text**: Styled text display with alignment and multi-line support
+- **Block**: Container with borders, titles, and custom styling  
+- **Container**: Layout container for organizing other widgets
 
 ### Interactive Widgets
-- **Button**: Clickable buttons with hover states
-- **Input**: Single-line text input fields
-- **TextArea**: Multi-line text editing with scrolling
+- **Button**: Clickable buttons with hover, pressed, and disabled states
+- **Input**: Single-line text input with placeholder, validation, and password mode
+- **TextArea**: Multi-line text editor with scrolling, line numbers, and word wrap
+- **List**: Selectable, scrollable item lists with custom styling and callbacks
 
 ### Data Display Widgets
-- **Table**: Column-based data display with sorting
-- **ProgressBar**: Visual progress indicators
+- **Table**: Advanced column-based data with sorting, selection, and styling
+- **ProgressBar**: Animated progress indicators with labels and customizable styles
+- **TaskMonitor**: Multi-task progress tracking (perfect for package managers)
 
 ### Advanced Widgets
-- **StreamingText**: Real-time text streaming (perfect for AI responses)
-- **CodeBlock**: Syntax-highlighted code display
+- **StreamingText**: Real-time text streaming with typing animation (ideal for AI chat)
+- **CodeBlock**: Syntax-highlighted code display with line numbers and multiple languages
+- **Dialog**: Modal dialogs with buttons and custom actions
+- **ContextMenu**: Right-click context menus with shortcuts and separators
+- **NetworkTopology**: Network visualization with nodes and connections
+- **SystemMonitor**: Real-time system metrics display
+
+### Specialized Widgets
+- **CommandBuilder**: Interactive command building with autocomplete
+- **UniversalPackageBrowser**: Multi-source package browser (npm, cargo, etc.)
+- **BlockchainPackageBrowser**: Cryptocurrency/blockchain package browser  
+- **AURDependencies**: Arch Linux AUR dependency tree viewer
+- **Notification**: Toast-style notification system
 
 ## 💡 Common Use Cases
 
@@ -235,7 +250,7 @@ const style = phantom.Style{
     .underline = true,
 };
 
-// Or use builder pattern
+// v0.3.3 uses fluent builder pattern (instance methods)
 const style2 = phantom.Style.default()
     .withFg(phantom.Color.red)
     .withBg(phantom.Color.white)
@@ -246,6 +261,35 @@ const style2 = phantom.Style.default()
 - Basic: `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`
 - Bright: `bright_black`, `bright_red`, `bright_green`, etc.
 - Custom: `Color.rgb(r, g, b)` or `Color.indexed(index)`
+
+## ✨ What's New in v0.3.3
+
+### 🚀 Production-Ready Features
+- **Full Zig 0.16+ Compatibility**: Updated for latest Zig version with proper ArrayList API usage
+- **Polished Style API**: Consistent instance-based method calls for better ergonomics
+- **Memory Safety**: Comprehensive allocator usage patterns and automatic cleanup
+- **Performance Optimized**: Efficient diff-based rendering and optimized memory management
+
+### 🧩 Expanded Widget Library
+- **20+ Widgets**: From basic text to advanced package browsers and system monitors  
+- **Rich Interactions**: Full mouse support, keyboard navigation, and focus management
+- **Advanced Components**: StreamingText for AI chat, TaskMonitor for package managers, CodeBlock with syntax highlighting
+
+### 🎨 Enhanced Styling System
+- **True Color Support**: RGB colors and 256-color palette support
+- **Fluent API**: Chain styling methods for clean, readable code
+- **Theme Support**: Consistent styling across all widgets
+- **Animation Ready**: Built-in support for progress animations and typing effects
+
+### 📱 Layout & Responsiveness  
+- **Flexible Layouts**: Constraint-based layout system inspired by Ratatui
+- **Responsive Design**: Adapt to terminal size changes automatically  
+- **Proper Focus Management**: Tab navigation and focus indication
+
+### 🧪 Testing & Reliability
+- **Comprehensive Tests**: All widgets and core functionality tested
+- **Example Applications**: 6 complete demo applications showing best practices
+- **Documentation**: Complete API reference and integration guides
 
 ## 🔧 Advanced Features
 

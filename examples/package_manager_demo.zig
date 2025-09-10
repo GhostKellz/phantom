@@ -17,7 +17,7 @@ pub fn main() !void {
     defer app.deinit();
 
     // Header
-    const header = try phantom.widgets.Text.initWithStyle(allocator, "🪐 ZION Package Manager - Multi-Task Demo", phantom.Style.withFg(phantom.Color.bright_cyan).withBold());
+    const header = try phantom.widgets.Text.initWithStyle(allocator, "🪐 ZION Package Manager - Multi-Task Demo", phantom.Style.default().withFg(phantom.Color.bright_cyan).withBold());
     try app.addWidget(&header.widget);
 
     // Create TaskMonitor
@@ -34,7 +34,7 @@ pub fn main() !void {
     try app.addWidget(&task_monitor.widget);
 
     // Instructions
-    const instructions = try phantom.widgets.Text.initWithStyle(allocator, "🎮 Watch the live package build progress • Press Ctrl+C to exit", phantom.Style.withFg(phantom.Color.bright_yellow));
+    const instructions = try phantom.widgets.Text.initWithStyle(allocator, "🎮 Watch the live package build progress • Press Ctrl+C to exit", phantom.Style.default().withFg(phantom.Color.bright_yellow));
     try app.addWidget(&instructions.widget);
 
     // Overall progress

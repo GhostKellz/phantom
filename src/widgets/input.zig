@@ -81,8 +81,8 @@ pub const Input = struct {
     }
 
     pub fn setText(self: *Input, text: []const u8) !void {
-        self.text.clearAndFree();
-        try self.text.appendSlice(text);
+        self.text.clearAndFree(self.allocator);
+        try self.text.appendSlice(self.allocator, text);
         self.cursor_pos = @min(self.cursor_pos, self.text.items.len);
         self.selection_start = null;
         self.updateScrollOffset();
@@ -135,7 +135,7 @@ pub const Input = struct {
     }
 
     pub fn clear(self: *Input) void {
-        self.text.clearAndFree();
+        self.text.clearAndFree(self.allocator);
         self.cursor_pos = 0;
         self.selection_start = null;
         self.scroll_offset = 0;
@@ -217,8 +217,8 @@ pub const Input = struct {
                 @memcpy(new_text[0..selection_start], self.text.items[0..selection_start]);
                 @memcpy(new_text[selection_start..], self.text.items[selection_end..]);
                 
-                self.text.clearAndFree();
-                self.text.appendSlice(new_text) catch return;
+                self.text.clearAndFree(self.allocator);
+                self.text.appendSlice(self.allocator, new_text) catch return;
                 
                 self.cursor_pos = selection_start;
                 self.selection_start = null;
@@ -520,7 +520,7 @@ pub const Input = struct {
 
     fn deinit(widget: *Widget) void {
         const self: *Input = @fieldParentPtr("widget", widget);
-        self.text.deinit();
+        self.text.deinit(self.allocator);
         self.allocator.free(self.placeholder);
         self.allocator.destroy(self);
     }

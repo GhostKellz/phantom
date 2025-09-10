@@ -439,66 +439,66 @@ pub const ClipboardEvent = struct {
 /// Utility functions for clipboard integration
 pub const ClipboardUtils = struct {
     /// Sanitize text for clipboard (remove null bytes, etc.)
-    pub fn sanitizeText(_: std.mem.Allocator, text: []const u8) ![]u8 {
+    pub fn sanitizeText(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
         var sanitized = std.ArrayList(u8){};
-        defer sanitized.deinit();
+        defer sanitized.deinit(allocator);
         
         for (text) |char| {
             if (char != 0 and char != '\r') {
-                try sanitized.append(char);
+                try sanitized.append(allocator, char);
             }
         }
         
-        return sanitized.toOwnedSlice();
+        return sanitized.toOwnedSlice(allocator);
     }
     
     /// Convert line endings to platform-specific format
-    pub fn normalizeLineEndings(_: std.mem.Allocator, text: []const u8) ![]u8 {
+    pub fn normalizeLineEndings(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
         const line_ending = switch (builtin.os.tag) {
             .windows => "\r\n",
             else => "\n",
         };
         
         var result = std.ArrayList(u8){};
-        defer result.deinit();
+        defer result.deinit(allocator);
         
         var i: usize = 0;
         while (i < text.len) {
             if (text[i] == '\n') {
-                try result.appendSlice(line_ending);
+                try result.appendSlice(allocator, line_ending);
             } else if (text[i] == '\r') {
                 // Skip \r if followed by \n
                 if (i + 1 < text.len and text[i + 1] == '\n') {
-                    try result.appendSlice(line_ending);
+                    try result.appendSlice(allocator, line_ending);
                     i += 1; // Skip the \n
                 } else {
-                    try result.appendSlice(line_ending);
+                    try result.appendSlice(allocator, line_ending);
                 }
             } else {
-                try result.append(text[i]);
+                try result.append(allocator, text[i]);
             }
             i += 1;
         }
         
-        return result.toOwnedSlice();
+        return result.toOwnedSlice(allocator);
     }
     
     /// Escape special characters for shell commands
-    pub fn escapeForShell(_: std.mem.Allocator, text: []const u8) ![]u8 {
+    pub fn escapeForShell(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
         var result = std.ArrayList(u8){};
-        defer result.deinit();
+        defer result.deinit(allocator);
         
         for (text) |char| {
             switch (char) {
                 '"', '\'', '\\', '$', '`', '!', '&', '|', ';', '<', '>', '(', ')', '{', '}', '[', ']', '*', '?' => {
-                    try result.append('\\');
-                    try result.append(char);
+                    try result.append(allocator, '\\');
+                    try result.append(allocator, char);
                 },
-                else => try result.append(char),
+                else => try result.append(allocator, char),
             }
         }
         
-        return result.toOwnedSlice();
+        return result.toOwnedSlice(allocator);
     }
 };
 

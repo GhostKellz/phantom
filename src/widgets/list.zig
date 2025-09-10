@@ -81,7 +81,7 @@ pub const List = struct {
         for (self.items.items) |item| {
             self.allocator.free(item.text);
         }
-        self.items.clearAndFree();
+        self.items.clearAndFree(self.allocator);
         self.selected_index = null;
         self.scroll_offset = 0;
     }

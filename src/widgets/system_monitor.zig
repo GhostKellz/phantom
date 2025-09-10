@@ -91,10 +91,10 @@ pub const SystemMonitor = struct {
         monitor.* = SystemMonitor{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
-            .normal_style = Style.withFg(style.Color.white),
-            .warning_style = Style.withFg(style.Color.bright_yellow),
-            .critical_style = Style.withFg(style.Color.bright_red),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
+            .normal_style = Style.default().withFg(style.Color.white),
+            .warning_style = Style.default().withFg(style.Color.bright_yellow),
+            .critical_style = Style.default().withFg(style.Color.bright_red),
         };
         
         // Initialize system info
@@ -297,7 +297,7 @@ pub const SystemMonitor = struct {
         defer self.allocator.free(term_text);
         
         const text_len = @min(term_text.len, width);
-        const fps_style = if (self.render_fps >= 60.0) Style.withFg(style.Color.bright_green)
+        const fps_style = if (self.render_fps >= 60.0) Style.default().withFg(style.Color.bright_green)
         else if (self.render_fps >= 30.0) self.warning_style
         else self.critical_style;
         buffer.writeText(x, y, term_text[0..text_len], fps_style);

@@ -111,8 +111,8 @@ pub const Table = struct {
     }
 
     pub fn setColumns(self: *Table, columns: []const Column) !void {
-        self.columns.clearAndFree();
-        self.calculated_widths.clearAndFree();
+        self.columns.clearAndFree(self.allocator);
+        self.calculated_widths.clearAndFree(self.allocator);
         
         for (columns) |column| {
             try self.addColumn(column);
@@ -120,7 +120,7 @@ pub const Table = struct {
     }
 
     pub fn setRows(self: *Table, rows: []const Row) !void {
-        self.rows.clearAndFree();
+        self.rows.clearAndFree(self.allocator);
         
         for (rows) |row| {
             try self.addRow(row);
@@ -128,15 +128,15 @@ pub const Table = struct {
     }
 
     pub fn clear(self: *Table) void {
-        self.rows.clearAndFree();
+        self.rows.clearAndFree(self.allocator);
         self.selected_row = null;
         self.scroll_offset_row = 0;
         self.scroll_offset_col = 0;
     }
 
     pub fn clearColumns(self: *Table) void {
-        self.columns.clearAndFree();
-        self.calculated_widths.clearAndFree();
+        self.columns.clearAndFree(self.allocator);
+        self.calculated_widths.clearAndFree(self.allocator);
         self.clear();
     }
 

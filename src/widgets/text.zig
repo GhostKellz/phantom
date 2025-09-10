@@ -116,7 +116,7 @@ test "Text widget style setting" {
     const text = try Text.init(allocator, "Styled text");
     defer text.widget.deinit();
 
-    const red_style = Style.withFg(style.Color.red);
+    const red_style = Style.default().withFg(style.Color.red);
     text.setStyle(red_style);
 
     try std.testing.expect(text.text_style.fg.? == style.Color.red);

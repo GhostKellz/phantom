@@ -19,10 +19,10 @@ pub fn main() !void {
     defer app.deinit();
 
     // Header
-    const title = try phantom.widgets.Text.initWithStyle(allocator, "🦎 ZION - ZIG INTERACTIVE OBJECT NAVIGATOR", phantom.Style.withFg(phantom.Color.bright_green).withBold());
+    const title = try phantom.widgets.Text.initWithStyle(allocator, "🦎 ZION - ZIG INTERACTIVE OBJECT NAVIGATOR", phantom.Style.default().withFg(phantom.Color.bright_green).withBold());
     try app.addWidget(&title.widget);
 
-    const subtitle = try phantom.widgets.Text.initWithStyle(allocator, "📚 Advanced Zig Library Management & ZigLibs Integration", phantom.Style.withFg(phantom.Color.bright_cyan));
+    const subtitle = try phantom.widgets.Text.initWithStyle(allocator, "📚 Advanced Zig Library Management & ZigLibs Integration", phantom.Style.default().withFg(phantom.Color.bright_cyan));
     try app.addWidget(&subtitle.widget);
 
     // Task monitor for library operations
@@ -55,7 +55,7 @@ pub fn main() !void {
     try task_monitor.updateTask("crypto", .running, "🛡️ Compiling security modules...");
 
     // Status message
-    const status = try phantom.widgets.Text.initWithStyle(allocator, "💡 ZION integrates with ZigLibs ecosystem for seamless dependency management", phantom.Style.withFg(phantom.Color.bright_yellow));
+    const status = try phantom.widgets.Text.initWithStyle(allocator, "💡 ZION integrates with ZigLibs ecosystem for seamless dependency management", phantom.Style.default().withFg(phantom.Color.bright_yellow));
     try app.addWidget(&status.widget);
 
     std.log.info("🦎 ZION - Zig Interactive Object Navigator\n", .{});

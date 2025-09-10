@@ -117,8 +117,10 @@ pub const Style = struct {
         return Style{};
     }
 
-    pub fn withFg(color: Color) Style {
-        return Style{ .fg = color };
+    pub fn withFg(self: Style, color: Color) Style {
+        var new_style = self;
+        new_style.fg = color;
+        return new_style;
     }
 
     pub fn withBg(self: Style, color: Color) Style {
@@ -127,8 +129,10 @@ pub const Style = struct {
         return new_style;
     }
 
-    pub fn withAttributes(attrs: Attributes) Style {
-        return Style{ .attributes = attrs };
+    pub fn withAttributes(self: Style, attrs: Attributes) Style {
+        var new_style = self;
+        new_style.attributes = attrs;
+        return new_style;
     }
 
     pub fn withBold(self: Style) Style {
@@ -183,7 +187,7 @@ test "Color ANSI codes" {
 }
 
 test "Style creation and modification" {
-    const style = Style.withFg(Color.red).withBold();
+    const style = Style.default().withFg(Color.red).withBold();
     try std.testing.expect(style.fg.? == Color.red);
     try std.testing.expect(style.attributes.bold);
 }

@@ -17,16 +17,16 @@ pub fn main() !void {
     defer app.deinit();
 
     // Create styled welcome banner
-    const banner = try phantom.widgets.Text.initWithStyle(allocator, "🌟 Welcome to Phantom TUI Framework! 🌟", phantom.Style.withFg(phantom.Color.bright_magenta).withBold());
+    const banner = try phantom.widgets.Text.initWithStyle(allocator, "🌟 Welcome to Phantom TUI Framework! 🌟", phantom.Style.default().withFg(phantom.Color.bright_magenta).withBold());
     try app.addWidget(&banner.widget);
 
     // Create subtitle
-    const subtitle = try phantom.widgets.Text.initWithStyle(allocator, "The Next-Gen TUI Framework for Zig - Built with zsync async ⚡", phantom.Style.withFg(phantom.Color.bright_cyan));
+    const subtitle = try phantom.widgets.Text.initWithStyle(allocator, "The Next-Gen TUI Framework for Zig - Built with zsync async ⚡", phantom.Style.default().withFg(phantom.Color.bright_cyan));
     try app.addWidget(&subtitle.widget);
 
     // Create feature showcase list
     const feature_list = try phantom.widgets.List.init(allocator);
-    feature_list.setSelectedStyle(phantom.Style.withFg(phantom.Color.white).withBg(phantom.Color.bright_blue).withBold());
+    feature_list.setSelectedStyle(phantom.Style.default().withFg(phantom.Color.white).withBg(phantom.Color.bright_blue).withBold());
 
     try feature_list.addItemText("🚀 Pure Zig - Zero C dependencies, idiomatic code");
     try feature_list.addItemText("⚡ Async-Native - Built with zsync async runtime");
@@ -42,7 +42,7 @@ pub fn main() !void {
     try app.addWidget(&feature_list.widget);
 
     // Instructions
-    const instructions = try phantom.widgets.Text.initWithStyle(allocator, "🎮 Use ↑↓ or j/k to navigate • Press Ctrl+C or ESC to exit", phantom.Style.withFg(phantom.Color.bright_yellow));
+    const instructions = try phantom.widgets.Text.initWithStyle(allocator, "🎮 Use ↑↓ or j/k to navigate • Press Ctrl+C or ESC to exit", phantom.Style.default().withFg(phantom.Color.bright_yellow));
     try app.addWidget(&instructions.widget);
 
     // Print startup info

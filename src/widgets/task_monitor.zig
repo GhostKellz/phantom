@@ -105,11 +105,11 @@ pub const TaskMonitor = struct {
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
             .tasks = std.ArrayList(Task){},
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
             .task_style = Style.default(),
-            .progress_style = Style.withFg(style.Color.green),
-            .completed_style = Style.withFg(style.Color.bright_green),
-            .failed_style = Style.withFg(style.Color.bright_red),
+            .progress_style = Style.default().withFg(style.Color.green),
+            .completed_style = Style.default().withFg(style.Color.bright_green),
+            .failed_style = Style.default().withFg(style.Color.bright_red),
         };
         return monitor;
     }
@@ -372,7 +372,7 @@ pub const TaskMonitor = struct {
 
             const msg_len = @min(message_text.len, width);
             if (msg_len > 0) {
-                buffer.writeText(x, current_y, message_text[0..msg_len], Style.withFg(style.Color.bright_black));
+                buffer.writeText(x, current_y, message_text[0..msg_len], Style.default().withFg(style.Color.bright_black));
             }
 
             current_y += 1;

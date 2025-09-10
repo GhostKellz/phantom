@@ -220,7 +220,7 @@ pub const CodeBlock = struct {
         for (self.lines.items) |line| {
             self.allocator.free(line);
         }
-        self.lines.clearAndFree();
+        self.lines.clearAndFree(self.allocator);
         
         // Split code into lines
         var lines_iter = std.mem.split(u8, self.code, "\n");
@@ -237,7 +237,7 @@ pub const CodeBlock = struct {
     }
 
     fn tokenize(self: *CodeBlock) !void {
-        self.tokens.clearAndFree();
+        self.tokens.clearAndFree(self.allocator);
         
         // Simple tokenization based on language
         switch (self.language) {

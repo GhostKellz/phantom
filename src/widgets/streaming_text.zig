@@ -76,8 +76,8 @@ pub const StreamingText = struct {
     }
 
     pub fn setText(self: *StreamingText, text: []const u8) !void {
-        self.text.clearAndFree();
-        try self.text.appendSlice(text);
+        self.text.clearAndFree(self.allocator);
+        try self.text.appendSlice(self.allocator, text);
         try self.updateLines();
         self.updateScrollOffset();
     }
@@ -93,7 +93,7 @@ pub const StreamingText = struct {
 
     pub fn stopStreaming(self: *StreamingText) void {
         self.is_streaming = false;
-        self.chunk_buffer.clearAndFree();
+        self.chunk_buffer.clearAndFree(self.allocator);
         self.current_chunk_index = 0;
         
         if (self.on_complete) |callback| {
@@ -102,7 +102,7 @@ pub const StreamingText = struct {
     }
 
     pub fn addChunk(self: *StreamingText, chunk: []const u8) !void {
-        try self.chunk_buffer.appendSlice(chunk);
+        try self.chunk_buffer.appendSlice(self.allocator, chunk);
         
         if (self.on_chunk) |callback| {
             callback(self, chunk);
@@ -151,8 +151,8 @@ pub const StreamingText = struct {
     }
 
     pub fn clear(self: *StreamingText) !void {
-        self.text.clearAndFree();
-        self.chunk_buffer.clearAndFree();
+        self.text.clearAndFree(self.allocator);
+        self.chunk_buffer.clearAndFree(self.allocator);
         self.current_chunk_index = 0;
         self.scroll_offset = 0;
         self.is_streaming = false;
@@ -194,7 +194,7 @@ pub const StreamingText = struct {
         for (self.lines.items) |line| {
             self.allocator.free(line);
         }
-        self.lines.clearAndFree();
+        self.lines.clearAndFree(self.allocator);
         
         if (!self.word_wrap) {
             // Simple line splitting by newlines
@@ -269,7 +269,7 @@ pub const StreamingText = struct {
         
         if (chars_to_add > 0) {
             const chunk_end = self.current_chunk_index + chars_to_add;
-            try self.text.appendSlice(self.chunk_buffer.items[self.current_chunk_index..chunk_end]);
+            try self.text.appendSlice(self.allocator, self.chunk_buffer.items[self.current_chunk_index..chunk_end]);
             self.current_chunk_index = chunk_end;
             
             try self.updateLines();

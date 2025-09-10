@@ -19,7 +19,7 @@ pub fn main() !void {
     defer app.deinit();
 
     // Create a simple text widget
-    const hello_text = try phantom.widgets.Text.initWithStyle(allocator, "Welcome to Phantom TUI! 👻", phantom.Style.withFg(phantom.Color.bright_cyan).withBold());
+    const hello_text = try phantom.widgets.Text.initWithStyle(allocator, "Welcome to Phantom TUI! 👻", phantom.Style.default().withFg(phantom.Color.bright_cyan).withBold());
     try app.addWidget(&hello_text.widget);
 
     // Create a list widget
@@ -43,9 +43,10 @@ pub fn main() !void {
 }
 
 test "simple test" {
+    const allocator = std.testing.allocator;
     var list = std.ArrayList(i32){};
-    defer list.deinit();
-    try list.append(42);
+    defer list.deinit(allocator);
+    try list.append(allocator, 42);
     try std.testing.expectEqual(@as(i32, 42), list.pop());
 }
 

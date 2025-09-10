@@ -173,12 +173,12 @@ pub const UniversalPackageBrowser = struct {
             .repositories = std.ArrayList(Repository){},
             .search_input = std.ArrayList(u8){},
             .search_options = SearchOptions{},
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
-            .package_style = Style.withFg(style.Color.white),
-            .selected_style = Style.withFg(style.Color.bright_yellow).withBold(),
-            .source_style = Style.withFg(style.Color.bright_green),
-            .info_style = Style.withFg(style.Color.bright_black),
-            .loading_style = Style.withFg(style.Color.bright_blue),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
+            .package_style = Style.default().withFg(style.Color.white),
+            .selected_style = Style.default().withFg(style.Color.bright_yellow).withBold(),
+            .source_style = Style.default().withFg(style.Color.bright_green),
+            .info_style = Style.default().withFg(style.Color.bright_black),
+            .loading_style = Style.default().withFg(style.Color.bright_blue),
         };
         
         // Initialize default repositories
@@ -302,8 +302,8 @@ pub const UniversalPackageBrowser = struct {
             if (pkg.description) |d| self.allocator.free(d);
             if (pkg.maintainer) |m| self.allocator.free(m);
             if (pkg.url) |u| self.allocator.free(u);
-            pkg.tags.deinit(self.allocator);
-            pkg.dependencies.deinit(self.allocator);
+            pkg.tags.deinit();
+            pkg.dependencies.deinit();
         }
         self.packages.clearRetainingCapacity();
         
@@ -364,8 +364,8 @@ pub const UniversalPackageBrowser = struct {
                 .version = try self.allocator.dupe(u8, aur_pkg.version),
                 .description = try self.allocator.dupe(u8, aur_pkg.desc),
                 .source = .aur,
-                .tags = std.ArrayList([]const u8).init(self.allocator),
-                .dependencies = std.ArrayList([]const u8).init(self.allocator),
+                .tags = std.ArrayList([]const u8){},
+                .dependencies = std.ArrayList([]const u8){},
             };
             
             try self.packages.append(self.allocator, pkg);
@@ -397,8 +397,8 @@ pub const UniversalPackageBrowser = struct {
                 .name = try self.allocator.dupe(u8, zlib_pkg.name),
                 .description = try self.allocator.dupe(u8, zlib_pkg.desc),
                 .source = .ziglibs,
-                .tags = std.ArrayList([]const u8).init(self.allocator),
-                .dependencies = std.ArrayList([]const u8).init(self.allocator),
+                .tags = std.ArrayList([]const u8){},
+                .dependencies = std.ArrayList([]const u8){},
             };
             
             try self.packages.append(self.allocator, pkg);
@@ -423,8 +423,8 @@ pub const UniversalPackageBrowser = struct {
                 .name = try self.allocator.dupe(u8, chaotic_pkg.name),
                 .description = try self.allocator.dupe(u8, chaotic_pkg.desc),
                 .source = .chaotic_aur,
-                .tags = std.ArrayList([]const u8).init(self.allocator),
-                .dependencies = std.ArrayList([]const u8).init(self.allocator),
+                .tags = std.ArrayList([]const u8){},
+                .dependencies = std.ArrayList([]const u8){},
             };
             
             try self.packages.append(self.allocator, pkg);
@@ -445,8 +445,8 @@ pub const UniversalPackageBrowser = struct {
                 .description = try std.fmt.allocPrint(self.allocator, "GitHub repository: {s}", .{repo.name}),
                 .source = .custom_github,
                 .url = try self.allocator.dupe(u8, repo.url),
-                .tags = std.ArrayList([]const u8).init(self.allocator),
-                .dependencies = std.ArrayList([]const u8).init(self.allocator),
+                .tags = std.ArrayList([]const u8){},
+                .dependencies = std.ArrayList([]const u8){},
             };
             
             try self.packages.append(self.allocator, pkg);
@@ -471,8 +471,8 @@ pub const UniversalPackageBrowser = struct {
                 .name = try self.allocator.dupe(u8, pac_pkg.name),
                 .description = try self.allocator.dupe(u8, pac_pkg.desc),
                 .source = .pacman_repo,
-                .tags = std.ArrayList([]const u8).init(self.allocator),
-                .dependencies = std.ArrayList([]const u8).init(self.allocator),
+                .tags = std.ArrayList([]const u8){},
+                .dependencies = std.ArrayList([]const u8){},
             };
             
             try self.packages.append(self.allocator, pkg);
@@ -502,7 +502,7 @@ pub const UniversalPackageBrowser = struct {
                 if (!found_in_name and !found_in_desc) continue;
             }
             
-            self.filtered_packages.append(i) catch break;
+            self.filtered_packages.append(self.allocator, i) catch break;
         }
         
         // Reset selection if out of bounds
@@ -514,7 +514,7 @@ pub const UniversalPackageBrowser = struct {
     /// Set search query and update results
     pub fn setSearchQuery(self: *UniversalPackageBrowser, query: []const u8) !void {
         self.search_input.clearRetainingCapacity();
-        try self.search_input.appendSlice(query);
+        try self.search_input.appendSlice(self.allocator, query);
         
         self.search_options.query = self.search_input.items;
         self.updateFilters();
@@ -602,7 +602,7 @@ pub const UniversalPackageBrowser = struct {
                 
                 const filter_x = x + width - @as(u16, @intCast(filter_text.len));
                 if (filter_x > input_x + display_len) {
-                    buffer.writeText(filter_x, y, filter_text, Style.withFg(filter.getColor()));
+                    buffer.writeText(filter_x, y, filter_text, Style.default().withFg(filter.getColor()));
                 }
             }
         }
@@ -675,13 +675,13 @@ pub const UniversalPackageBrowser = struct {
         
         // Source icon
         const source_icon = pkg.source.getIcon();
-        buffer.writeText(current_x, y, source_icon, Style.withFg(pkg.source.getColor()));
+        buffer.writeText(current_x, y, source_icon, Style.default().withFg(pkg.source.getColor()));
         current_x += 3;
         
         // Source name
         const source_name = pkg.source.getDisplayName();
         const source_len = @min(source_name.len, 8);
-        buffer.writeText(current_x, y, source_name[0..source_len], Style.withFg(pkg.source.getColor()));
+        buffer.writeText(current_x, y, source_name[0..source_len], Style.default().withFg(pkg.source.getColor()));
         current_x += 10;
         
         // Package name
@@ -734,7 +734,7 @@ pub const UniversalPackageBrowser = struct {
                 
                 // Word wrap description
                 const words = std.mem.split(u8, desc, " ");
-                var line = std.ArrayList(u8).init(self.allocator);
+                var line = std.ArrayList(u8){};
                 defer line.deinit(self.allocator);
                 
                 var word_iter = words;
@@ -746,9 +746,9 @@ pub const UniversalPackageBrowser = struct {
                     }
                     
                     if (line.items.len > 0) {
-                        line.append(' ') catch break;
+                        line.append(self.allocator, ' ') catch break;
                     }
-                    line.appendSlice(word) catch break;
+                    line.appendSlice(self.allocator, word) catch break;
                 }
                 
                 if (line.items.len > 0) {
@@ -893,7 +893,7 @@ pub const UniversalPackageBrowser = struct {
                             },
                             else => {
                                 if (self.current_view == .search_input) {
-                                    self.search_input.append(char) catch {};
+                                    self.search_input.append(self.allocator, char) catch {};
                                     return true;
                                 }
                             },
@@ -946,8 +946,8 @@ pub const UniversalPackageBrowser = struct {
             if (pkg.description) |d| self.allocator.free(d);
             if (pkg.maintainer) |m| self.allocator.free(m);
             if (pkg.url) |u| self.allocator.free(u);
-            pkg.tags.deinit(self.allocator);
-            pkg.dependencies.deinit(self.allocator);
+            pkg.tags.deinit();
+            pkg.dependencies.deinit();
         }
         self.packages.deinit(self.allocator);
         

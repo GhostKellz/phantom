@@ -19,10 +19,10 @@ pub fn main() !void {
     defer app.deinit();
 
     // Header
-    const title = try phantom.widgets.Text.initWithStyle(allocator, "👻 PHANTOM TUI v0.2.1 - PACKAGE MANAGER DEMO", phantom.Style.withFg(phantom.Color.bright_magenta).withBold());
+    const title = try phantom.widgets.Text.initWithStyle(allocator, "👻 PHANTOM TUI v0.2.1 - PACKAGE MANAGER DEMO", phantom.Style.default().withFg(phantom.Color.bright_magenta).withBold());
     try app.addWidget(&title.widget);
 
-    const subtitle = try phantom.widgets.Text.initWithStyle(allocator, "🚀 TaskMonitor Widget for ZION & Reaper Integration", phantom.Style.withFg(phantom.Color.bright_cyan));
+    const subtitle = try phantom.widgets.Text.initWithStyle(allocator, "🚀 TaskMonitor Widget for ZION & Reaper Integration", phantom.Style.default().withFg(phantom.Color.bright_cyan));
     try app.addWidget(&subtitle.widget);
 
     // Task monitor
@@ -55,7 +55,7 @@ pub fn main() !void {
     try monitor.updateTask("phantom", .completed, "✅ Ready for production!");
 
     // Instructions
-    const instructions = try phantom.widgets.Text.initWithStyle(allocator, "\n🎯 This showcases multi-task progress tracking for package managers\n🎮 Press Ctrl+C or ESC to exit", phantom.Style.withFg(phantom.Color.bright_yellow));
+    const instructions = try phantom.widgets.Text.initWithStyle(allocator, "\n🎯 This showcases multi-task progress tracking for package managers\n🎮 Press Ctrl+C or ESC to exit", phantom.Style.default().withFg(phantom.Color.bright_yellow));
     try app.addWidget(&instructions.widget);
 
     // Print startup

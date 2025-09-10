@@ -23,7 +23,8 @@ const TextLine = struct {
     content: std.ArrayList(u8),
     wrapped_lines: std.ArrayList([]const u8),
     
-    pub fn init(_: std.mem.Allocator) TextLine {
+    pub fn init(allocator: std.mem.Allocator) TextLine {
+        _ = allocator;
         return TextLine{
             .content = std.ArrayList(u8){},
             .wrapped_lines = std.ArrayList([]const u8){},
@@ -34,8 +35,8 @@ const TextLine = struct {
         for (self.wrapped_lines.items) |line| {
             self.content.allocator.free(line);
         }
-        self.wrapped_lines.deinit();
-        self.content.deinit();
+        self.wrapped_lines.deinit(self.content.allocator);
+        self.content.deinit(self.content.allocator);
     }
     
     pub fn updateWrapping(self: *TextLine, width: u16) !void {
@@ -43,7 +44,7 @@ const TextLine = struct {
         for (self.wrapped_lines.items) |line| {
             self.content.allocator.free(line);
         }
-        self.wrapped_lines.clearAndFree();
+        self.wrapped_lines.clearAndFree(self.allocator);
         
         if (width == 0) return;
         
@@ -53,14 +54,14 @@ const TextLine = struct {
         while (start < text.len) {
             const end = @min(start + width, text.len);
             const line = try self.content.allocator.dupe(u8, text[start..end]);
-            try self.wrapped_lines.append(line);
+            try self.wrapped_lines.append(self.content.allocator, line);
             start = end;
         }
         
         // Ensure at least one line exists
         if (self.wrapped_lines.items.len == 0) {
             const empty_line = try self.content.allocator.dupe(u8, "");
-            try self.wrapped_lines.append(empty_line);
+            try self.wrapped_lines.append(self.content.allocator, empty_line);
         }
     }
 };
@@ -121,7 +122,7 @@ pub const TextArea = struct {
     pub fn init(allocator: std.mem.Allocator) !*TextArea {
         const textarea = try allocator.create(TextArea);
         var lines = std.ArrayList(TextLine){};
-        try lines.append(TextLine.init(allocator));
+        try lines.append(allocator, TextLine.init(allocator));
         
         textarea.* = TextArea{
             .widget = Widget{ .vtable = &vtable },
@@ -146,19 +147,19 @@ pub const TextArea = struct {
         for (self.lines.items) |*line| {
             line.deinit();
         }
-        self.lines.clearAndFree();
+        self.lines.clearAndFree(self.allocator);
         
         // Split text into lines
         var lines_iter = std.mem.split(u8, text, "\n");
         while (lines_iter.next()) |line_text| {
             var line = TextLine.init(self.allocator);
-            try line.content.appendSlice(line_text);
-            try self.lines.append(line);
+            try line.content.appendSlice(self.allocator, line_text);
+            try self.lines.append(self.allocator, line);
         }
         
         // Ensure at least one line exists
         if (self.lines.items.len == 0) {
-            try self.lines.append(TextLine.init(self.allocator));
+            try self.lines.append(self.allocator, TextLine.init(self.allocator));
         }
         
         self.cursor_line = @min(self.cursor_line, self.lines.items.len - 1);
@@ -175,13 +176,13 @@ pub const TextArea = struct {
         var result = std.ArrayList(u8){};
         
         for (self.lines.items, 0..) |line, i| {
-            try result.appendSlice(line.content.items);
+            try result.appendSlice(self.allocator, line.content.items);
             if (i < self.lines.items.len - 1) {
-                try result.append('\n');
+                try result.append(self.allocator, '\n');
             }
         }
         
-        return result.toOwnedSlice();
+        return result.toOwnedSlice(self.allocator);
     }
 
     pub fn setWordWrap(self: *TextArea, word_wrap: bool) !void {
@@ -228,9 +229,9 @@ pub const TextArea = struct {
         for (self.lines.items) |*line| {
             line.deinit();
         }
-        self.lines.clearAndFree();
+        self.lines.clearAndFree(self.allocator);
         
-        try self.lines.append(TextLine.init(self.allocator));
+        try self.lines.append(self.allocator, TextLine.init(self.allocator));
         
         self.cursor_line = 0;
         self.cursor_col = 0;
@@ -332,7 +333,7 @@ pub const TextArea = struct {
         
         // Create new line
         var new_line = TextLine.init(self.allocator);
-        try new_line.content.appendSlice(new_line_text);
+        try new_line.content.appendSlice(self.allocator, new_line_text);
         
         // Insert new line after current line
         try self.lines.insert(self.cursor_line + 1, new_line);
@@ -362,7 +363,7 @@ pub const TextArea = struct {
             const prev_line = &self.lines.items[self.cursor_line - 1];
             
             self.cursor_col = prev_line.content.items.len;
-            try prev_line.content.appendSlice(current_line.content.items);
+            try prev_line.content.appendSlice(self.allocator, current_line.content.items);
             
             // Remove current line
             var line_to_remove = self.lines.orderedRemove(self.cursor_line);
@@ -654,7 +655,7 @@ pub const TextArea = struct {
         for (self.lines.items) |*line| {
             line.deinit();
         }
-        self.lines.deinit();
+        self.lines.deinit(self.allocator);
         
         self.allocator.free(self.placeholder);
         self.allocator.destroy(self);

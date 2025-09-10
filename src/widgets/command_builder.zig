@@ -114,13 +114,13 @@ pub const CommandBuilder = struct {
             .available_suggestions = std.ArrayList(Suggestion){},
             .filtered_suggestions = std.ArrayList(usize){},
             .preview_command = std.ArrayList(u8){},
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
-            .input_style = Style.withFg(style.Color.bright_white),
-            .suggestion_style = Style.withFg(style.Color.white),
-            .selected_suggestion_style = Style.withFg(style.Color.bright_yellow).withBold(),
-            .preview_style = Style.withFg(style.Color.bright_green),
-            .error_style = Style.withFg(style.Color.bright_red),
-            .success_style = Style.withFg(style.Color.bright_green),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
+            .input_style = Style.default().withFg(style.Color.bright_white),
+            .suggestion_style = Style.default().withFg(style.Color.white),
+            .selected_suggestion_style = Style.default().withFg(style.Color.bright_yellow).withBold(),
+            .preview_style = Style.default().withFg(style.Color.bright_green),
+            .error_style = Style.default().withFg(style.Color.bright_red),
+            .success_style = Style.default().withFg(style.Color.bright_green),
         };
         
         // Initialize with base command
@@ -137,7 +137,7 @@ pub const CommandBuilder = struct {
             .arg_type = suggestion.arg_type,
             .required = suggestion.required,
         };
-        try self.available_suggestions.append(owned_suggestion);
+        try self.available_suggestions.append(self.allocator, owned_suggestion);
     }
 
     /// Add multiple suggestions at once
@@ -154,7 +154,7 @@ pub const CommandBuilder = struct {
             .arg_type = arg_type,
             .value = if (value) |v| try self.allocator.dupe(u8, v) else null,
         };
-        try self.command_parts.append(part);
+        try self.command_parts.append(self.allocator, part);
         try self.updatePreview();
     }
 
@@ -204,12 +204,12 @@ pub const CommandBuilder = struct {
     pub fn validate(self: *CommandBuilder) bool {
         // Basic validation - check for required arguments
         var required_flags = std.ArrayList([]const u8){};
-        defer required_flags.deinit();
+        defer required_flags.deinit(self.allocator);
         
         // Collect required suggestions
         for (self.available_suggestions.items) |*suggestion| {
             if (suggestion.required) {
-                required_flags.append(suggestion.text) catch continue;
+                required_flags.append(self.allocator, suggestion.text) catch continue;
             }
         }
         
@@ -238,20 +238,20 @@ pub const CommandBuilder = struct {
         self.preview_command.clearRetainingCapacity();
         
         // Start with base command
-        try self.preview_command.appendSlice(self.base_command);
+        try self.preview_command.appendSlice(self.allocator, self.base_command);
         
         // Add all command parts
         for (self.command_parts.items) |*part| {
-            try self.preview_command.append(' ');
+            try self.preview_command.append(self.allocator, ' ');
             const part_text = try part.getFullText(self.allocator);
             defer self.allocator.free(part_text);
-            try self.preview_command.appendSlice(part_text);
+            try self.preview_command.appendSlice(self.allocator, part_text);
         }
         
         // Add current input if any
         if (self.current_input.items.len > 0) {
-            try self.preview_command.append(' ');
-            try self.preview_command.appendSlice(self.current_input.items);
+            try self.preview_command.append(self.allocator, ' ');
+            try self.preview_command.appendSlice(self.allocator, self.current_input.items);
         }
         
         // Validate the command
@@ -265,13 +265,13 @@ pub const CommandBuilder = struct {
         if (input.len == 0) {
             // Show all suggestions
             for (0..self.available_suggestions.items.len) |i| {
-                self.filtered_suggestions.append(i) catch break;
+                self.filtered_suggestions.append(self.allocator, i) catch break;
             }
         } else {
             // Filter by input prefix
             for (self.available_suggestions.items, 0..) |*suggestion, i| {
                 if (std.mem.startsWith(u8, suggestion.text, input)) {
-                    self.filtered_suggestions.append(i) catch break;
+                    self.filtered_suggestions.append(self.allocator, i) catch break;
                 }
             }
         }
@@ -451,7 +451,7 @@ pub const CommandBuilder = struct {
         if (area.height > 3) {
             const help_text = "Tab: autocomplete | Enter: execute | Esc: clear | Backspace: remove";
             const help_len = @min(help_text.len, area.width);
-            buffer.writeText(area.x, area.y + 3, help_text[0..help_len], Style.withFg(style.Color.bright_black));
+            buffer.writeText(area.x, area.y + 3, help_text[0..help_len], Style.default().withFg(style.Color.bright_black));
         }
     }
 
@@ -567,18 +567,18 @@ pub const CommandBuilder = struct {
             self.allocator.free(part.text);
             if (part.value) |val| self.allocator.free(val);
         }
-        self.command_parts.deinit();
+        self.command_parts.deinit(self.allocator);
         
         // Free suggestions
         for (self.available_suggestions.items) |*suggestion| {
             self.allocator.free(suggestion.text);
             self.allocator.free(suggestion.description);
         }
-        self.available_suggestions.deinit();
+        self.available_suggestions.deinit(self.allocator);
         
-        self.filtered_suggestions.deinit();
-        self.current_input.deinit();
-        self.preview_command.deinit();
+        self.filtered_suggestions.deinit(self.allocator);
+        self.current_input.deinit(self.allocator);
+        self.preview_command.deinit(self.allocator);
         self.allocator.free(self.base_command);
         
         if (self.validation_message) |msg| {

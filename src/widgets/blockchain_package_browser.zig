@@ -209,12 +209,12 @@ pub const BlockchainPackageBrowser = struct {
             .packages = std.ArrayList(BlockchainPackage){},
             .filtered_packages = std.ArrayList(usize){},
             .search_query = std.ArrayList(u8){},
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
-            .package_style = Style.withFg(style.Color.white),
-            .selected_style = Style.withFg(style.Color.bright_yellow).withBold(),
-            .category_style = Style.withFg(style.Color.bright_green),
-            .security_style = Style.withFg(style.Color.bright_red),
-            .network_style = Style.withFg(style.Color.bright_blue),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
+            .package_style = Style.default().withFg(style.Color.white),
+            .selected_style = Style.default().withFg(style.Color.bright_yellow).withBold(),
+            .category_style = Style.default().withFg(style.Color.bright_green),
+            .security_style = Style.default().withFg(style.Color.bright_red),
+            .network_style = Style.default().withFg(style.Color.bright_blue),
         };
         
         // Load blockchain packages
@@ -232,14 +232,14 @@ pub const BlockchainPackageBrowser = struct {
             .description = "Bitcoin consensus validation library",
             .category = .consensus,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .bitcoin);
                 break :blk networks;
             },
             .repository_url = "https://github.com/zigbitcoin/consensus",
             .is_audited = true,
             .security_score = 85,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         try self.addPackage(BlockchainPackage{
@@ -248,13 +248,13 @@ pub const BlockchainPackageBrowser = struct {
             .description = "Ethereum 2.0 consensus implementation",
             .category = .consensus,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .ethereum);
                 break :blk networks;
             },
             .is_audited = true,
             .security_score = 92,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         // Cryptography packages
@@ -264,14 +264,14 @@ pub const BlockchainPackageBrowser = struct {
             .description = "Optimized secp256k1 elliptic curve library",
             .category = .cryptography,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .bitcoin);
                 try networks.append(self.allocator, .ethereum);
                 break :blk networks;
             },
             .is_audited = true,
             .security_score = 95,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         try self.addPackage(BlockchainPackage{
@@ -280,14 +280,14 @@ pub const BlockchainPackageBrowser = struct {
             .description = "Ed25519 signature scheme for Solana/Cardano",
             .category = .cryptography,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .solana);
-                try networks.append(.cardano);
+                try networks.append(self.allocator, .cardano);
                 break :blk networks;
             },
             .is_audited = true,
             .security_score = 88,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         try self.addPackage(BlockchainPackage{
@@ -296,14 +296,14 @@ pub const BlockchainPackageBrowser = struct {
             .description = "Keccak-256 hash function for Ethereum",
             .category = .cryptography,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .ethereum);
-                try networks.append(.polygon);
+                try networks.append(self.allocator, .polygon);
                 break :blk networks;
             },
             .is_audited = false,
             .security_score = 72,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         // Networking packages
@@ -313,14 +313,14 @@ pub const BlockchainPackageBrowser = struct {
             .description = "LibP2P networking stack",
             .category = .networking,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .ethereum);
-                try networks.append(.polkadot);
+                try networks.append(self.allocator, .polkadot);
                 break :blk networks;
             },
             .is_audited = false,
             .security_score = 68,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         try self.addPackage(BlockchainPackage{
@@ -329,14 +329,14 @@ pub const BlockchainPackageBrowser = struct {
             .description = "Gossip protocol for blockchain networks",
             .category = .networking,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .solana);
-                try networks.append(.avalanche);
+                try networks.append(self.allocator, .avalanche);
                 break :blk networks;
             },
             .is_audited = false,
             .security_score = 65,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         // Storage packages
@@ -346,13 +346,13 @@ pub const BlockchainPackageBrowser = struct {
             .description = "Efficient Merkle tree implementation",
             .category = .storage,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.generic);
+                var networks = std.ArrayList(BlockchainNetwork){};
+                try networks.append(self.allocator, .generic);
                 break :blk networks;
             },
             .is_audited = true,
             .security_score = 82,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         try self.addPackage(BlockchainPackage{
@@ -361,13 +361,13 @@ pub const BlockchainPackageBrowser = struct {
             .description = "RocksDB bindings for blockchain storage",
             .category = .storage,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.generic);
+                var networks = std.ArrayList(BlockchainNetwork){};
+                try networks.append(self.allocator, .generic);
                 break :blk networks;
             },
             .is_audited = false,
             .security_score = 75,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         // RPC packages
@@ -377,15 +377,15 @@ pub const BlockchainPackageBrowser = struct {
             .description = "Ethereum JSON-RPC client",
             .category = .rpc,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .ethereum);
-                try networks.append(.polygon);
-                try networks.append(.arbitrum);
+                try networks.append(self.allocator, .polygon);
+                try networks.append(self.allocator, .arbitrum);
                 break :blk networks;
             },
             .is_audited = false,
             .security_score = 78,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         try self.addPackage(BlockchainPackage{
@@ -394,13 +394,13 @@ pub const BlockchainPackageBrowser = struct {
             .description = "Solana RPC client implementation",
             .category = .rpc,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .solana);
                 break :blk networks;
             },
             .is_audited = false,
             .security_score = 71,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         // Wallet packages
@@ -410,14 +410,14 @@ pub const BlockchainPackageBrowser = struct {
             .description = "HD wallet key derivation (BIP32/BIP44)",
             .category = .wallet,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .bitcoin);
                 try networks.append(self.allocator, .ethereum);
                 break :blk networks;
             },
             .is_audited = true,
             .security_score = 90,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         try self.addPackage(BlockchainPackage{
@@ -426,13 +426,13 @@ pub const BlockchainPackageBrowser = struct {
             .description = "BIP39 mnemonic phrase generation",
             .category = .wallet,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
-                try networks.append(.generic);
+                var networks = std.ArrayList(BlockchainNetwork){};
+                try networks.append(self.allocator, .generic);
                 break :blk networks;
             },
             .is_audited = true,
             .security_score = 93,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         // DeFi packages
@@ -442,14 +442,14 @@ pub const BlockchainPackageBrowser = struct {
             .description = "Uniswap V3 protocol implementation",
             .category = .defi,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .ethereum);
-                try networks.append(.polygon);
+                try networks.append(self.allocator, .polygon);
                 break :blk networks;
             },
             .is_audited = false,
             .security_score = 76,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         try self.addPackage(BlockchainPackage{
@@ -458,14 +458,14 @@ pub const BlockchainPackageBrowser = struct {
             .description = "Aave lending protocol bindings",
             .category = .defi,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .ethereum);
-                try networks.append(.avalanche);
+                try networks.append(self.allocator, .avalanche);
                 break :blk networks;
             },
             .is_audited = false,
             .security_score = 69,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         // NFT packages
@@ -475,14 +475,14 @@ pub const BlockchainPackageBrowser = struct {
             .description = "ERC-721 NFT standard implementation",
             .category = .nft,
             .networks = blk: {
-                var networks = std.ArrayList(BlockchainNetwork).init(self.allocator);
+                var networks = std.ArrayList(BlockchainNetwork){};
                 try networks.append(self.allocator, .ethereum);
-                try networks.append(.polygon);
+                try networks.append(self.allocator, .polygon);
                 break :blk networks;
             },
             .is_audited = true,
             .security_score = 87,
-            .dependencies = std.ArrayList([]const u8).init(self.allocator),
+            .dependencies = std.ArrayList([]const u8){},
         });
         
         // Update filters
@@ -490,7 +490,7 @@ pub const BlockchainPackageBrowser = struct {
     }
 
     fn addPackage(self: *BlockchainPackageBrowser, package: BlockchainPackage) !void {
-        try self.packages.append(package);
+        try self.packages.append(self.allocator, package);
     }
 
     /// Update filtered package list
@@ -528,7 +528,7 @@ pub const BlockchainPackageBrowser = struct {
                 if (!found_in_name and !found_in_desc) continue;
             }
             
-            self.filtered_packages.append(i) catch break;
+            self.filtered_packages.append(self.allocator, i) catch break;
         }
         
         // Reset selection if out of bounds
@@ -599,7 +599,7 @@ pub const BlockchainPackageBrowser = struct {
             const filter_text = std.fmt.allocPrint(self.allocator, "{s} {s}", .{ filter.getIcon(), filter.getDisplayName() }) catch return;
             defer self.allocator.free(filter_text);
             
-            buffer.writeText(current_x, y, filter_text, Style.withFg(filter.getColor()));
+            buffer.writeText(current_x, y, filter_text, Style.default().withFg(filter.getColor()));
             current_x += @as(u16, @intCast(filter_text.len)) + 2;
         }
         
@@ -622,7 +622,7 @@ pub const BlockchainPackageBrowser = struct {
         const help_text = "F1: Categories | F2: Networks | F3: Audited | /: Search";
         const help_x = x + width - @as(u16, @intCast(help_text.len));
         if (help_x > current_x) {
-            buffer.writeText(help_x, y, help_text, Style.withFg(style.Color.bright_black));
+            buffer.writeText(help_x, y, help_text, Style.default().withFg(style.Color.bright_black));
         }
     }
 
@@ -651,10 +651,10 @@ pub const BlockchainPackageBrowser = struct {
         // Help text at bottom
         if (area.height > 2) {
             const help_y = area.y + area.height - 1;
-            buffer.fill(Rect.init(area.x, help_y, area.width, 1), Cell.withStyle(Style.withFg(style.Color.bright_black)));
+            buffer.fill(Rect.init(area.x, help_y, area.width, 1), Cell.withStyle(Style.default().withFg(style.Color.bright_black)));
             const help_text = "Enter: details | Space: install | /: search | F1-F3: filters | q: quit";
             const help_len = @min(help_text.len, area.width);
-            buffer.writeText(area.x, help_y, help_text[0..help_len], Style.withFg(style.Color.bright_black));
+            buffer.writeText(area.x, help_y, help_text[0..help_len], Style.default().withFg(style.Color.bright_black));
         }
     }
 
@@ -667,7 +667,7 @@ pub const BlockchainPackageBrowser = struct {
         var current_x = x;
         
         // Category icon
-        buffer.writeText(current_x, y, pkg.category.getIcon(), Style.withFg(pkg.category.getColor()));
+        buffer.writeText(current_x, y, pkg.category.getIcon(), Style.default().withFg(pkg.category.getColor()));
         current_x += 5;
         
         // Security rating
@@ -676,11 +676,11 @@ pub const BlockchainPackageBrowser = struct {
                               else if (pkg.security_score >= 60) style.Color.bright_yellow 
                               else style.Color.bright_red;
         
-        buffer.writeText(current_x, y, security_text, Style.withFg(security_color));
+        buffer.writeText(current_x, y, security_text, Style.default().withFg(security_color));
         
         const score_text = std.fmt.allocPrint(self.allocator, "{d}", .{pkg.security_score}) catch return;
         defer self.allocator.free(score_text);
-        buffer.writeText(current_x + 2, y, score_text, Style.withFg(security_color));
+        buffer.writeText(current_x + 2, y, score_text, Style.default().withFg(security_color));
         current_x += 9;
         
         // Package name
@@ -691,16 +691,16 @@ pub const BlockchainPackageBrowser = struct {
         // Version
         if (pkg.version) |version| {
             const ver_len = @min(version.len, 8);
-            buffer.writeText(current_x, y, version[0..ver_len], Style.withFg(style.Color.bright_black));
+            buffer.writeText(current_x, y, version[0..ver_len], Style.default().withFg(style.Color.bright_black));
         }
         current_x += 11;
         
         // Networks
-        var network_text = std.ArrayList(u8).init(self.allocator);
+        var network_text = std.ArrayList(u8){};
         defer network_text.deinit(self.allocator);
         
         for (pkg.networks.items, 0..) |network, i| {
-            if (i > 0) network_text.appendSlice(self.allocator, ", ") catch break;
+            if (i > 0) network_text.appendSlice(", ") catch break;
             network_text.appendSlice(network.getIcon()) catch break;
         }
         
@@ -751,9 +751,9 @@ pub const BlockchainPackageBrowser = struct {
             y += 1;
             
             if (pkg.is_audited) {
-                buffer.writeText(area.x, y, "🛡️ Audited - Security review completed", Style.withFg(style.Color.bright_green));
+                buffer.writeText(area.x, y, "🛡️ Audited - Security review completed", Style.default().withFg(style.Color.bright_green));
             } else {
-                buffer.writeText(area.x, y, "⚠️ Not audited - Use with caution", Style.withFg(style.Color.bright_yellow));
+                buffer.writeText(area.x, y, "⚠️ Not audited - Use with caution", Style.default().withFg(style.Color.bright_yellow));
             }
             y += 2;
             
@@ -789,7 +789,7 @@ pub const BlockchainPackageBrowser = struct {
             
             for (info_lines) |line| {
                 if (y < area.y + area.height) {
-                    buffer.writeText(area.x, y, line, Style.withFg(style.Color.bright_black));
+                    buffer.writeText(area.x, y, line, Style.default().withFg(style.Color.bright_black));
                     self.allocator.free(line);
                     y += 1;
                 }
@@ -801,13 +801,13 @@ pub const BlockchainPackageBrowser = struct {
                 defer self.allocator.free(repo_line);
                 
                 if (y < area.y + area.height) {
-                    buffer.writeText(area.x, y, repo_line, Style.withFg(style.Color.bright_cyan));
+                    buffer.writeText(area.x, y, repo_line, Style.default().withFg(style.Color.bright_cyan));
                     y += 1;
                 }
             }
             
         } else {
-            buffer.writeText(area.x, area.y, "No package selected", Style.withFg(style.Color.bright_black));
+            buffer.writeText(area.x, area.y, "No package selected", Style.default().withFg(style.Color.bright_black));
         }
     }
 
@@ -823,7 +823,7 @@ pub const BlockchainPackageBrowser = struct {
             if (y >= area.y + area.height) break;
             
             const is_selected = (self.category_filter == category);
-            const line_style = if (is_selected) self.selected_style else Style.withFg(category.getColor());
+            const line_style = if (is_selected) self.selected_style else Style.default().withFg(category.getColor());
             
             const line = std.fmt.allocPrint(self.allocator, "{s} {s}", .{ 
                 category.getIcon(), category.getDisplayName() 
@@ -936,8 +936,8 @@ pub const BlockchainPackageBrowser = struct {
             if (pkg.description) |d| self.allocator.free(d);
             if (pkg.repository_url) |u| self.allocator.free(u);
             if (pkg.documentation_url) |u| self.allocator.free(u);
-            pkg.networks.deinit(self.allocator);
-            pkg.dependencies.deinit(self.allocator);
+            pkg.networks.deinit();
+            pkg.dependencies.deinit();
         }
         self.packages.deinit(self.allocator);
         self.filtered_packages.deinit(self.allocator);

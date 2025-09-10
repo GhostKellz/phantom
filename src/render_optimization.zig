@@ -71,7 +71,7 @@ pub const DirtyRegionManager = struct {
         }
         
         // No overlap, add as new dirty rect
-        try self.dirty_rects.append(DirtyRect.init(rect));
+        try self.dirty_rects.append(self.allocator, DirtyRect.init(rect));
         self.dirty_rects.items[self.dirty_rects.items.len - 1].markDirty();
     }
     

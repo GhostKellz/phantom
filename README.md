@@ -1,27 +1,27 @@
 # 👻 Phantom — The Next-Gen TUI Framework for Zig
 
-[![Zig v0.15+](https://img.shields.io/badge/zig-0.15+-f7a41d?logo=zig\&logoColor=white)](https://ziglang.org/)
-[![Async by zsync](https://img.shields.io/badge/async-zsync-blue)]()
-[![Rattatui-inspired](https://img.shields.io/badge/tui-rattatui-ghostly)]()
-[![Pure Zig](https://img.shields.io/badge/pure-zig-success)]()
+[![Zig v0.16+](https://img.shields.io/badge/zig-0.16+-f7a41d?logo=zig\&logoColor=white)](https://ziglang.org/)
+[![Production Ready](https://img.shields.io/badge/status-production_ready-success)](https://github.com/ghostkellz/phantom)
+[![Ratatui-inspired](https://img.shields.io/badge/tui-ratatui_style-ghostly)](https://github.com/ratatui-org/ratatui)
+[![Pure Zig](https://img.shields.io/badge/pure-zig-success)](https://ziglang.org/)
 
 ---
 
-**Phantom** is a lightning-fast, async-native TUI (terminal user interface) framework for Zig — inspired by Rattatui/tui-rs, rebuilt from scratch for Zig v0.15+ and the zsync async runtime.
+**Phantom** is a production-ready TUI (terminal user interface) framework for Zig — inspired by Ratatui, built from the ground up for Zig 0.16+ with comprehensive widgets, advanced styling, and professional-grade reliability.
 
 ---
 
 ## ✨ Features
 
-* 🚀 **Pure Zig:** Zero C glue, idiomatic types
-* ⚡ **zsync-powered async:** True async event loop, input, timers, and UI refresh
-* 🧱 **Widgets Galore:** Tabs, lists, tables, trees, grids, progress, forms, modals, markdown, and more
-* 🖼️ **Compositional Layouts:** Flex, grid, stack, float, absolute
-* 🌈 **Styled Output:** Colors, gradients, bold, underline, Unicode, Nerd Font
-* 🖱️ **Input Handling:** Keyboard, mouse, focus, signals
-* 🔄 **Live Updates:** Async render loop—UI never blocks
-* 🧩 **Extensible:** Custom widgets, event hooks, async actions
-* 🧪 **Testable:** Snapshot and integration tests
+* 🚀 **Production Ready:** Stable API, comprehensive testing, memory-safe
+* 🧩 **Rich Widget Library:** 20+ widgets from basic text to advanced package browsers
+* 🎨 **Advanced Styling:** True colors, animations, themes with fluent builder API
+* 🖱️ **Full Input Support:** Keyboard navigation, mouse events, focus management
+* 📱 **Responsive Layouts:** Constraint-based layout system adapts to terminal size
+* ⚡ **High Performance:** Efficient diff-based rendering, optimized memory usage
+* 🧪 **Thoroughly Tested:** Comprehensive test suite with example applications
+* 🔧 **Developer Friendly:** Complete documentation, migration guides, best practices
+* 💻 **Zig 0.16+ Compatible:** Built for modern Zig with proper ArrayList API usage
 
 ---
 
@@ -29,8 +29,8 @@
 
 **Requirements:**
 
-* Zig v0.15+
-* (Optional) zsync for async workflows
+* **Zig v0.16+** (tested with 0.16.0-dev.164+bc7955306)
+* Terminal with ANSI color support
 
 ```sh
 git clone https://github.com/ghostkellz/phantom.git
@@ -38,11 +38,18 @@ cd phantom
 zig build run
 ```
 
-Or add to your build.zig:
+Or add to your project:
+
+```bash
+zig fetch --save https://github.com/ghostkellz/phantom/archive/v0.3.3.tar.gz
+```
+
+Then in your `build.zig`:
 
 ```zig
 const phantom_dep = b.dependency("phantom", .{ .target = target, .optimize = optimize });
-const phantom = phantom_dep.module("phantom");
+const phantom_mod = phantom_dep.module("phantom");
+exe.root_module.addImport("phantom", phantom_mod);
 ```
 
 ---
@@ -58,88 +65,111 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
     
-    // Initialize runtime
-    phantom.runtime.initRuntime(allocator);
-    defer phantom.runtime.deinitRuntime();
-    
-    // Create app
-    var app = try phantom.App.init(allocator, phantom.AppConfig{
+    // Create application
+    var app = try phantom.App.init(allocator, .{
         .title = "👻 My Phantom App",
         .tick_rate_ms = 50,
+        .mouse_enabled = true,
     });
     defer app.deinit();
     
-    // Add widgets
+    // Add styled text (v0.3.3 uses instance methods)
     const text = try phantom.widgets.Text.initWithStyle(
         allocator,
         "Hello, Phantom! 👻",
-        phantom.Style.withFg(phantom.Color.bright_cyan).withBold()
+        phantom.Style.default().withFg(phantom.Color.bright_cyan).withBold()
     );
     try app.addWidget(&text.widget);
     
+    // Add interactive list
     const list = try phantom.widgets.List.init(allocator);
-    try list.addItemText("Option 1");
-    try list.addItemText("Option 2");
-    try list.addItemText("Option 3");
+    try list.addItemText("🚀 Production Ready");
+    try list.addItemText("🧩 Rich Widget Library");
+    try list.addItemText("🎨 Advanced Styling");
+    list.setSelectedStyle(
+        phantom.Style.default().withFg(phantom.Color.white).withBg(phantom.Color.bright_blue)
+    );
     try app.addWidget(&list.widget);
     
-    // Run
+    // Run application
     try app.run();
 }
 ```
 
-### Current Widget Library
-- **Text**: Styled text display with alignment
-- **Block**: Bordered containers with optional titles
-- **List**: Selectable item lists with keyboard navigation
+### Widget Library (v0.3.3)
+- **Core Widgets**: Text, Block, Container, List, Button, Input, TextArea
+- **Data Display**: Table, ProgressBar, TaskMonitor, SystemMonitor  
+- **Advanced**: StreamingText, CodeBlock, Dialog, ContextMenu
+- **Specialized**: NetworkTopology, PackageBrowsers, CommandBuilder
 
-### Available Styling
-- **Colors**: Basic terminal colors + bright variants
-- **Attributes**: Bold, italic, underline, strikethrough
-- **Backgrounds**: All colors available as backgrounds
-
----
-
-## ⚡️ Async Power
-
-* **zsync integration:** Use async/await everywhere—event handlers, widgets, background jobs
-* **Non-blocking input:** UI, signals, and timers run in async tasks
-* **Async hooks:** Live network, file, or shell ops in your TUI (great for dashboards, chat, logs, etc)
+### Styling System
+- **Colors**: 16 basic + 16 bright + RGB true color + 256-color palette
+- **Attributes**: Bold, italic, underline, strikethrough, dim, reverse, blink
+- **Fluent API**: `Style.default().withFg(color).withBold().withBg(bg_color)`
+- **Animations**: Built-in progress animations and typing effects
 
 ---
 
-## 🗺️ Roadmap
+## 📚 Documentation & Examples
 
-### ✅ Completed (v0.1.0 MVP)
-* [x] **Project Setup**: Pure Zig v0.15+ with zsync integration
-* [x] **Core Terminal Interface**: Raw mode, screen buffers, ANSI output
-* [x] **Event System**: Keyboard input, event loops, handlers
-* [x] **Widget Framework**: Base widget trait with vtable system
-* [x] **Core Widgets**: Text, Block (borders), List (selectable)
-* [x] **Style System**: Colors, attributes (bold, italic, underline)
-* [x] **Geometry Types**: Rect, Position, Size with operations
-* [x] **Double Buffering**: Efficient diff-based rendering
-* [x] **App Framework**: Main application loop and lifecycle
+* **[Complete Documentation](DOCS.md)**: Comprehensive guide with all features
+* **[API Reference](API.md)**: Detailed API documentation for all widgets
+* **[Integration Guide](PHANTOM_INTEGRATION.md)**: Step-by-step integration instructions
+* **Example Applications**: 6 complete demo applications in `examples/`
+  - `simple_package_demo` - Package manager progress tracking
+  - `zion_cli_demo` - Advanced Zig library management
+  - `ghostty_performance_demo` - System performance monitoring
+  - `crypto_package_demo` - Blockchain package browser
+  - `reaper_aur_demo` - Arch Linux AUR dependency manager
+  - `comprehensive_demo` - All widgets showcase
 
-### 🚧 In Progress
-* [ ] **Layout Engine**: Flex, Grid layouts with constraints
-* [ ] **Mouse Support**: Click, drag, scroll events
-* [ ] **More Widgets**: Progress bars, Tables, Input boxes, Tabs
-* [ ] **Advanced Styling**: Gradients, themes, dynamic colors
+---
 
-### 📋 Planned (v0.2.0+)
-* [ ] **Async Integration**: Full zsync async event loops
-* [ ] **Modal/Popup System**: Overlay widgets and focus management
-* [ ] **Layout Constraints**: Rattatui-style constraint system
-* [ ] **Terminal Detection**: Proper size detection and capabilities
-* [ ] **Testing Framework**: Snapshot testing for TUI components
+## 🏆 Version History & Roadmap
+
+### ✅ v0.3.3 (Current) - Production Ready
+* **Full Zig 0.16+ Compatibility**: Updated ArrayList API, memory management
+* **20+ Professional Widgets**: Complete widget ecosystem for any TUI app
+* **Advanced Styling System**: True colors, animations, fluent API
+* **Comprehensive Documentation**: Complete guides, API reference, examples
+* **Production Testing**: Memory-safe, performance-optimized, thoroughly tested
+
+### ✅ v0.3.2 - Polish & Refinement
+* Enhanced widget library with specialized components
+* Improved event handling and focus management
+* Better layout system with responsive design
+
+### ✅ v0.3.1 - Advanced Features
+* StreamingText widget for AI chat applications
+* TaskMonitor for package manager integration
+* CodeBlock with syntax highlighting
+
+### ✅ v0.3.0 - Major Expansion
+* Comprehensive widget library (15+ widgets)
+* Advanced input handling (mouse, keyboard, focus)
+* Professional styling system
+
+### 🚧 v0.4.0 - Planned Features
+* **Async Integration**: Non-blocking I/O with zsync runtime
+* **Plugin System**: Custom widget development framework  
+* **Theme Engine**: Built-in themes and theme switching
+* **Performance Profiler**: Built-in performance analysis tools
+* **Accessibility**: Screen reader support and accessibility features
 
 ---
 
 ## 🤝 Contributing
 
-PRs, issues, widget ideas, and flames welcome!
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for guidelines and style.
+Phantom is actively maintained and welcomes contributions! Here's how you can help:
+
+* **🐛 Bug Reports**: Found an issue? [Open an issue](https://github.com/ghostkellz/phantom/issues)
+* **💡 Feature Requests**: Have an idea for a new widget or feature?
+* **📖 Documentation**: Help improve guides, examples, or API docs
+* **🧩 Widget Development**: Create new widgets for the ecosystem
+* **🧪 Testing**: Add tests or test on different platforms
+* **⭐ Star the Project**: Show your support and help others discover Phantom
+
+See our contributing guidelines for code style, testing requirements, and development setup.
 
 ---
 

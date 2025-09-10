@@ -155,7 +155,7 @@ pub const ContextMenu = struct {
                 self.allocator.free(shortcut);
             }
         }
-        self.items.clearAndFree();
+        self.items.clearAndFree(self.allocator);
     }
 
     pub fn showAt(self: *ContextMenu, position: Position) void {

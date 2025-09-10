@@ -109,11 +109,11 @@ pub const CommandBuilder = struct {
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
             .base_command = try allocator.dupe(u8, base_command),
-            .command_parts = std.ArrayList(CommandPart){},
-            .current_input = std.ArrayList(u8){},
-            .available_suggestions = std.ArrayList(Suggestion){},
-            .filtered_suggestions = std.ArrayList(usize){},
-            .preview_command = std.ArrayList(u8){},
+            .command_parts = std.ArrayList(CommandPart).init(allocator),
+            .current_input = std.ArrayList(u8).init(allocator),
+            .available_suggestions = std.ArrayList(Suggestion).init(allocator),
+            .filtered_suggestions = std.ArrayList(usize).init(allocator),
+            .preview_command = std.ArrayList(u8).init(allocator),
             .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
             .input_style = Style.default().withFg(style.Color.bright_white),
             .suggestion_style = Style.default().withFg(style.Color.white),
@@ -203,7 +203,7 @@ pub const CommandBuilder = struct {
     /// Validate the current command
     pub fn validate(self: *CommandBuilder) bool {
         // Basic validation - check for required arguments
-        var required_flags = std.ArrayList([]const u8){};
+        var required_flags = std.ArrayList([]const u8).init(self.allocator);
         defer required_flags.deinit(self.allocator);
         
         // Collect required suggestions

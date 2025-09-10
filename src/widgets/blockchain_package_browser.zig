@@ -239,7 +239,7 @@ pub const BlockchainPackageBrowser = struct {
             .repository_url = "https://github.com/zigbitcoin/consensus",
             .is_audited = true,
             .security_score = 85,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         try self.addPackage(BlockchainPackage{
@@ -254,7 +254,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = true,
             .security_score = 92,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         // Cryptography packages
@@ -271,7 +271,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = true,
             .security_score = 95,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         try self.addPackage(BlockchainPackage{
@@ -287,7 +287,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = true,
             .security_score = 88,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         try self.addPackage(BlockchainPackage{
@@ -303,7 +303,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = false,
             .security_score = 72,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         // Networking packages
@@ -320,7 +320,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = false,
             .security_score = 68,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         try self.addPackage(BlockchainPackage{
@@ -336,7 +336,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = false,
             .security_score = 65,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         // Storage packages
@@ -352,7 +352,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = true,
             .security_score = 82,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         try self.addPackage(BlockchainPackage{
@@ -367,7 +367,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = false,
             .security_score = 75,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         // RPC packages
@@ -385,7 +385,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = false,
             .security_score = 78,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         try self.addPackage(BlockchainPackage{
@@ -400,7 +400,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = false,
             .security_score = 71,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         // Wallet packages
@@ -417,7 +417,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = true,
             .security_score = 90,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         try self.addPackage(BlockchainPackage{
@@ -432,7 +432,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = true,
             .security_score = 93,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         // DeFi packages
@@ -449,7 +449,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = false,
             .security_score = 76,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         try self.addPackage(BlockchainPackage{
@@ -465,7 +465,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = false,
             .security_score = 69,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         // NFT packages
@@ -482,7 +482,7 @@ pub const BlockchainPackageBrowser = struct {
             },
             .is_audited = true,
             .security_score = 87,
-            .dependencies = std.ArrayList([]const u8){},
+            .dependencies = std.ArrayList([]const u8).init(self.allocator),
         });
         
         // Update filters

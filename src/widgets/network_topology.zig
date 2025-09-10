@@ -142,8 +142,8 @@ pub const NetworkTopology = struct {
         topology.* = NetworkTopology{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .nodes = std.ArrayList(NetworkNode){},
-            .connections = std.ArrayList(Connection){},
+            .nodes = std.ArrayList(NetworkNode).init(allocator),
+            .connections = std.ArrayList(Connection).init(allocator),
             .node_map = std.HashMap([]const u8, usize, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
             .node_style = Style.default().withFg(style.Color.bright_white),

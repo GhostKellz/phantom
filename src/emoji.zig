@@ -243,7 +243,7 @@ pub fn truncateText(allocator: std.mem.Allocator, text: []const u8, max_width: u
     }
 
     // Simple truncation - could be improved with proper Unicode handling
-    var result = std.ArrayList(u8){};
+    var result = std.ArrayList(u8).init(allocator);
     var width: usize = 0;
     var i: usize = 0;
 

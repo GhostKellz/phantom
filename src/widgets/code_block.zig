@@ -150,8 +150,8 @@ pub const CodeBlock = struct {
             .allocator = allocator,
             .code = try allocator.dupe(u8, code),
             .language = language,
-            .lines = std.ArrayList([]const u8){},
-            .tokens = std.ArrayList(Token){},
+            .lines = std.ArrayList([]const u8).init(allocator),
+            .tokens = std.ArrayList(Token).init(allocator),
             .line_number_style = Style.default().withFg(style.Color.yellow),
             .theme = Theme{},
         };
@@ -223,7 +223,7 @@ pub const CodeBlock = struct {
         self.lines.clearAndFree(self.allocator);
         
         // Split code into lines
-        var lines_iter = std.mem.split(u8, self.code, "\n");
+        var lines_iter = std.mem.splitSequence(u8, self.code, "\n");
         while (lines_iter.next()) |line| {
             const owned_line = try self.allocator.dupe(u8, line);
             try self.lines.append(self.allocator, owned_line);

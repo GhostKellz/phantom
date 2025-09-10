@@ -183,9 +183,9 @@ pub const SystemMonitor = struct {
         
         if (result.term.Exited == 0) {
             // Parse nvidia-smi output: "memory_total, memory_used, gpu_util"
-            var lines = std.mem.split(u8, std.mem.trim(u8, result.stdout, "\n\r "), "\n");
+            var lines = std.mem.splitSequence(u8, std.mem.trim(u8, result.stdout, "\n\r "), "\n");
             if (lines.next()) |line| {
-                var parts = std.mem.split(u8, line, ",");
+                var parts = std.mem.splitSequence(u8, line, ",");
                 
                 if (parts.next()) |memory_total_str| {
                     const trimmed = std.mem.trim(u8, memory_total_str, " ");
@@ -219,7 +219,7 @@ pub const SystemMonitor = struct {
         
         if (result.term.Exited == 0) {
             // Look for VGA or 3D controller entries
-            var lines = std.mem.split(u8, result.stdout, "\n");
+            var lines = std.mem.splitSequence(u8, result.stdout, "\n");
             while (lines.next()) |line| {
                 if (std.mem.indexOf(u8, line, "VGA") != null or 
                     std.mem.indexOf(u8, line, "3D controller") != null) {

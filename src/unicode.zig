@@ -141,14 +141,14 @@ pub const UnicodeWidth = struct {
 pub const TextWrap = struct {
     /// Wrap text to fit within a given width
     pub fn wrapText(allocator: std.mem.Allocator, text: []const u8, width: u16) !std.ArrayList([]const u8) {
-        var lines = std.ArrayList([]const u8){};
+        var lines = std.ArrayList([]const u8).init(allocator);
         
         if (width == 0) {
             try lines.append(allocator, try allocator.dupe(u8, ""));
             return lines;
         }
         
-        var line_iter = std.mem.split(u8, text, "\n");
+        var line_iter = std.mem.splitSequence(u8, text, "\n");
         while (line_iter.next()) |line| {
             try wrapLine(allocator, &lines, line, width);
         }
@@ -299,7 +299,7 @@ pub const TextMeasure = struct {
     /// Get the width of the longest line in a text
     pub fn getMaxLineWidth(text: []const u8) !u16 {
         var max_width: u16 = 0;
-        var line_iter = std.mem.split(u8, text, "\n");
+        var line_iter = std.mem.splitSequence(u8, text, "\n");
         
         while (line_iter.next()) |line| {
             const width = try UnicodeWidth.stringWidth(line);

@@ -206,7 +206,7 @@ pub const Animation = struct {
     pub fn init(allocator: std.mem.Allocator, duration_ms: u64) Animation {
         return Animation{
             .allocator = allocator,
-            .keyframes = std.ArrayList(Keyframe){},
+            .keyframes = std.ArrayList(Keyframe).init(allocator),
             .duration_ms = duration_ms,
         };
     }
@@ -409,7 +409,7 @@ pub const AnimationManager = struct {
     pub fn init(allocator: std.mem.Allocator) AnimationManager {
         return AnimationManager{
             .allocator = allocator,
-            .animations = std.ArrayList(*Animation){},
+            .animations = std.ArrayList(*Animation).init(allocator),
         };
     }
     

@@ -193,10 +193,10 @@ pub const AURDependencies = struct {
         widget.* = AURDependencies{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .dependency_tree = std.ArrayList(Package){},
-            .expanded_nodes = std.ArrayList(bool){},
-            .search_query = std.ArrayList(u8){},
-            .filtered_dependencies = std.ArrayList(usize){},
+            .dependency_tree = std.ArrayList(Package).init(allocator),
+            .expanded_nodes = std.ArrayList(bool).init(allocator),
+            .search_query = std.ArrayList(u8).init(allocator),
+            .filtered_dependencies = std.ArrayList(usize).init(allocator),
             .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
             .package_style = Style.default().withFg(style.Color.bright_white).withBold(),
             .dependency_style = Style.default().withFg(style.Color.white),
@@ -233,7 +233,7 @@ pub const AURDependencies = struct {
             .maintainer = try self.allocator.dupe(u8, package.maintainer),
             .repo = try self.allocator.dupe(u8, package.repo),
             .status = package.status,
-            .dependencies = std.ArrayList(PackageDependency){},
+            .dependencies = std.ArrayList(PackageDependency).init(self.allocator),
         };
         
         // Copy dependencies
@@ -629,7 +629,7 @@ test "AURDependencies widget creation" {
     defer widget.widget.deinit();
 
     // Create test package
-    var deps = std.ArrayList(PackageDependency){};
+    var deps = std.ArrayList(PackageDependency).init(allocator);
     defer deps.deinit(allocator);
     
     try deps.append(allocator, PackageDependency{

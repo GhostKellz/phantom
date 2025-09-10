@@ -97,50 +97,52 @@ pub const Clipboard = struct {
     // Linux implementation using xclip/xsel
     fn copyTextLinux(self: *Clipboard, text: []const u8) ClipboardError!void {
         // Try xclip first
-        const xclip_result = std.ChildProcess.exec(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{ "xclip", "-selection", "clipboard" },
-            .stdin_behavior = .Pipe,
-        });
+        var xclip_child = std.process.Child.init(&[_][]const u8{ "xclip", "-selection", "clipboard" }, self.allocator);
+        xclip_child.stdin_behavior = .Pipe;
+        xclip_child.stdout_behavior = .Pipe;
+        xclip_child.stderr_behavior = .Pipe;
+        const xclip_result = xclip_child.spawnAndWait();
         
-        if (xclip_result) |result| {
-            defer self.allocator.free(result.stdout);
-            defer self.allocator.free(result.stderr);
-            
-            if (result.term.Exited == 0) {
-                // Write text to xclip stdin
+        if (xclip_result) |term| {
+            if (term == .Exited and term.Exited == 0) {
+                if (xclip_child.stdin) |stdin| {
+                    _ = stdin.writeAll(text) catch {};
+                    stdin.close();
+                }
                 return;
             }
         } else |_| {}
         
         // Fallback to xsel
-        const xsel_result = std.ChildProcess.exec(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{ "xsel", "--clipboard", "--input" },
-            .stdin_behavior = .Pipe,
-        });
+        var xsel_child = std.process.Child.init(&[_][]const u8{ "xsel", "--clipboard", "--input" }, self.allocator);
+        xsel_child.stdin_behavior = .Pipe;
+        xsel_child.stdout_behavior = .Pipe;
+        xsel_child.stderr_behavior = .Pipe;
+        const xsel_result = xsel_child.spawnAndWait();
         
-        if (xsel_result) |result| {
-            defer self.allocator.free(result.stdout);
-            defer self.allocator.free(result.stderr);
-            
-            if (result.term.Exited == 0) {
-                // Write text to xsel stdin
+        if (xsel_result) |term| {
+            if (term == .Exited and term.Exited == 0) {
+                if (xsel_child.stdin) |stdin| {
+                    _ = stdin.writeAll(text) catch {};
+                    stdin.close();
+                }
                 return;
             }
         } else |_| {}
         
         // If both fail, try using /proc/self/fd/0 approach
-        const proc_result = std.ChildProcess.exec(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{ "sh", "-c", "echo -n \"" ++ text ++ "\" | xclip -selection clipboard" },
-        });
+        const escaped_text = ClipboardUtils.escapeForShell(self.allocator, text) catch return ClipboardError.OutOfMemory;
+        defer self.allocator.free(escaped_text);
+        const cmd = std.fmt.allocPrint(self.allocator, "echo -n '{s}' | xclip -selection clipboard", .{escaped_text}) catch return ClipboardError.OutOfMemory;
+        defer self.allocator.free(cmd);
         
-        if (proc_result) |result| {
-            defer self.allocator.free(result.stdout);
-            defer self.allocator.free(result.stderr);
-            
-            if (result.term.Exited == 0) {
+        var proc_child = std.process.Child.init(&[_][]const u8{ "sh", "-c", cmd }, self.allocator);
+        proc_child.stdout_behavior = .Pipe;
+        proc_child.stderr_behavior = .Pipe;
+        const proc_result = proc_child.spawnAndWait();
+        
+        if (proc_result) |term| {
+            if (term == .Exited and term.Exited == 0) {
                 return;
             }
         } else |_| {}
@@ -150,30 +152,34 @@ pub const Clipboard = struct {
     
     fn pasteTextLinux(self: *Clipboard) ClipboardError![]u8 {
         // Try xclip first
-        const xclip_result = std.ChildProcess.exec(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{ "xclip", "-selection", "clipboard", "-o" },
-        });
+        var xclip_child = std.process.Child.init(&[_][]const u8{ "xclip", "-selection", "clipboard", "-o" }, self.allocator);
+        xclip_child.stdout_behavior = .Pipe;
+        xclip_child.stderr_behavior = .Pipe;
         
-        if (xclip_result) |result| {
-            defer self.allocator.free(result.stderr);
-            
-            if (result.term.Exited == 0) {
-                return result.stdout;
+        const xclip_result = xclip_child.spawnAndWait();
+        
+        if (xclip_result) |term| {
+            if (term == .Exited and term.Exited == 0) {
+                if (xclip_child.stdout) |stdout| {
+                    const output = stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize)) catch return ClipboardError.SystemError;
+                    return output;
+                }
             }
         } else |_| {}
         
         // Fallback to xsel
-        const xsel_result = std.ChildProcess.exec(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{ "xsel", "--clipboard", "--output" },
-        });
+        var xsel_child = std.process.Child.init(&[_][]const u8{ "xsel", "--clipboard", "--output" }, self.allocator);
+        xsel_child.stdout_behavior = .Pipe;
+        xsel_child.stderr_behavior = .Pipe;
         
-        if (xsel_result) |result| {
-            defer self.allocator.free(result.stderr);
-            
-            if (result.term.Exited == 0) {
-                return result.stdout;
+        const xsel_result = xsel_child.spawnAndWait();
+        
+        if (xsel_result) |term| {
+            if (term == .Exited and term.Exited == 0) {
+                if (xsel_child.stdout) |stdout| {
+                    const output = stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize)) catch return ClipboardError.SystemError;
+                    return output;
+                }
             }
         } else |_| {}
         
@@ -196,18 +202,19 @@ pub const Clipboard = struct {
     
     // macOS implementation using pbcopy/pbpaste
     fn copyTextMacOS(self: *Clipboard, text: []const u8) ClipboardError!void {
-        const result = std.ChildProcess.exec(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{"pbcopy"},
-            .stdin_behavior = .Pipe,
-        });
+        var child = std.process.Child.init(&[_][]const u8{"pbcopy"}, self.allocator);
+        child.stdin_behavior = .Pipe;
+        child.stdout_behavior = .Pipe;
+        child.stderr_behavior = .Pipe;
         
-        if (result) |proc_result| {
-            defer self.allocator.free(proc_result.stdout);
-            defer self.allocator.free(proc_result.stderr);
-            
-            if (proc_result.term.Exited == 0) {
-                // Write text to pbcopy stdin
+        const result = child.spawnAndWait();
+        
+        if (result) |term| {
+            if (term == .Exited and term.Exited == 0) {
+                if (child.stdin) |stdin| {
+                    _ = stdin.writeAll(text) catch {};
+                    stdin.close();
+                }
                 return;
             }
         } else |_| {}
@@ -216,16 +223,14 @@ pub const Clipboard = struct {
         const echo_cmd = try std.fmt.allocPrint(self.allocator, "echo -n '{s}' | pbcopy", .{text});
         defer self.allocator.free(echo_cmd);
         
-        const echo_result = std.ChildProcess.exec(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{ "sh", "-c", echo_cmd },
-        });
+        var echo_child = std.process.Child.init(&[_][]const u8{ "sh", "-c", echo_cmd }, self.allocator);
+        echo_child.stdout_behavior = .Pipe;
+        echo_child.stderr_behavior = .Pipe;
         
-        if (echo_result) |proc_result| {
-            defer self.allocator.free(proc_result.stdout);
-            defer self.allocator.free(proc_result.stderr);
-            
-            if (proc_result.term.Exited == 0) {
+        const echo_result = echo_child.spawnAndWait();
+        
+        if (echo_result) |term| {
+            if (term == .Exited and term.Exited == 0) {
                 return;
             }
         } else |_| {}
@@ -234,16 +239,18 @@ pub const Clipboard = struct {
     }
     
     fn pasteTextMacOS(self: *Clipboard) ClipboardError![]u8 {
-        const result = std.ChildProcess.exec(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{"pbpaste"},
-        });
+        var child = std.process.Child.init(&[_][]const u8{"pbpaste"}, self.allocator);
+        child.stdout_behavior = .Pipe;
+        child.stderr_behavior = .Pipe;
         
-        if (result) |proc_result| {
-            defer self.allocator.free(proc_result.stderr);
-            
-            if (proc_result.term.Exited == 0) {
-                return proc_result.stdout;
+        const result = child.spawnAndWait();
+        
+        if (result) |term| {
+            if (term == .Exited and term.Exited == 0) {
+                if (child.stdout) |stdout| {
+                    const output = stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize)) catch return ClipboardError.SystemError;
+                    return output;
+                }
             }
         } else |_| {}
         
@@ -269,16 +276,14 @@ pub const Clipboard = struct {
         const cmd = try std.fmt.allocPrint(self.allocator, "echo {s} | clip", .{text});
         defer self.allocator.free(cmd);
         
-        const result = std.ChildProcess.exec(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{ "cmd", "/c", cmd },
-        });
+        var child = std.process.Child.init(&[_][]const u8{ "cmd", "/c", cmd }, self.allocator);
+        child.stdout_behavior = .Pipe;
+        child.stderr_behavior = .Pipe;
         
-        if (result) |proc_result| {
-            defer self.allocator.free(proc_result.stdout);
-            defer self.allocator.free(proc_result.stderr);
-            
-            if (proc_result.term.Exited == 0) {
+        const result = child.spawnAndWait();
+        
+        if (result) |term| {
+            if (term == .Exited and term.Exited == 0) {
                 return;
             }
         } else |_| {}
@@ -287,16 +292,18 @@ pub const Clipboard = struct {
     }
     
     fn pasteTextWindows(self: *Clipboard) ClipboardError![]u8 {
-        const result = std.ChildProcess.exec(.{
-            .allocator = self.allocator,
-            .argv = &[_][]const u8{ "powershell", "-Command", "Get-Clipboard" },
-        });
+        var child = std.process.Child.init(&[_][]const u8{ "powershell", "-Command", "Get-Clipboard" }, self.allocator);
+        child.stdout_behavior = .Pipe;
+        child.stderr_behavior = .Pipe;
         
-        if (result) |proc_result| {
-            defer self.allocator.free(proc_result.stderr);
-            
-            if (proc_result.term.Exited == 0) {
-                return proc_result.stdout;
+        const result = child.spawnAndWait();
+        
+        if (result) |term| {
+            if (term == .Exited and term.Exited == 0) {
+                if (child.stdout) |stdout| {
+                    const output = stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize)) catch return ClipboardError.SystemError;
+                    return output;
+                }
             }
         } else |_| {}
         
@@ -440,7 +447,7 @@ pub const ClipboardEvent = struct {
 pub const ClipboardUtils = struct {
     /// Sanitize text for clipboard (remove null bytes, etc.)
     pub fn sanitizeText(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
-        var sanitized = std.ArrayList(u8){};
+        var sanitized = std.ArrayList(u8).init(allocator);
         defer sanitized.deinit(allocator);
         
         for (text) |char| {
@@ -459,7 +466,7 @@ pub const ClipboardUtils = struct {
             else => "\n",
         };
         
-        var result = std.ArrayList(u8){};
+        var result = std.ArrayList(u8).init(allocator);
         defer result.deinit(allocator);
         
         var i: usize = 0;
@@ -485,7 +492,7 @@ pub const ClipboardUtils = struct {
     
     /// Escape special characters for shell commands
     pub fn escapeForShell(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
-        var result = std.ArrayList(u8){};
+        var result = std.ArrayList(u8).init(allocator);
         defer result.deinit(allocator);
         
         for (text) |char| {

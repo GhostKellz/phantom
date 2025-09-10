@@ -223,7 +223,7 @@ pub const UniversalPackageBrowser = struct {
         const content = try file.readToEndAlloc(self.allocator, 1024 * 1024); // 1MB max
         defer self.allocator.free(content);
         
-        var lines = std.mem.split(u8, content, "\n");
+        var lines = std.mem.splitSequence(u8, content, "\n");
         var current_repo: ?[]const u8 = null;
         
         while (lines.next()) |line| {
@@ -365,7 +365,7 @@ pub const UniversalPackageBrowser = struct {
                 .description = try self.allocator.dupe(u8, aur_pkg.desc),
                 .source = .aur,
                 .tags = std.ArrayList([]const u8){},
-                .dependencies = std.ArrayList([]const u8){},
+                .dependencies = std.ArrayList([]const u8).init(self.allocator),
             };
             
             try self.packages.append(self.allocator, pkg);
@@ -398,7 +398,7 @@ pub const UniversalPackageBrowser = struct {
                 .description = try self.allocator.dupe(u8, zlib_pkg.desc),
                 .source = .ziglibs,
                 .tags = std.ArrayList([]const u8){},
-                .dependencies = std.ArrayList([]const u8){},
+                .dependencies = std.ArrayList([]const u8).init(self.allocator),
             };
             
             try self.packages.append(self.allocator, pkg);
@@ -424,7 +424,7 @@ pub const UniversalPackageBrowser = struct {
                 .description = try self.allocator.dupe(u8, chaotic_pkg.desc),
                 .source = .chaotic_aur,
                 .tags = std.ArrayList([]const u8){},
-                .dependencies = std.ArrayList([]const u8){},
+                .dependencies = std.ArrayList([]const u8).init(self.allocator),
             };
             
             try self.packages.append(self.allocator, pkg);
@@ -446,7 +446,7 @@ pub const UniversalPackageBrowser = struct {
                 .source = .custom_github,
                 .url = try self.allocator.dupe(u8, repo.url),
                 .tags = std.ArrayList([]const u8){},
-                .dependencies = std.ArrayList([]const u8){},
+                .dependencies = std.ArrayList([]const u8).init(self.allocator),
             };
             
             try self.packages.append(self.allocator, pkg);
@@ -472,7 +472,7 @@ pub const UniversalPackageBrowser = struct {
                 .description = try self.allocator.dupe(u8, pac_pkg.desc),
                 .source = .pacman_repo,
                 .tags = std.ArrayList([]const u8){},
-                .dependencies = std.ArrayList([]const u8){},
+                .dependencies = std.ArrayList([]const u8).init(self.allocator),
             };
             
             try self.packages.append(self.allocator, pkg);
@@ -733,7 +733,7 @@ pub const UniversalPackageBrowser = struct {
                 y += 1;
                 
                 // Word wrap description
-                const words = std.mem.split(u8, desc, " ");
+                const words = std.mem.splitSequence(u8, desc, " ");
                 var line = std.ArrayList(u8){};
                 defer line.deinit(self.allocator);
                 

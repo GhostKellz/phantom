@@ -87,13 +87,13 @@ pub const Table = struct {
         table.* = Table{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .columns = std.ArrayList(Column){},
-            .rows = std.ArrayList(Row){},
+            .columns = std.ArrayList(Column).init(allocator),
+            .rows = std.ArrayList(Row).init(allocator),
             .header_style = Style.default().withBold(),
             .row_style = Style.default(),
             .selected_style = Style.default().withBg(style.Color.blue),
             .border_style = Style.default(),
-            .calculated_widths = std.ArrayList(u16){},
+            .calculated_widths = std.ArrayList(u16).init(allocator),
         };
         return table;
     }

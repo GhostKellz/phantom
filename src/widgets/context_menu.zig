@@ -123,7 +123,7 @@ pub const ContextMenu = struct {
         menu.* = ContextMenu{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .items = std.ArrayList(MenuItem){},
+            .items = std.ArrayList(MenuItem).init(allocator),
             .item_style = Style.default().withFg(style.Color.white).withBg(style.Color.black),
             .selected_style = Style.default().withFg(style.Color.white).withBg(style.Color.blue),
             .disabled_style = Style.default().withFg(style.Color.bright_black).withBg(style.Color.black),

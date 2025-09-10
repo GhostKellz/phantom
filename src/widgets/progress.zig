@@ -190,7 +190,7 @@ pub const ProgressBar = struct {
             buffer.fill(text_rect, Cell.withStyle(self.text_style));
 
             // Build text string
-            var text_buffer = std.ArrayList(u8){};
+            var text_buffer = std.ArrayList(u8).init(self.allocator);
             defer text_buffer.deinit(self.allocator);
 
             if (self.label) |label| {

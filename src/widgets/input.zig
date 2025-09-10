@@ -66,7 +66,7 @@ pub const Input = struct {
         input.* = Input{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .text = std.ArrayList(u8){},
+            .text = std.ArrayList(u8).init(allocator),
             .placeholder = "",
             .normal_style = Style.default(),
             .focused_style = Style.default().withBg(style.Color.blue),

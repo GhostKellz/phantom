@@ -162,8 +162,8 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (xclip_child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const reader = stdout.reader(&buffer);
-                    const output = try reader.readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    const bytes_read = try stdout.readAll(&buffer);
+                    const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
                     return output;
                 }
             }
@@ -180,8 +180,8 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (xsel_child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const reader = stdout.reader(&buffer);
-                    const output = try reader.readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    const bytes_read = try stdout.readAll(&buffer);
+                    const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
                     return output;
                 }
             }
@@ -253,8 +253,8 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const reader = stdout.reader(&buffer);
-                    const output = try reader.readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    const bytes_read = try stdout.readAll(&buffer);
+                    const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
                     return output;
                 }
             }
@@ -308,8 +308,8 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const reader = stdout.reader(&buffer);
-                    const output = try reader.readAllAlloc(self.allocator, std.math.maxInt(usize));
+                    const bytes_read = try stdout.readAll(&buffer);
+                    const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
                     return output;
                 }
             }

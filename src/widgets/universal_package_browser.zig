@@ -220,9 +220,9 @@ pub const UniversalPackageBrowser = struct {
         const file = std.fs.openFileAbsolute(self.pacman_conf_path, .{}) catch return;
         defer file.close();
         
-        var buffer: [8192]u8 = undefined;
-        const reader = file.reader(&buffer);
-        const content = try reader.readAllAlloc(self.allocator, 1024 * 1024); // 1MB max
+        var buffer: [1024 * 1024]u8 = undefined; // 1MB max
+        const bytes_read = try file.readAll(&buffer);
+        const content = try self.allocator.dupe(u8, buffer[0..bytes_read]);
         defer self.allocator.free(content);
         
         var lines = std.mem.splitSequence(u8, content, "\n");

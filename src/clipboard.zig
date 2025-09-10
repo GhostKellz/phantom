@@ -492,7 +492,7 @@ pub const ClipboardUtils = struct {
     
     /// Escape special characters for shell commands
     pub fn escapeForShell(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
-        var result = std.ArrayList(u8).init(allocator);
+        var result = std.ArrayList(u8){};
         defer result.deinit(allocator);
         
         for (text) |char| {

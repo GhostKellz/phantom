@@ -161,7 +161,7 @@ pub const Clipboard = struct {
         if (xclip_result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (xclip_child.stdout) |stdout| {
-                    const output = try stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize));
+                    const output = try stdout.reader().readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -177,7 +177,7 @@ pub const Clipboard = struct {
         if (xsel_result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (xsel_child.stdout) |stdout| {
-                    const output = try stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize));
+                    const output = try stdout.reader().readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -248,7 +248,7 @@ pub const Clipboard = struct {
         if (result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
-                    const output = try stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize));
+                    const output = try stdout.reader().readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -301,7 +301,7 @@ pub const Clipboard = struct {
         if (result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
-                    const output = try stdout.readToEndAlloc(self.allocator, std.math.maxInt(usize));
+                    const output = try stdout.reader().readAllAlloc(self.allocator, std.math.maxInt(usize));
                     return output;
                 }
             }
@@ -447,7 +447,7 @@ pub const ClipboardEvent = struct {
 pub const ClipboardUtils = struct {
     /// Sanitize text for clipboard (remove null bytes, etc.)
     pub fn sanitizeText(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
-        var sanitized = std.ArrayList(u8).init(allocator);
+        var sanitized = std.ArrayList(u8){};
         defer sanitized.deinit();
         
         for (text) |char| {
@@ -466,7 +466,7 @@ pub const ClipboardUtils = struct {
             else => "\n",
         };
         
-        var result = std.ArrayList(u8).init(allocator);
+        var result = std.ArrayList(u8){};
         defer result.deinit();
         
         var i: usize = 0;
@@ -492,7 +492,7 @@ pub const ClipboardUtils = struct {
     
     /// Escape special characters for shell commands
     pub fn escapeForShell(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
-        var result = std.ArrayList(u8).init(allocator);
+        var result = std.ArrayList(u8){};
         defer result.deinit();
         
         for (text) |char| {

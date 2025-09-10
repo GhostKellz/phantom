@@ -225,11 +225,47 @@ pub const Terminal = struct {
     }
 };
 
-/// Get current terminal size (simplified implementation)
-fn getTerminalSize() !Size {
-    // TODO: Implement proper terminal size detection using ioctl
-    // For now, return a default size
-    return Size.init(80, 24);
+/// Get current terminal size using ioctl
+pub fn getTerminalSize() !Size {
+    if (@import("builtin").os.tag == .windows) {
+        // Windows implementation would use GetConsoleScreenBufferInfo
+        return Size.init(80, 24); // Default fallback for Windows
+    }
+    
+    // Unix/Linux implementation using ioctl TIOCGWINSZ
+    const c = std.c;
+    const TIOCGWINSZ = if (@import("builtin").os.tag == .linux) 0x5413 else 0x40087468;
+    
+    const WinSize = extern struct {
+        ws_row: u16,
+        ws_col: u16,
+        ws_xpixel: u16,
+        ws_ypixel: u16,
+    };
+    
+    var ws: WinSize = undefined;
+    const stdout_file = std.fs.File.stdout;
+    const stdout = stdout_file();
+    
+    const result = c.ioctl(stdout.handle, TIOCGWINSZ, &ws);
+    if (result == -1) {
+        // Fallback: try parsing environment variables
+        if (std.posix.getenv("COLUMNS")) |cols_str| {
+            if (std.posix.getenv("LINES")) |lines_str| {
+                const cols = std.fmt.parseInt(u16, cols_str, 10) catch 80;
+                const lines = std.fmt.parseInt(u16, lines_str, 10) catch 24;
+                return Size.init(cols, lines);
+            }
+        }
+        // Final fallback
+        return Size.init(80, 24);
+    }
+    
+    // Ensure minimum size
+    const width = if (ws.ws_col > 0) ws.ws_col else 80;
+    const height = if (ws.ws_row > 0) ws.ws_row else 24;
+    
+    return Size.init(width, height);
 }
 
 test "Buffer operations" {

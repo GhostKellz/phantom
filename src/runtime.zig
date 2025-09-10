@@ -1,64 +1,91 @@
-//! Async runtime utilities for Phantom TUI
+//! Async runtime utilities for Phantom TUI with zsync integration
 const std = @import("std");
+const zsync = @import("zsync");
 
-// For now, we'll create placeholder functions until zsync integration is complete
-// TODO: Integrate with zsync for proper async support
-
-/// Basic async task handle
+/// Task handle for async operations
 pub const Task = struct {
     id: u64,
-    completed: bool = false,
+    completed: std.atomic.Value(bool),
+    result: ?anyerror = null,
 
     pub fn init(id: u64) Task {
-        return Task{ .id = id };
+        return Task{ 
+            .id = id,
+            .completed = std.atomic.Value(bool).init(false),
+        };
     }
 
     pub fn isCompleted(self: *const Task) bool {
-        return self.completed;
+        return self.completed.load(.acquire);
     }
 
     pub fn complete(self: *Task) void {
-        self.completed = true;
+        self.completed.store(true, .release);
+    }
+
+    pub fn wait(self: *Task) void {
+        while (!self.isCompleted()) {
+            std.Thread.sleep(1_000_000); // 1ms
+        }
     }
 };
 
-/// Simple async runtime manager
+/// Async runtime manager with zsync integration
 pub const Runtime = struct {
     allocator: std.mem.Allocator,
-    next_task_id: u64 = 1,
+    next_task_id: std.atomic.Value(u64),
     tasks: std.ArrayList(Task),
+    runtime: *zsync.runtime.Runtime,
 
-    pub fn init(allocator: std.mem.Allocator) Runtime {
+    pub fn init(allocator: std.mem.Allocator) !Runtime {
         return Runtime{
             .allocator = allocator,
+            .next_task_id = std.atomic.Value(u64).init(1),
             .tasks = std.ArrayList(Task){},
+            .runtime = try zsync.runtime.Runtime.init(allocator, .{}),
         };
     }
 
     pub fn deinit(self: *Runtime) void {
+        self.runtime.deinit();
         self.tasks.deinit(self.allocator);
     }
 
     pub fn spawn(self: *Runtime, comptime func: anytype, args: anytype) !Task {
-        _ = func;
-        _ = args;
+        const task_id = self.next_task_id.fetchAdd(1, .monotonic);
+        var task = Task.init(task_id);
 
-        const task = Task.init(self.next_task_id);
-        self.next_task_id += 1;
+        // Create async wrapper for the function
+        const AsyncWrapper = struct {
+            fn run(rt: *Runtime, t: *Task, f: anytype, a: anytype) void {
+                defer t.complete();
+                _ = rt;
+                @call(.auto, f, a);
+            }
+        };
+
+        // Queue the task for execution with zsync runtime
+        const handle = try self.runtime.spawn(AsyncWrapper.run, .{self, &task, func, args});
+        _ = handle; // Store handle if needed for cancellation
 
         try self.tasks.append(self.allocator, task);
-
-        // TODO: Actually spawn async task with zsync
         return task;
     }
 
     pub fn sleep(duration_ms: u64) void {
-        std.time.sleep(duration_ms * 1_000_000); // Convert to nanoseconds
+        std.Thread.sleep(duration_ms * 1_000_000); // Convert to nanoseconds
     }
 
     pub fn yield() void {
-        // TODO: Implement proper yielding with zsync
-        std.time.sleep(1_000_000); // 1ms
+        // Yield to other threads
+        std.Thread.yield() catch {
+            // Fallback to short sleep if yield fails
+            std.Thread.sleep(100_000); // 0.1ms
+        };
+    }
+
+    pub fn runUntilComplete(self: *Runtime) void {
+        self.runtime.run();
     }
 };
 
@@ -72,8 +99,8 @@ pub fn getRuntime() !*Runtime {
     return &global_runtime.?;
 }
 
-pub fn initRuntime(allocator: std.mem.Allocator) void {
-    global_runtime = Runtime.init(allocator);
+pub fn initRuntime(allocator: std.mem.Allocator) !void {
+    global_runtime = try Runtime.init(allocator);
 }
 
 pub fn deinitRuntime() void {

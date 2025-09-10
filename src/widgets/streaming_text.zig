@@ -198,7 +198,7 @@ pub const StreamingText = struct {
         
         if (!self.word_wrap) {
             // Simple line splitting by newlines
-            var lines_iter = std.mem.split(u8, self.text.items, "\n");
+            var lines_iter = std.mem.splitSequence(u8, self.text.items, "\n");
             while (lines_iter.next()) |line| {
                 const owned_line = try self.allocator.dupe(u8, line);
                 try self.lines.append(self.allocator, owned_line);
@@ -206,7 +206,7 @@ pub const StreamingText = struct {
         } else {
             // Word wrapping
             const wrap_width = if (self.area.width > 0) self.area.width else 80;
-            var lines_iter = std.mem.split(u8, self.text.items, "\n");
+            var lines_iter = std.mem.splitSequence(u8, self.text.items, "\n");
             
             while (lines_iter.next()) |line| {
                 try self.wrapLine(line, wrap_width);

@@ -155,15 +155,23 @@ fn appEventHandler(event: Event) !bool {
                 },
             }
         },
-        .mouse => |_| {
-            // TODO: Handle mouse events
+        .mouse => |mouse_event| {
+            // Handle mouse events by dispatching to the focused widget
             app.needs_redraw = true;
+            
+            
+            // Handle mouse events on widgets (simplified for now)
+            for (app.widgets.items) |widget| {
+                // Dispatch mouse event to all widgets for now
+                _ = widget.handleEvent(Event.fromMouse(mouse_event));
+            }
         },
         .system => |sys_event| {
             switch (sys_event) {
                 .resize => {
-                    // TODO: Get actual new terminal size
-                    const new_size = Size.init(80, 24);
+                    // Get actual new terminal size using improved detection
+                    const terminal = @import("terminal.zig");
+                    const new_size = terminal.getTerminalSize() catch Size.init(80, 24);
                     try app.resize(new_size);
                 },
                 else => {},

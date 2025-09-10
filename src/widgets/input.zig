@@ -266,7 +266,7 @@ pub const Input = struct {
         }
         
         // Insert new character
-        try self.text.insertSlice(self.cursor_pos, utf8_bytes[0..len]);
+        try self.text.insertSlice(self.allocator, self.cursor_pos, utf8_bytes[0..len]);
         self.cursor_pos += len;
         self.updateScrollOffset();
         self.notifyChange();

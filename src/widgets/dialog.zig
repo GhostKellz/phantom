@@ -528,7 +528,12 @@ pub const Dialog = struct {
                     }
                     
                     // Check if click is on a button
-                    // TODO: Implement button click detection
+                    if (self.detectButtonClick(pos)) |button_action| {
+                        if (self.on_action) |callback| {
+                            callback(self, button_action);
+                        }
+                        return true;
+                    }
                     
                     // Check if click is outside dialog (close if modal)
                     if (self.is_modal and 
@@ -545,6 +550,38 @@ pub const Dialog = struct {
         }
         
         return false;
+    }
+    
+    fn detectButtonClick(self: *Dialog, pos: Position) ?DialogAction {
+        if (self.buttons.items.len == 0) return null;
+        
+        // Calculate button positions (same logic as in render)
+        const button_area_height: u16 = 3;
+        const button_start_y = self.area.y + self.area.height - button_area_height - 1;
+        
+        // Calculate total width needed for all buttons
+        var total_button_width: u16 = 0;
+        for (self.buttons.items) |button| {
+            total_button_width += @as(u16, @intCast(button.text.len)) + 4; // 2 spaces padding on each side
+        }
+        total_button_width += @as(u16, @intCast(self.buttons.items.len - 1)) * 2; // 2 spaces between buttons
+        
+        const button_start_x = self.area.x + (self.area.width - total_button_width) / 2;
+        
+        // Check each button
+        var current_x = button_start_x;
+        for (self.buttons.items) |button| {
+            const button_width = @as(u16, @intCast(button.text.len)) + 4;
+            
+            if (pos.x >= current_x and pos.x < current_x + button_width and
+                pos.y >= button_start_y and pos.y < button_start_y + button_area_height) {
+                return button.action;
+            }
+            
+            current_x += button_width + 2; // Move to next button position
+        }
+        
+        return null;
     }
 
     fn resize(widget: *Widget, area: Rect) void {

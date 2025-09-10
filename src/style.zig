@@ -53,13 +53,27 @@ pub const Color = union(enum) {
             .bright_magenta => if (background) "\x1b[105m" else "\x1b[95m",
             .bright_cyan => if (background) "\x1b[106m" else "\x1b[96m",
             .bright_white => if (background) "\x1b[107m" else "\x1b[97m",
-            .indexed => |idx| blk: {
-                _ = idx; // TODO: implement 256-color support
-                break :blk if (background) "\x1b[49m" else "\x1b[39m";
+            .indexed => |idx| if (background) blk: {
+                // 256-color background support
+                var buffer: [16]u8 = undefined;
+                const escape_seq = std.fmt.bufPrint(&buffer, "\x1b[48;5;{}m", .{idx}) catch "";
+                break :blk escape_seq;
+            } else blk: {
+                // 256-color foreground support
+                var buffer: [16]u8 = undefined;
+                const escape_seq = std.fmt.bufPrint(&buffer, "\x1b[38;5;{}m", .{idx}) catch "";
+                break :blk escape_seq;
             },
-            .rgb => |_| blk: {
-                // TODO: implement true color support
-                break :blk if (background) "\x1b[49m" else "\x1b[39m";
+            .rgb => |rgb| if (background) blk: {
+                // True color background support
+                var buffer: [24]u8 = undefined;
+                const escape_seq = std.fmt.bufPrint(&buffer, "\x1b[48;2;{};{};{}m", .{rgb.r, rgb.g, rgb.b}) catch "";
+                break :blk escape_seq;
+            } else blk: {
+                // True color foreground support
+                var buffer: [24]u8 = undefined;
+                const escape_seq = std.fmt.bufPrint(&buffer, "\x1b[38;2;{};{};{}m", .{rgb.r, rgb.g, rgb.b}) catch "";
+                break :blk escape_seq;
             },
         };
     }

@@ -154,9 +154,93 @@ pub const SystemMonitor = struct {
         // Detect CPU cores
         self.cpu_cores = @as(u32, @intCast(std.Thread.getCpuCount() catch 1));
         
-        // TODO: Detect GPU info via nvidia-smi or similar
-        // For now, set reasonable defaults
-        self.gpu_stats.memory_total_mb = 8192; // 8GB default
+        // Detect GPU info via nvidia-smi, lspci, or similar
+        try self.detectGPUInfo();
+    }
+    
+    fn detectGPUInfo(self: *SystemMonitor) !void {
+        // Try nvidia-smi first (for NVIDIA GPUs)
+        if (self.detectNVIDIAGPU()) {
+            return;
+        }
+        
+        // Try lspci for general GPU detection
+        if (self.detectGPUVialsci()) {
+            return;
+        }
+        
+        // Fallback defaults
+        self.gpu_stats.memory_total_mb = 4096; // 4GB default
+    }
+    
+    fn detectNVIDIAGPU(self: *SystemMonitor) bool {
+        const result = std.ChildProcess.exec(.{
+            .allocator = self.allocator,
+            .argv = &[_][]const u8{ "nvidia-smi", "--query-gpu=memory.total,memory.used,utilization.gpu", "--format=csv,noheader,nounits" },
+        }) catch return false;
+        defer self.allocator.free(result.stdout);
+        defer self.allocator.free(result.stderr);
+        
+        if (result.term.Exited == 0) {
+            // Parse nvidia-smi output: "memory_total, memory_used, gpu_util"
+            var lines = std.mem.split(u8, std.mem.trim(u8, result.stdout, "\n\r "), "\n");
+            if (lines.next()) |line| {
+                var parts = std.mem.split(u8, line, ",");
+                
+                if (parts.next()) |memory_total_str| {
+                    const trimmed = std.mem.trim(u8, memory_total_str, " ");
+                    self.gpu_stats.memory_total_mb = std.fmt.parseInt(u32, trimmed, 10) catch 4096;
+                }
+                
+                if (parts.next()) |memory_used_str| {
+                    const trimmed = std.mem.trim(u8, memory_used_str, " ");
+                    self.gpu_stats.memory_used_mb = std.fmt.parseInt(u32, trimmed, 10) catch 0;
+                }
+                
+                if (parts.next()) |utilization_str| {
+                    const trimmed = std.mem.trim(u8, utilization_str, " ");
+                    self.gpu_stats.utilization = std.fmt.parseFloat(f64, trimmed) catch 0.0;
+                }
+                
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    fn detectGPUVialsci(self: *SystemMonitor) bool {
+        const result = std.ChildProcess.exec(.{
+            .allocator = self.allocator,
+            .argv = &[_][]const u8{ "lspci", "-nn" },
+        }) catch return false;
+        defer self.allocator.free(result.stdout);
+        defer self.allocator.free(result.stderr);
+        
+        if (result.term.Exited == 0) {
+            // Look for VGA or 3D controller entries
+            var lines = std.mem.split(u8, result.stdout, "\n");
+            while (lines.next()) |line| {
+                if (std.mem.indexOf(u8, line, "VGA") != null or 
+                    std.mem.indexOf(u8, line, "3D controller") != null) {
+                    
+                    // Estimate GPU memory based on GPU type
+                    if (std.mem.indexOf(u8, line, "NVIDIA") != null) {
+                        self.gpu_stats.memory_total_mb = 8192; // Assume 8GB for NVIDIA
+                    } else if (std.mem.indexOf(u8, line, "AMD") != null or 
+                               std.mem.indexOf(u8, line, "Radeon") != null) {
+                        self.gpu_stats.memory_total_mb = 6144; // Assume 6GB for AMD
+                    } else if (std.mem.indexOf(u8, line, "Intel") != null) {
+                        self.gpu_stats.memory_total_mb = 2048; // Assume 2GB for Intel iGPU
+                    } else {
+                        self.gpu_stats.memory_total_mb = 4096; // Generic fallback
+                    }
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     fn getMemoryUsagePercent(self: *const SystemMonitor) f64 {

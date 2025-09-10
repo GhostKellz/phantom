@@ -85,6 +85,9 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
+    
+    // Link to libc for system calls like ioctl
+    exe.linkLibC();
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
@@ -155,6 +158,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     pkg_demo.root_module.addImport("phantom", mod);
+    pkg_demo.linkLibC();
     b.installArtifact(pkg_demo);
 
     const run_pkg_demo = b.addRunArtifact(pkg_demo);
@@ -171,6 +175,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     ghostty_demo.root_module.addImport("phantom", mod);
+    ghostty_demo.linkLibC();
     b.installArtifact(ghostty_demo);
 
     const run_ghostty_demo = b.addRunArtifact(ghostty_demo);
@@ -187,6 +192,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     zion_demo.root_module.addImport("phantom", mod);
+    zion_demo.linkLibC();
     b.installArtifact(zion_demo);
 
     const run_zion_demo = b.addRunArtifact(zion_demo);
@@ -203,6 +209,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     reaper_demo.root_module.addImport("phantom", mod);
+    reaper_demo.linkLibC();
     b.installArtifact(reaper_demo);
 
     const run_reaper_demo = b.addRunArtifact(reaper_demo);
@@ -219,6 +226,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     crypto_demo.root_module.addImport("phantom", mod);
+    crypto_demo.linkLibC();
     b.installArtifact(crypto_demo);
 
     const run_crypto_demo = b.addRunArtifact(crypto_demo);

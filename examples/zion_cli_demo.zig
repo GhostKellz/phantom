@@ -8,7 +8,7 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     // Initialize runtime
-    phantom.runtime.initRuntime(allocator);
+    try phantom.runtime.initRuntime(allocator);
     defer phantom.runtime.deinitRuntime();
 
     // Create application

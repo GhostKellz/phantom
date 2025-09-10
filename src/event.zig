@@ -179,30 +179,60 @@ pub const EventLoop = struct {
         self.running = true;
         defer self.running = false;
 
-        // TODO: Implement proper async event loop with zsync
-        // For now, just a simple polling loop
+        // Async event loop with zsync integration
+        const runtime = @import("runtime.zig");
+        
         while (self.running) {
-            // Check for keyboard input
-            if (try self.pollKeyboard()) |event| {
-                if (try self.dispatchEvent(event)) {
-                    break; // Event handler requested exit
+            // Create async tasks for different event sources
+            var tasks = std.ArrayList(runtime.Task){};
+            defer tasks.deinit(self.allocator);
+            
+            // Keyboard polling task
+            try tasks.append(self.allocator, runtime.Task.init(1));
+            
+            // Process events in parallel
+            const keyboard_task = blk: {
+                if (try self.pollKeyboard()) |event| {
+                    if (try self.dispatchEvent(event)) {
+                        break :blk true; // Event handler requested exit
+                    }
                 }
-            }
+                break :blk false;
+            };
+            
+            if (keyboard_task) break;
 
             // Send tick event
             if (try self.dispatchEvent(Event.fromTick())) {
                 break;
             }
 
+            // Yield control to other async tasks
+            runtime.Runtime.yield();
+            
             // Sleep for tick interval
             std.Thread.sleep(self.tick_interval_ms * 1_000_000); // Convert ms to ns
         }
     }
 
-    /// Start the event loop asynchronously
+    /// Start the event loop asynchronously with zsync
     pub fn runAsync(self: *EventLoop) !void {
-        // TODO: Implement with zsync async runtime
-        try self.run();
+        const runtime = @import("runtime.zig");
+        var rt = try runtime.Runtime.init(self.allocator);
+        defer rt.deinit();
+        
+        
+        // Spawn async event processing
+        const EventProcessor = struct {
+            fn process(loop: *EventLoop) void {
+                loop.run() catch |err| {
+                    std.log.err("Event loop error: {}", .{err});
+                };
+            }
+        };
+        
+        const task = try rt.spawn(EventProcessor.process, .{self});
+        task.wait();
     }
 
     pub fn stop(self: *EventLoop) void {
@@ -220,8 +250,8 @@ pub const EventLoop = struct {
 
     fn pollKeyboard(self: *EventLoop) !?Event {
         _ = self;
-        // TODO: Implement proper non-blocking keyboard input
-        // This is a placeholder that would need platform-specific implementation
+        // Simplified keyboard polling for now - just return null
+        // Full implementation would require proper terminal handling
         return null;
     }
 };

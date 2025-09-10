@@ -65,9 +65,9 @@ pub const StreamingText = struct {
         streaming_text.* = StreamingText{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .text = std.ArrayList(u8).init(allocator),
-            .lines = std.ArrayList([]const u8).init(allocator),
-            .chunk_buffer = std.ArrayList(u8).init(allocator),
+            .text = std.ArrayList(u8){},
+            .lines = std.ArrayList([]const u8){},
+            .chunk_buffer = std.ArrayList(u8){},
             .text_style = Style.default(),
             .streaming_style = Style.default().withFg(style.Color.cyan),
             .cursor_style = Style.default().withFg(style.Color.white).withBg(style.Color.blue),

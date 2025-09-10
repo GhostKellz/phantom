@@ -162,7 +162,10 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (xclip_child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const bytes_read = try stdout.readAll(&buffer);
+                    const bytes_read = stdout.readAll(&buffer) catch |err| switch (err) {
+                        error.OutOfMemory => return ClipboardError.OutOfMemory,
+                        else => return ClipboardError.SystemError,
+                    };
                     const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
                     return output;
                 }
@@ -180,7 +183,10 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (xsel_child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const bytes_read = try stdout.readAll(&buffer);
+                    const bytes_read = stdout.readAll(&buffer) catch |err| switch (err) {
+                        error.OutOfMemory => return ClipboardError.OutOfMemory,
+                        else => return ClipboardError.SystemError,
+                    };
                     const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
                     return output;
                 }
@@ -253,7 +259,10 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const bytes_read = try stdout.readAll(&buffer);
+                    const bytes_read = stdout.readAll(&buffer) catch |err| switch (err) {
+                        error.OutOfMemory => return ClipboardError.OutOfMemory,
+                        else => return ClipboardError.SystemError,
+                    };
                     const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
                     return output;
                 }
@@ -308,7 +317,10 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const bytes_read = try stdout.readAll(&buffer);
+                    const bytes_read = stdout.readAll(&buffer) catch |err| switch (err) {
+                        error.OutOfMemory => return ClipboardError.OutOfMemory,
+                        else => return ClipboardError.SystemError,
+                    };
                     const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
                     return output;
                 }

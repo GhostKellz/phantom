@@ -1,5 +1,9 @@
 # 👻 Phantom — The Next-Gen TUI Framework for Zig
 
+<p align="center">
+  <img src="assets/icons/phantom-tui.png" alt="Phantom TUI" />
+</p>
+
 [![Zig v0.16+](https://img.shields.io/badge/zig-0.16+-f7a41d?logo=zig\&logoColor=white)](https://ziglang.org/)
 [![Production Ready](https://img.shields.io/badge/status-production_ready-success)](https://github.com/ghostkellz/phantom)
 [![Ratatui-inspired](https://img.shields.io/badge/tui-ratatui_style-ghostly)](https://github.com/ratatui-org/ratatui)

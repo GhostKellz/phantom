@@ -3,3 +3,4 @@
 *.o
 *.exe
 /.zig-cache/
+CLAUDE.md

@@ -2,6 +2,9 @@
 //! A lightning-fast, async-native TUI framework inspired by Rattatui
 const std = @import("std");
 
+// Build-time configuration
+pub const phantom_config = @import("phantom_config");
+
 // Core exports
 pub const App = @import("app.zig").App;
 pub const AppConfig = @import("app.zig").AppConfig;
@@ -9,25 +12,34 @@ pub const Terminal = @import("terminal.zig").Terminal;
 pub const Event = @import("event.zig").Event;
 pub const EventLoop = @import("event.zig").EventLoop;
 
-// Widget system
-pub const widgets = @import("widgets/mod.zig");
+// Widget system - conditionally exported based on build configuration
+pub const widgets = if (phantom_config.enable_basic_widgets or phantom_config.enable_data_widgets or phantom_config.enable_package_mgmt or phantom_config.enable_crypto or phantom_config.enable_system or phantom_config.enable_advanced) @import("widgets/mod.zig") else struct {};
+
+// Search functionality - conditionally exported with advanced widgets
+pub const search = if (phantom_config.enable_advanced) @import("search/FuzzySearch.zig") else struct {};
+
+// Advanced widget framework (vxfw) - always available
+pub const vxfw = @import("vxfw.zig");
+
+// Layout system - always available
 pub const layout = @import("layout/mod.zig");
 pub const render = @import("render/mod.zig");
 
-// Input and events
+// Input and events - always available
 pub const input = @import("input/mod.zig");
 
-// Core types
+// Core types - always available
 pub const Rect = @import("geometry.zig").Rect;
 pub const Position = @import("geometry.zig").Position;
+pub const Point = @import("geometry.zig").Point;
 pub const Size = @import("geometry.zig").Size;
 pub const Color = @import("style.zig").Color;
 pub const Style = @import("style.zig").Style;
 
-// Modern UI utilities
+// Modern UI utilities - always available
 pub const emoji = @import("emoji.zig");
 
-// Async runtime
+// Async runtime - always available
 pub const runtime = @import("runtime.zig");
 
 // For compatibility with existing code

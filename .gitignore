@@ -1,6 +1,8 @@
-/zig-cache/
-/zig-out/
+.zig-cache/
+zig-out/
 *.o
 *.exe
 /.zig-cache/
 CLAUDE.md
+TODO.md 
+archive/

@@ -90,16 +90,16 @@ const AURDependencies = struct {
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
     const allocator = gpa.allocator();
+    defer _ = gpa.deinit();
 
     // Initialize Phantom app
     var app = try App.init(allocator, .{});
     defer app.deinit();
 
     // Create sample Reaper package with realistic dependencies
-    var reaper_package = try createReaperPackage(allocator);
-    defer freePackage(allocator, &reaper_package);
+    const reaper_package = try createReaperPackage(allocator);
+    defer freePackage(allocator, reaper_package);
     
     // Print out demo information
     std.log.info("📦 Created sample REAPER package with {d} dependencies\n", .{reaper_package.dependencies.items.len});
@@ -112,19 +112,19 @@ pub fn main() !void {
 
     // Simple demo showing package analysis
     std.log.info("🔍 Analyzing package dependencies...\n", .{});
-    std.Thread.sleep(1_000_000_000); // 1 second
+     // 1 second
     
     std.log.info("📊 Dependency analysis complete!\n", .{});
     for (reaper_package.dependencies.items, 0..) |dep, i| {
         std.log.info("  {d}. {s} [{s}] - {s}\n", .{ i + 1, dep.dependency_type.getIcon(), dep.repo, dep.name });
-        std.Thread.sleep(100_000_000); // 100ms between items
+         // 100ms between items
     }
 
     std.log.info("🎶 Reaper AUR analysis completed!\n", .{});
 }
 
 fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
-    var dependencies = std.ArrayList(AURDependencies.PackageDependency){};
+    var dependencies = try std.ArrayList(AURDependencies.PackageDependency).initCapacity(allocator, 16);
     
     // Runtime dependencies
     try dependencies.append(allocator, AURDependencies.PackageDependency{
@@ -278,9 +278,10 @@ fn createReaperPackage(allocator: std.mem.Allocator) !AURDependencies.Package {
     };
 }
 
-fn freePackage(allocator: std.mem.Allocator, package: *AURDependencies.Package) void {
+fn freePackage(allocator: std.mem.Allocator, package: AURDependencies.Package) void {
     // Note: In this demo, strings are literals, not allocated memory
-    package.dependencies.deinit(allocator);
+    var mutable_package = package;
+    mutable_package.dependencies.deinit(allocator);
 }
 
 

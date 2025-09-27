@@ -29,10 +29,10 @@ pub const ConnectionStatus = enum {
     
     pub fn getStyle(self: ConnectionStatus) Style {
         return switch (self) {
-            .connected => Style.default().withFg(style.Color.bright_green),
-            .connecting => Style.default().withFg(style.Color.bright_yellow),
-            .disconnected => Style.default().withFg(style.Color.white),
-            .err => Style.default().withFg(style.Color.bright_red),
+            .connected => Style.withFg(style.Color.bright_green),
+            .connecting => Style.withFg(style.Color.bright_yellow),
+            .disconnected => Style.withFg(style.Color.white),
+            .err => Style.withFg(style.Color.bright_red),
         };
     }
 };
@@ -145,10 +145,10 @@ pub const NetworkTopology = struct {
             .nodes = std.ArrayList(NetworkNode).init(allocator),
             .connections = std.ArrayList(Connection).init(allocator),
             .node_map = std.HashMap([]const u8, usize, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
-            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
-            .node_style = Style.default().withFg(style.Color.bright_white),
-            .connection_style = Style.default().withFg(style.Color.bright_blue),
-            .info_style = Style.default().withFg(style.Color.white),
+            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
+            .node_style = Style.withFg(style.Color.bright_white),
+            .connection_style = Style.withFg(style.Color.bright_blue),
+            .info_style = Style.withFg(style.Color.white),
         };
         
         return topology;
@@ -170,7 +170,7 @@ pub const NetworkTopology = struct {
         };
         
         const index = self.nodes.items.len;
-        try self.nodes.append(self.allocator, owned_node);
+        try self.nodes.append(owned_node);
         try self.node_map.put(owned_node.id, index);
         
         // Auto-position if not specified
@@ -210,7 +210,7 @@ pub const NetworkTopology = struct {
             .latency_ms = latency_ms,
             .last_activity = std.time.timestamp(),
         };
-        try self.connections.append(self.allocator, connection);
+        try self.connections.append(connection);
     }
 
     /// Set the layout algorithm
@@ -373,7 +373,7 @@ pub const NetworkTopology = struct {
             const latency_text = std.fmt.allocPrint(self.allocator, "{d:.0}ms", .{conn.latency_ms}) catch return;
             defer self.allocator.free(latency_text);
             
-            buffer.writeText(mid_x, mid_y, latency_text, Style.default().withFg(style.Color.bright_yellow));
+            buffer.writeText(mid_x, mid_y, latency_text, Style.withFg(style.Color.bright_yellow));
         }
     }
 
@@ -386,8 +386,8 @@ pub const NetworkTopology = struct {
             }
             
             // Determine node style
-            const node_style = if (self.selected_node == i) Style.default().withFg(style.Color.bright_cyan).withBold()
-            else if (self.hover_node == i) Style.default().withFg(style.Color.bright_white).withBold()
+            const node_style = if (self.selected_node == i) Style.withFg(style.Color.bright_cyan).withBold()
+            else if (self.hover_node == i) Style.withFg(style.Color.bright_white).withBold()
             else node.status.getStyle();
             
             // Draw node icon
@@ -513,14 +513,14 @@ pub const NetworkTopology = struct {
             self.allocator.free(node.name);
             self.allocator.free(node.ip_address);
         }
-        self.nodes.deinit(self.allocator);
+        self.nodes.deinit();
         
         // Free connection data
         for (self.connections.items) |*conn| {
             self.allocator.free(conn.from_id);
             self.allocator.free(conn.to_id);
         }
-        self.connections.deinit(self.allocator);
+        self.connections.deinit();
         
         self.node_map.deinit();
         self.allocator.destroy(self);

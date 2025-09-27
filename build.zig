@@ -1,6 +1,97 @@
 //! Use `zig init --strip` next time to generate a project without comments.
 const std = @import("std");
 
+// Feature configuration structure
+const Features = struct {
+    basic_widgets: bool,
+    data_widgets: bool,
+    package_mgmt: bool,
+    crypto: bool,
+    system: bool,
+    advanced: bool,
+};
+
+// Resolve feature flags based on preset or explicit options
+fn resolveFeatures(preset: []const u8, explicit: struct {
+    basic_widgets: ?bool,
+    data_widgets: ?bool,
+    package_mgmt: ?bool,
+    crypto: ?bool,
+    system: ?bool,
+    advanced: ?bool,
+}) Features {
+    // Start with preset defaults
+    var features: Features = undefined;
+    
+    if (std.mem.eql(u8, preset, "basic")) {
+        features = Features{
+            .basic_widgets = true,
+            .data_widgets = false,
+            .package_mgmt = false,
+            .crypto = false,
+            .system = false,
+            .advanced = false,
+        };
+    } else if (std.mem.eql(u8, preset, "package-mgr")) {
+        features = Features{
+            .basic_widgets = true,
+            .data_widgets = true,
+            .package_mgmt = true,
+            .crypto = false,
+            .system = false,
+            .advanced = true,
+        };
+    } else if (std.mem.eql(u8, preset, "crypto")) {
+        features = Features{
+            .basic_widgets = true,
+            .data_widgets = true,
+            .package_mgmt = false,
+            .crypto = true,
+            .system = false,
+            .advanced = true,
+        };
+    } else if (std.mem.eql(u8, preset, "system")) {
+        features = Features{
+            .basic_widgets = true,
+            .data_widgets = true,
+            .package_mgmt = false,
+            .crypto = false,
+            .system = true,
+            .advanced = true,
+        };
+    } else if (std.mem.eql(u8, preset, "full")) {
+        features = Features{
+            .basic_widgets = true,
+            .data_widgets = true,
+            .package_mgmt = true,
+            .crypto = true,
+            .system = true,
+            .advanced = true,
+        };
+    } else {
+        // Unknown preset, default to full
+        std.debug.print("Warning: Unknown preset '{s}', defaulting to 'full'\n", .{preset});
+        features = Features{
+            .basic_widgets = true,
+            .data_widgets = true,
+            .package_mgmt = true,
+            .crypto = true,
+            .system = true,
+            .advanced = true,
+        };
+    }
+
+    // Override with explicit options if provided
+    if (explicit.basic_widgets) |val| features.basic_widgets = val;
+    if (explicit.data_widgets) |val| features.data_widgets = val;
+    if (explicit.package_mgmt) |val| features.package_mgmt = val;
+    if (explicit.crypto) |val| features.crypto = val;
+    if (explicit.system) |val| features.system = val;
+    if (explicit.advanced) |val| features.advanced = val;
+
+    return features;
+}
+
 // Although this function looks imperative, it does not perform the build
 // directly and instead it mutates the build graph (`b`) that will be then
 // executed by an external runner. The functions in `std.Build` implement a DSL
@@ -17,10 +108,28 @@ pub fn build(b: *std.Build) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall. Here we do not
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
-    // It's also possible to define more custom flags to toggle optional features
-    // of this build script using `b.option()`. All defined flags (including
-    // target and optimize options) will be listed when running `zig build --help`
-    // in this directory.
+
+    // Phantom TUI Build Configuration Options
+    // Preset configurations for common use cases
+    const preset = b.option([]const u8, "preset", "Use case preset: basic, package-mgr, crypto, system, full (default)") orelse "full";
+
+    // Individual feature flags (auto-configured based on preset, but can be overridden)
+    const enable_basic_widgets = b.option(bool, "basic-widgets", "Enable basic widgets (Text, Block, List, Button, Input, TextArea)") orelse null;
+    const enable_data_widgets = b.option(bool, "data-widgets", "Enable data display widgets (ProgressBar, Table, TaskMonitor)") orelse null;
+    const enable_package_mgmt = b.option(bool, "package-mgmt", "Enable package management widgets (UniversalPackageBrowser, AURDependencies)") orelse null;
+    const enable_crypto = b.option(bool, "crypto", "Enable blockchain/crypto widgets (BlockchainPackageBrowser)") orelse null;
+    const enable_system = b.option(bool, "system", "Enable system monitoring widgets (SystemMonitor, NetworkTopology, CommandBuilder)") orelse null;
+    const enable_advanced = b.option(bool, "advanced", "Enable advanced widgets (StreamingText, CodeBlock, Container)") orelse null;
+
+    // Resolve feature flags based on preset or explicit options
+    const features = resolveFeatures(preset, .{
+        .basic_widgets = enable_basic_widgets,
+        .data_widgets = enable_data_widgets,
+        .package_mgmt = enable_package_mgmt,
+        .crypto = enable_crypto,
+        .system = enable_system,
+        .advanced = enable_advanced,
+    });
 
     // This creates a module, which represents a collection of source files alongside
     // some compilation options, such as optimization mode and linked system libraries.
@@ -36,13 +145,47 @@ pub fn build(b: *std.Build) void {
     });
     const zsync_mod = zsync_dep.module("zsync");
 
+    // Get gcode dependency for Unicode processing
+    const gcode_dep = b.dependency("gcode", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const gcode_mod = gcode_dep.module("gcode");
+
     const mod = b.addModule("phantom", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .imports = &.{
             .{ .name = "zsync", .module = zsync_mod },
+            .{ .name = "gcode", .module = gcode_mod },
         },
     });
+
+    // Pass feature flags as comptime constants to the module
+    // This creates conditional compilation based on build options
+    const phantom_mod = b.addModule("phantom_config", .{
+        .root_source_file = b.addWriteFiles().add("phantom_config.zig", 
+            std.fmt.allocPrint(b.allocator, 
+                \\pub const enable_basic_widgets = {};
+                \\pub const enable_data_widgets = {};
+                \\pub const enable_package_mgmt = {};
+                \\pub const enable_crypto = {};
+                \\pub const enable_system = {};
+                \\pub const enable_advanced = {};
+            , .{
+                features.basic_widgets,
+                features.data_widgets,
+                features.package_mgmt,
+                features.crypto,
+                features.system,
+                features.advanced,
+            }) catch @panic("Failed to create config")
+        ),
+        .target = target,
+    });
+
+    // Add the config module as an import to the main phantom module
+    mod.addImport("phantom_config", phantom_mod);
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
@@ -70,7 +213,7 @@ pub fn build(b: *std.Build) void {
             // Target and optimization levels must be explicitly wired in when
             // defining an executable or library (in the root module), and you
             // can also hardcode a specific target for an executable or library
-            // definition if desireable (e.g. firmware for embedded devices).
+            // definition if desireable (in the case of firmware for embedded devices).
             .target = target,
             .optimize = optimize,
             // List of modules available for import in source files part of the
@@ -85,8 +228,6 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    
-    // Link to libc for system calls like ioctl
     exe.linkLibC();
 
     // This declares intent for the executable to be installed into the
@@ -148,90 +289,194 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 
-    // Package Manager Demo
-    const pkg_demo = b.addExecutable(.{
-        .name = "simple_package_demo",
+    // Package Manager Demo - requires package-mgmt widgets
+    if (features.package_mgmt) {
+        const pkg_demo = b.addExecutable(.{
+            .name = "simple_package_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/simple_package_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        pkg_demo.linkLibC();
+        b.installArtifact(pkg_demo);
+
+        const run_pkg_demo = b.addRunArtifact(pkg_demo);
+        const pkg_demo_step = b.step("demo-pkg", "Run the package manager demo");
+        pkg_demo_step.dependOn(&run_pkg_demo.step);
+    }
+
+    // Ghostty Performance Demo - requires system widgets
+    if (features.system) {
+        const ghostty_demo = b.addExecutable(.{
+            .name = "ghostty_performance_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/ghostty_performance_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        ghostty_demo.linkLibC();
+        b.installArtifact(ghostty_demo);
+
+        const run_ghostty_demo = b.addRunArtifact(ghostty_demo);
+        const ghostty_demo_step = b.step("demo-ghostty", "Run the Ghostty NVIDIA performance demo");
+        ghostty_demo_step.dependOn(&run_ghostty_demo.step);
+    }
+
+    // ZION CLI Demo - requires basic widgets
+    if (features.basic_widgets) {
+        const zion_demo = b.addExecutable(.{
+            .name = "zion_cli_demo", 
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/zion_cli_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        zion_demo.linkLibC();
+        b.installArtifact(zion_demo);
+
+        const run_zion_demo = b.addRunArtifact(zion_demo);
+        const zion_demo_step = b.step("demo-zion", "Run the ZION CLI interactive demo");
+        zion_demo_step.dependOn(&run_zion_demo.step);
+    }
+
+    // Reaper AUR Demo - requires package management widgets
+    if (features.package_mgmt) {
+        const reaper_demo = b.addExecutable(.{
+            .name = "reaper_aur_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/reaper_aur_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        reaper_demo.linkLibC();
+        b.installArtifact(reaper_demo);
+
+        const run_reaper_demo = b.addRunArtifact(reaper_demo);
+        const reaper_demo_step = b.step("demo-reaper", "Run the Reaper AUR dependencies demo");
+        reaper_demo_step.dependOn(&run_reaper_demo.step);
+    }
+
+    // Crypto Package Demo - requires crypto widgets
+    if (features.crypto) {
+        const crypto_demo = b.addExecutable(.{
+            .name = "crypto_package_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/crypto_package_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        crypto_demo.linkLibC();
+        b.installArtifact(crypto_demo);
+
+        const run_crypto_demo = b.addRunArtifact(crypto_demo);
+        const crypto_demo_step = b.step("demo-crypto", "Run the crypto/blockchain package demo");
+        crypto_demo_step.dependOn(&run_crypto_demo.step);
+    }
+
+    // AUR Dependencies Demo - requires package management widgets
+    if (features.package_mgmt) {
+        const aur_demo = b.addExecutable(.{
+            .name = "aur_dependencies_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/reaper_aur_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        aur_demo.linkLibC();
+        b.installArtifact(aur_demo);
+
+        const run_aur_demo = b.addRunArtifact(aur_demo);
+        const aur_demo_step = b.step("demo-aur", "Run the AUR dependencies demo");
+        aur_demo_step.dependOn(&run_aur_demo.step);
+    }
+
+    // Universal Package Browser Demo - requires package management widgets
+    if (features.package_mgmt) {
+        const package_browser_demo = b.addExecutable(.{
+            .name = "package_browser_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/package_manager_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        package_browser_demo.linkLibC();
+        b.installArtifact(package_browser_demo);
+
+        const run_package_browser_demo = b.addRunArtifact(package_browser_demo);
+        const package_browser_demo_step = b.step("demo-package-browser", "Run the universal package browser demo");
+        package_browser_demo_step.dependOn(&run_package_browser_demo.step);
+    }
+
+    // VXFW Widget Framework Demo - always available
+    const vxfw_demo = b.addExecutable(.{
+        .name = "vxfw_demo",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("examples/simple_package_demo.zig"),
+            .root_source_file = b.path("examples/vxfw_demo.zig"),
             .target = target,
             .optimize = optimize,
+            .imports = &.{
+                .{ .name = "phantom", .module = mod },
+            },
         }),
     });
-    pkg_demo.root_module.addImport("phantom", mod);
-    pkg_demo.linkLibC();
-    b.installArtifact(pkg_demo);
+    vxfw_demo.linkLibC();
+    b.installArtifact(vxfw_demo);
 
-    const run_pkg_demo = b.addRunArtifact(pkg_demo);
-    const pkg_demo_step = b.step("demo-pkg", "Run the package manager demo");
-    pkg_demo_step.dependOn(&run_pkg_demo.step);
+    const run_vxfw_demo = b.addRunArtifact(vxfw_demo);
+    const vxfw_demo_step = b.step("demo-vxfw", "Run the VXFW widget framework demo");
+    vxfw_demo_step.dependOn(&run_vxfw_demo.step);
 
-    // Ghostty Performance Demo  
-    const ghostty_demo = b.addExecutable(.{
-        .name = "ghostty_performance_demo",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("examples/ghostty_performance_demo.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    ghostty_demo.root_module.addImport("phantom", mod);
-    ghostty_demo.linkLibC();
-    b.installArtifact(ghostty_demo);
+    // Fuzzy Search Demo - requires advanced widgets
+    // TODO: Temporarily disabled due to Zig 0.16 type system compatibility issues
+    // See: https://github.com/ziglang/zig/issues/fuzzy-search-error-union
+    if (false and features.advanced) {
+        const fuzzy_search_demo = b.addExecutable(.{
+            .name = "fuzzy_search_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/fuzzy_search_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        fuzzy_search_demo.linkLibC();
+        b.installArtifact(fuzzy_search_demo);
 
-    const run_ghostty_demo = b.addRunArtifact(ghostty_demo);
-    const ghostty_demo_step = b.step("demo-ghostty", "Run the Ghostty NVIDIA performance demo");
-    ghostty_demo_step.dependOn(&run_ghostty_demo.step);
-
-    // ZION CLI Demo
-    const zion_demo = b.addExecutable(.{
-        .name = "zion_cli_demo", 
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("examples/zion_cli_demo.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    zion_demo.root_module.addImport("phantom", mod);
-    zion_demo.linkLibC();
-    b.installArtifact(zion_demo);
-
-    const run_zion_demo = b.addRunArtifact(zion_demo);
-    const zion_demo_step = b.step("demo-zion", "Run the ZION CLI interactive demo");
-    zion_demo_step.dependOn(&run_zion_demo.step);
-
-    // Reaper AUR Demo
-    const reaper_demo = b.addExecutable(.{
-        .name = "reaper_aur_demo",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("examples/reaper_aur_demo.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    reaper_demo.root_module.addImport("phantom", mod);
-    reaper_demo.linkLibC();
-    b.installArtifact(reaper_demo);
-
-    const run_reaper_demo = b.addRunArtifact(reaper_demo);
-    const reaper_demo_step = b.step("demo-reaper", "Run the Reaper AUR dependencies demo");
-    reaper_demo_step.dependOn(&run_reaper_demo.step);
-
-    // Crypto Package Demo
-    const crypto_demo = b.addExecutable(.{
-        .name = "crypto_package_demo",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("examples/crypto_package_demo.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    crypto_demo.root_module.addImport("phantom", mod);
-    crypto_demo.linkLibC();
-    b.installArtifact(crypto_demo);
-
-    const run_crypto_demo = b.addRunArtifact(crypto_demo);
-    const crypto_demo_step = b.step("demo-crypto", "Run the crypto/blockchain package demo");
-    crypto_demo_step.dependOn(&run_crypto_demo.step);
+        const run_fuzzy_search_demo = b.addRunArtifact(fuzzy_search_demo);
+        const fuzzy_search_demo_step = b.step("demo-fuzzy", "Run the fuzzy search theme picker demo");
+        fuzzy_search_demo_step.dependOn(&run_fuzzy_search_demo.step);
+    }
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

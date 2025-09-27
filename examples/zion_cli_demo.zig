@@ -19,40 +19,39 @@ pub fn main() !void {
     defer app.deinit();
 
     // Header
-    const title = try phantom.widgets.Text.initWithStyle(allocator, "🦎 ZION - ZIG INTERACTIVE OBJECT NAVIGATOR", phantom.Style.default().withFg(phantom.Color.bright_green).withBold());
+    const title_style = phantom.Style.default().withFg(phantom.Color.bright_green).withBold();
+    const title = try phantom.widgets.Text.initWithStyle(allocator, "🦎 ZION - ZIG INTERACTIVE OBJECT NAVIGATOR", title_style);
     try app.addWidget(&title.widget);
 
     const subtitle = try phantom.widgets.Text.initWithStyle(allocator, "📚 Advanced Zig Library Management & ZigLibs Integration", phantom.Style.default().withFg(phantom.Color.bright_cyan));
     try app.addWidget(&subtitle.widget);
 
-    // Task monitor for library operations
-    const task_monitor = try phantom.widgets.TaskMonitor.init(allocator);
-    try app.addWidget(&task_monitor.widget);
-    
-    // Add sample library installation tasks
-    try task_monitor.addTask("search", "🔍 Searching ZigLibs Registry");
-    task_monitor.updateProgress("search", 100.0);
-    try task_monitor.updateTask("search", .completed, "✅ Found 847 packages");
+    // Task monitor for library operations (only if data widgets are enabled)
+    if (phantom.phantom_config.enable_data_widgets) {
+        const task_monitor = try phantom.widgets.TaskMonitor.init(allocator);
+        try app.addWidget(&task_monitor.widget);
+        
+        // Add sample library installation tasks
+        try task_monitor.addTask("search", "🔍 Searching ZigLibs Registry");
+        task_monitor.updateProgress("search", 100.0);
+        try task_monitor.updateTask("search", .completed, "✅ Found 847 packages");
 
-    try task_monitor.addTask("raylib", "📦 Installing raylib-zig");
-    task_monitor.updateProgress("raylib", 65.0);
-    try task_monitor.updateTask("raylib", .running, "� Building native bindings...");
+        try task_monitor.addTask("raylib", "📦 Installing raylib-zig");
+        task_monitor.updateProgress("raylib", 65.0);
+        try task_monitor.updateTask("raylib", .running, "📦 Building native bindings...");
 
-    try task_monitor.addTask("zap", "⚡ Installing zap framework");
-    task_monitor.updateProgress("zap", 80.0);
-    try task_monitor.updateTask("zap", .running, "🌐 Setting up HTTP server...");
+        try task_monitor.addTask("zap", "⚡ Installing zap framework");
+        task_monitor.updateProgress("zap", 80.0);
+        try task_monitor.updateTask("zap", .running, "🌐 Setting up HTTP server...");
 
-    try task_monitor.addTask("clap", "🧮 Installing zig-clap");
-    task_monitor.updateProgress("clap", 45.0);
-    try task_monitor.updateTask("clap", .running, "📝 Generating CLI interface...");
+        try task_monitor.addTask("clap", "🧮 Installing zig-clap");
+        task_monitor.updateProgress("clap", 45.0);
+        try task_monitor.updateTask("clap", .running, "📝 Generating CLI interface...");
 
-    try task_monitor.addTask("sqlite", "🗃️ Installing sqlite bindings");
-    task_monitor.updateProgress("sqlite", 90.0);
-    try task_monitor.updateTask("sqlite", .running, "🔨 Linking database drivers...");
-
-    try task_monitor.addTask("crypto", "🔐 Installing crypto library");
-    task_monitor.updateProgress("crypto", 25.0);
-    try task_monitor.updateTask("crypto", .running, "🛡️ Compiling security modules...");
+        try task_monitor.addTask("sqlite", "🗃️ Installing sqlite bindings");
+        task_monitor.updateProgress("sqlite", 30.0);
+        try task_monitor.updateTask("sqlite", .running, "🔗 Linking C library...");
+    }
 
     // Status message
     const status = try phantom.widgets.Text.initWithStyle(allocator, "💡 ZION integrates with ZigLibs ecosystem for seamless dependency management", phantom.Style.default().withFg(phantom.Color.bright_yellow));

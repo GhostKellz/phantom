@@ -1,40 +1,40 @@
 //! Widget system module exports
 const std = @import("std");
+const config = @import("phantom_config");
 
-// Core widget types
+// Core widget types - always available
 pub const Widget = @import("../app.zig").Widget;
 
-// Basic widgets
-pub const Text = @import("text.zig").Text;
-pub const Block = @import("block.zig").Block;
-pub const List = @import("list.zig").List;
+// Basic widgets - conditionally exported
+pub const Text = if (config.enable_basic_widgets) @import("text.zig").Text else void;
+pub const Block = if (config.enable_basic_widgets) @import("block.zig").Block else void;
+pub const List = if (config.enable_basic_widgets) @import("list.zig").List else void;
+pub const Button = if (config.enable_basic_widgets) @import("button.zig").Button else void;
+pub const Input = if (config.enable_basic_widgets) @import("input.zig").Input else void;
+pub const TextArea = if (config.enable_basic_widgets) @import("textarea.zig").TextArea else void;
 
-// Interactive widgets
-pub const Button = @import("button.zig").Button;
-pub const Input = @import("input.zig").Input;
-pub const TextArea = @import("textarea.zig").TextArea;
+// Data display widgets - conditionally exported
+pub const ProgressBar = if (config.enable_data_widgets) @import("progress.zig").ProgressBar else void;
+pub const Table = if (config.enable_data_widgets) @import("table.zig").Table else void;
+pub const TaskMonitor = if (config.enable_data_widgets) @import("task_monitor.zig").TaskMonitor else void;
 
-// Data display widgets
-pub const ProgressBar = @import("progress.zig").ProgressBar;
-pub const Table = @import("table.zig").Table;
-pub const TaskMonitor = @import("task_monitor.zig").TaskMonitor;
+// Advanced widgets - conditionally exported
+pub const StreamingText = if (config.enable_advanced) @import("streaming_text.zig").StreamingText else void;
+pub const CodeBlock = if (config.enable_advanced) @import("code_block.zig").CodeBlock else void;
+pub const Container = if (config.enable_advanced) @import("container.zig").Container else void;
+pub const ThemePicker = if (config.enable_advanced) @import("theme_picker.zig").ThemePicker else void;
 
-// Advanced widgets
-pub const StreamingText = @import("streaming_text.zig").StreamingText;
-pub const CodeBlock = @import("code_block.zig").CodeBlock;
+// Package management widgets - conditionally exported
+pub const UniversalPackageBrowser = if (config.enable_package_mgmt) @import("universal_package_browser.zig").UniversalPackageBrowser else void;
+pub const AURDependencies = if (config.enable_package_mgmt) @import("aur_dependencies.zig").AURDependencies else void;
 
-// Container widgets
-pub const Container = @import("container.zig").Container;
+// Blockchain/crypto widgets - conditionally exported
+pub const BlockchainPackageBrowser = if (config.enable_crypto) @import("blockchain_package_browser.zig").BlockchainPackageBrowser else void;
 
-// Package management widgets
-pub const UniversalPackageBrowser = @import("universal_package_browser.zig").UniversalPackageBrowser;
-pub const AURDependencies = @import("aur_dependencies.zig").AURDependencies;
-pub const BlockchainPackageBrowser = @import("blockchain_package_browser.zig").BlockchainPackageBrowser;
-
-// Development tools widgets
-pub const CommandBuilder = @import("command_builder.zig").CommandBuilder;
-pub const NetworkTopology = @import("network_topology.zig").NetworkTopology;
-pub const SystemMonitor = @import("system_monitor.zig").SystemMonitor;
+// Development tools widgets - conditionally exported
+pub const CommandBuilder = if (config.enable_system) @import("command_builder.zig").CommandBuilder else void;
+pub const NetworkTopology = if (config.enable_system) @import("network_topology.zig").NetworkTopology else void;
+pub const SystemMonitor = if (config.enable_system) @import("system_monitor.zig").SystemMonitor else void;
 
 test {
     // Import all widget tests

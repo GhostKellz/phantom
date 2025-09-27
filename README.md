@@ -45,7 +45,7 @@ zig build run
 Or add to your project:
 
 ```bash
-zig fetch --save https://github.com/ghostkellz/phantom/archive/v0.3.3.tar.gz
+zig fetch --save https://github.com/ghostkellz/phantom/archive/refs/tags/v0.3.10.tar.gz
 ```
 
 Then in your `build.zig`:
@@ -77,7 +77,7 @@ pub fn main() !void {
     });
     defer app.deinit();
     
-    // Add styled text (v0.3.3 uses instance methods)
+    // Add styled text (v0.3.10 uses instance methods)
     const text = try phantom.widgets.Text.initWithStyle(
         allocator,
         "Hello, Phantom! 👻",
@@ -100,7 +100,7 @@ pub fn main() !void {
 }
 ```
 
-### Widget Library (v0.3.3)
+### Widget Library (v0.3.10)
 - **Core Widgets**: Text, Block, Container, List, Button, Input, TextArea
 - **Data Display**: Table, ProgressBar, TaskMonitor, SystemMonitor  
 - **Advanced**: StreamingText, CodeBlock, Dialog, ContextMenu
@@ -116,27 +116,35 @@ pub fn main() !void {
 
 ## 📚 Documentation & Examples
 
-* **[Complete Documentation](DOCS.md)**: Comprehensive guide with all features
-* **[API Reference](API.md)**: Detailed API documentation for all widgets
-* **[Integration Guide](PHANTOM_INTEGRATION.md)**: Step-by-step integration instructions
+* **[📋 Complete Documentation](DOCS.md)**: Comprehensive guide with all features
+* **[🔧 API Reference](API.md)**: Detailed API documentation for all widgets
+* **[🚀 Integration Guide](docs/PHANTOM_INTEGRATION.md)**: Step-by-step integration instructions
+* **[🎯 Feature Guide](docs/FEATURES.md)**: Detailed feature overview and API guide
 * **Example Applications**: 6 complete demo applications in `examples/`
   - `simple_package_demo` - Package manager progress tracking
   - `zion_cli_demo` - Advanced Zig library management
   - `ghostty_performance_demo` - System performance monitoring
   - `crypto_package_demo` - Blockchain package browser
   - `reaper_aur_demo` - Arch Linux AUR dependency manager
+  - `package_manager_demo` - Universal package browser
   - `comprehensive_demo` - All widgets showcase
 
 ---
 
 ## 🏆 Version History & Roadmap
 
-### ✅ v0.3.3 (Current) - Production Ready
+### ✅ v0.3.10 (Current) - Production Ready
 * **Full Zig 0.16+ Compatibility**: Updated ArrayList API, memory management
 * **20+ Professional Widgets**: Complete widget ecosystem for any TUI app
 * **Advanced Styling System**: True colors, animations, fluent API
 * **Comprehensive Documentation**: Complete guides, API reference, examples
 * **Production Testing**: Memory-safe, performance-optimized, thoroughly tested
+
+### ✅ v0.3.3 - Build System Optimization
+* **Conditional Compilation**: Build presets for optimal binary sizes
+* **Size Optimization**: Basic preset ~24MB, full preset ~100MB
+* **Demo Applications**: 6 complete working examples
+* **Zig 0.16 Compatibility**: Updated for latest Zig APIs
 
 ### ✅ v0.3.2 - Polish & Refinement
 * Enhanced widget library with specialized components

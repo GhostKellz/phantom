@@ -19,7 +19,8 @@ pub fn main() !void {
     defer app.deinit();
 
     // Create a simple text widget
-    const hello_text = try phantom.widgets.Text.initWithStyle(allocator, "Welcome to Phantom TUI! 👻", phantom.Style.default().withFg(phantom.Color.bright_cyan).withBold());
+    const hello_style = phantom.Style.default().withFg(phantom.Color.bright_cyan).withBold();
+    const hello_text = try phantom.widgets.Text.initWithStyle(allocator, "Welcome to Phantom TUI! 👻", hello_style);
     try app.addWidget(&hello_text.widget);
 
     // Create a list widget

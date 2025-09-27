@@ -117,7 +117,7 @@ pub const Attributes = packed struct {
         if (self.reverse) try codes.appendSlice(allocator, "\x1b[7m");
         if (self.blink) try codes.appendSlice(allocator, "\x1b[5m");
 
-        return codes.toOwnedSlice(allocator);
+        return try codes.toOwnedSlice(allocator);
     }
 };
 
@@ -167,9 +167,16 @@ pub const Style = struct {
         return new_style;
     }
 
+    /// Check if two styles are equal
+    pub fn eq(self: Style, other: Style) bool {
+        return std.meta.eql(self.fg, other.fg) and
+               std.meta.eql(self.bg, other.bg) and
+               std.meta.eql(self.attributes, other.attributes);
+    }
+
     /// Generate ANSI escape codes for this style
     pub fn ansiCodes(self: Style, allocator: std.mem.Allocator) ![]const u8 {
-        var codes = std.ArrayList(u8){};
+        var codes = try std.ArrayList(u8).initCapacity(allocator, 32);
         defer codes.deinit(allocator);
 
         // Reset first
@@ -190,7 +197,7 @@ pub const Style = struct {
         defer allocator.free(attr_codes);
         try codes.appendSlice(allocator, attr_codes);
 
-        return codes.toOwnedSlice(allocator);
+        return try codes.toOwnedSlice(allocator);
     }
 };
 

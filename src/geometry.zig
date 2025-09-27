@@ -22,6 +22,31 @@ pub const Position = struct {
     }
 };
 
+/// Point with signed coordinates (for mouse events, relative positioning)
+pub const Point = struct {
+    x: i16,
+    y: i16,
+
+    pub fn init(x: i16, y: i16) Point {
+        return Point{ .x = x, .y = y };
+    }
+
+    pub fn origin() Point {
+        return Point{ .x = 0, .y = 0 };
+    }
+
+    pub fn offset(self: Point, dx: i16, dy: i16) Point {
+        return Point{ .x = self.x + dx, .y = self.y + dy };
+    }
+
+    pub fn toPosition(self: Point) Position {
+        return Position{
+            .x = @intCast(@max(0, self.x)),
+            .y = @intCast(@max(0, self.y)),
+        };
+    }
+};
+
 /// Represents dimensions with width and height
 pub const Size = struct {
     width: u16,
@@ -83,6 +108,12 @@ pub const Rect = struct {
     pub fn contains(self: Rect, pos: Position) bool {
         return pos.x >= self.x and pos.x < self.right() and
             pos.y >= self.y and pos.y < self.bottom();
+    }
+
+    pub fn containsPoint(self: Rect, point: Point) bool {
+        return point.x >= 0 and point.y >= 0 and
+               @as(u16, @intCast(point.x)) >= self.x and @as(u16, @intCast(point.x)) < self.right() and
+               @as(u16, @intCast(point.y)) >= self.y and @as(u16, @intCast(point.y)) < self.bottom();
     }
 
     pub fn intersect(self: Rect, other: Rect) ?Rect {

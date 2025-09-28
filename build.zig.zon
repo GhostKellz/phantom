@@ -42,7 +42,7 @@
         },
         .zfont = .{
             .url = "https://github.com/ghostkellz/zfont/archive/refs/heads/main.tar.gz",
-            .hash = "zfont-0.1.0-qcMRYJ5HCABkkIYMqnbEtKQzeg2rOw-zYyV3Z19pszAd",
+            .hash = "zfont-0.1.0-qcMRYK2ICwDi_11E8mQm0gYnTxp-VCPW__7nBSKD3kMe",
         },
         .zigzag = .{
             .url = "https://github.com/ghostkellz/zigzag/archive/refs/heads/main.tar.gz",

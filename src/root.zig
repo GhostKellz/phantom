@@ -42,6 +42,17 @@ pub const emoji = @import("emoji.zig");
 // Async runtime - always available
 pub const runtime = @import("runtime.zig");
 
+// ===== v0.5.0 New Features =====
+
+// Font system with zfont + gcode integration
+pub const font = @import("font/mod.zig");
+
+// Unicode processing with gcode
+pub const unicode = @import("unicode.zig");
+
+// GPU rendering system (Vulkan + CUDA)
+pub const gpu = @import("render/gpu/mod.zig");
+
 // For compatibility with existing code
 pub fn bufferedPrint() !void {
     const stdout_file = std.fs.File.stdout().writer();

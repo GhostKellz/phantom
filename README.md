@@ -27,6 +27,15 @@
 * 🔧 **Developer Friendly:** Complete documentation, migration guides, best practices
 * 💻 **Zig 0.16+ Compatible:** Built for modern Zig with proper ArrayList API usage
 
+## 🎯 New Features
+
+* 🔤 **Advanced Font System:** zfont integration with programming ligatures, Nerd Font icons, and BiDi text rendering
+* ✏️ **TextEditor Widget:** Production-ready multi-cursor editor with rope buffer, undo/redo, code folding, and millions-of-lines support
+* 🎮 **GPU Rendering:** Vulkan 1.3 + CUDA compute architecture for hardware-accelerated text rendering (NVIDIA optimized)
+* 🌍 **Enhanced Unicode:** gcode integration for blazing-fast Unicode processing (3-15x faster than traditional libraries)
+* 📊 **Performance Benchmarks:** Comprehensive benchmark suite proving rendering speed and efficiency gains
+* 🚀 **Glyph Caching:** LRU cache with GPU texture atlas support for optimal font rendering performance
+
 ---
 
 ## 🛠️ Quick Start
@@ -100,10 +109,10 @@ pub fn main() !void {
 }
 ```
 
-### Widget Library (v0.3.10)
+### Widget Library
 - **Core Widgets**: Text, Block, Container, List, Button, Input, TextArea
-- **Data Display**: Table, ProgressBar, TaskMonitor, SystemMonitor  
-- **Advanced**: StreamingText, CodeBlock, Dialog, ContextMenu
+- **Data Display**: Table, ProgressBar, TaskMonitor, SystemMonitor
+- **Advanced**: StreamingText, CodeBlock, Dialog, ContextMenu, **TextEditor** (multi-cursor, rope buffer)
 - **Specialized**: NetworkTopology, PackageBrowsers, CommandBuilder
 
 ### Styling System
@@ -133,7 +142,21 @@ pub fn main() !void {
 
 ## 🏆 Version History & Roadmap
 
-### ✅ v0.3.10 (Current) - Production Ready
+### ✅ v0.5.0 (Current) - Modern Editor Revolution
+* **Font System**: zfont integration with ligatures, Nerd Font icons, BiDi text
+* **TextEditor Widget**: Multi-cursor, rope buffer, undo/redo, code folding
+* **GPU Architecture**: Vulkan 1.3 + CUDA compute for hardware acceleration
+* **Unicode Performance**: gcode integration (3-15x faster than traditional libs)
+* **Benchmark Suite**: Comprehensive performance testing framework
+* **Glyph Caching**: LRU cache with GPU texture atlas support
+
+### ✅ v0.4.0 - Async & Runtime
+* **Async Integration**: Non-blocking I/O with zsync runtime
+* **Ghost Shell**: Advanced shell functionality for CLI tools
+* **Performance Optimizations**: Enhanced rendering and memory management
+* **Dependency Updates**: Latest zig-zag, zsync, gcode integration
+
+### ✅ v0.3.10 - Production Ready
 * **Full Zig 0.16+ Compatibility**: Updated ArrayList API, memory management
 * **20+ Professional Widgets**: Complete widget ecosystem for any TUI app
 * **Advanced Styling System**: True colors, animations, fluent API
@@ -160,13 +183,6 @@ pub fn main() !void {
 * Comprehensive widget library (15+ widgets)
 * Advanced input handling (mouse, keyboard, focus)
 * Professional styling system
-
-### 🚧 v0.4.0 - Planned Features
-* **Async Integration**: Non-blocking I/O with zsync runtime
-* **Plugin System**: Custom widget development framework  
-* **Theme Engine**: Built-in themes and theme switching
-* **Performance Profiler**: Built-in performance analysis tools
-* **Accessibility**: Screen reader support and accessibility features
 
 ---
 

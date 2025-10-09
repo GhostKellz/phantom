@@ -1,6 +1,11 @@
 //! Unicode support and text utilities for Phantom TUI
 const std = @import("std");
 
+/// Convenience function for getting string width (delegates to UnicodeWidth)
+pub fn getStringWidth(text: []const u8) !u16 {
+    return UnicodeWidth.stringWidth(text);
+}
+
 /// Unicode character width calculation
 pub const UnicodeWidth = struct {
     /// Calculate the display width of a Unicode codepoint

@@ -36,6 +36,9 @@ pub const CommandBuilder = if (config.enable_system) @import("command_builder.zi
 pub const NetworkTopology = if (config.enable_system) @import("network_topology.zig").NetworkTopology else void;
 pub const SystemMonitor = if (config.enable_system) @import("system_monitor.zig").SystemMonitor else void;
 
+// v0.5.0: Advanced text editor for Grim - always available
+pub const editor = @import("editor/mod.zig");
+
 test {
     // Import all widget tests
     _ = @import("text.zig");

@@ -152,12 +152,20 @@ pub fn build(b: *std.Build) void {
     });
     const gcode_mod = gcode_dep.module("gcode");
 
+    // Get zfont dependency for advanced font rendering
+    const zfont_dep = b.dependency("zfont", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const zfont_mod = zfont_dep.module("zfont");
+
     const mod = b.addModule("phantom", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .imports = &.{
             .{ .name = "zsync", .module = zsync_mod },
             .{ .name = "gcode", .module = gcode_mod },
+            .{ .name = "zfont", .module = zfont_mod },
         },
     });
 
@@ -477,6 +485,73 @@ pub fn build(b: *std.Build) void {
         const fuzzy_search_demo_step = b.step("demo-fuzzy", "Run the fuzzy search theme picker demo");
         fuzzy_search_demo_step.dependOn(&run_fuzzy_search_demo.step);
     }
+
+    // =============================================================================
+    // v0.5.0 New Features
+    // =============================================================================
+
+    // Grim Editor Demo - showcases font system, TextEditor, Unicode, GPU
+    const grim_demo = b.addExecutable(.{
+        .name = "grim_editor_demo",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/grim_editor_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "phantom", .module = mod },
+            },
+        }),
+    });
+    grim_demo.linkLibC();
+    b.installArtifact(grim_demo);
+
+    const run_grim_demo = b.addRunArtifact(grim_demo);
+    const grim_demo_step = b.step("demo-grim", "Run the Grim editor feature showcase");
+    grim_demo_step.dependOn(&run_grim_demo.step);
+
+    // Unicode Performance Benchmarks
+    const unicode_bench = b.addExecutable(.{
+        .name = "unicode_bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/unicode_bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast, // Always optimize benchmarks
+            .imports = &.{
+                .{ .name = "phantom", .module = mod },
+                .{ .name = "gcode", .module = gcode_mod },
+            },
+        }),
+    });
+    unicode_bench.linkLibC();
+    b.installArtifact(unicode_bench);
+
+    const run_unicode_bench = b.addRunArtifact(unicode_bench);
+    const unicode_bench_step = b.step("bench-unicode", "Run Unicode performance benchmarks");
+    unicode_bench_step.dependOn(&run_unicode_bench.step);
+
+    // Rendering Performance Benchmarks
+    const render_bench = b.addExecutable(.{
+        .name = "render_bench",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/render_bench.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "phantom", .module = mod },
+            },
+        }),
+    });
+    render_bench.linkLibC();
+    b.installArtifact(render_bench);
+
+    const run_render_bench = b.addRunArtifact(render_bench);
+    const render_bench_step = b.step("bench-render", "Run rendering performance benchmarks");
+    render_bench_step.dependOn(&run_render_bench.step);
+
+    // Run all benchmarks
+    const bench_all_step = b.step("bench", "Run all performance benchmarks");
+    bench_all_step.dependOn(unicode_bench_step);
+    bench_all_step.dependOn(render_bench_step);
 
     // Just like flags, top level steps are also listed in the `--help` menu.
     //

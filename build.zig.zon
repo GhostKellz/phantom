@@ -45,8 +45,8 @@
             .hash = "zfont-0.1.0-qcMRYK2ICwA3x_9gRT2lotL7ZS4fUA1bRNQi9JKAn8Kw",
         },
         .zigzag = .{
-            .url = "https://github.com/ghostkellz/zigzag/archive/refs/heads/main.tar.gz",
-            .hash = "zigzag-0.0.0-NmTasAS_BwBOXEkNTsKAihZ3ZEt6PEtmgbeBQMgdeqaW",
+            .url = "https://github.com/ghostkellz/zigzag/archive/main.tar.gz",
+            .hash = "zigzag-0.0.0-NmTasPm-BwD9ZfdB0ek5kiWo0zk5HTEzEcugmRZrEbgL",
         },
     },
     .paths = .{

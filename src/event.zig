@@ -88,17 +88,44 @@ pub const MouseButton = enum {
     wheel_down,
 };
 
+/// Keyboard modifiers
+pub const Modifiers = struct {
+    shift: bool = false,
+    ctrl: bool = false,
+    alt: bool = false,
+    meta: bool = false,
+
+    pub fn none() Modifiers {
+        return Modifiers{};
+    }
+
+    pub fn hasAny(self: Modifiers) bool {
+        return self.shift or self.ctrl or self.alt or self.meta;
+    }
+};
+
 /// Mouse event types
 pub const MouseEvent = struct {
     button: MouseButton,
     position: Position,
     pressed: bool, // true for press, false for release
+    modifiers: Modifiers = .{},
 
     pub fn init(button: MouseButton, pos: Position, pressed: bool) MouseEvent {
         return MouseEvent{
             .button = button,
             .position = pos,
             .pressed = pressed,
+            .modifiers = .{},
+        };
+    }
+
+    pub fn initWithModifiers(button: MouseButton, pos: Position, pressed: bool, mods: Modifiers) MouseEvent {
+        return MouseEvent{
+            .button = button,
+            .position = pos,
+            .pressed = pressed,
+            .modifiers = mods,
         };
     }
 };

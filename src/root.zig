@@ -53,6 +53,17 @@ pub const unicode = @import("unicode.zig");
 // GPU rendering system (Vulkan + CUDA)
 pub const gpu = @import("render/gpu/mod.zig");
 
+// ===== v0.6.0 New Features =====
+
+// Animation system for smooth transitions
+pub const animation = @import("animation.zig");
+
+// Enhanced mouse support with hover, drag, etc.
+pub const mouse = @import("mouse.zig");
+
+// Clipboard integration (system copy/paste)
+pub const clipboard = @import("clipboard.zig");
+
 // For compatibility with existing code
 pub fn bufferedPrint() !void {
     const stdout_file = std.fs.File.stdout().writer();

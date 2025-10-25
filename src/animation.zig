@@ -260,7 +260,7 @@ pub const Animation = struct {
         }
     }
     
-    pub fn resume(self: *Animation) void {
+    pub fn resumeAnimation(self: *Animation) void {
         if (self.state == .paused) {
             self.state = .running;
         }
@@ -538,12 +538,174 @@ test "Animation keyframes" {
     try std.testing.expect(animation.keyframes.items.len == 2);
 }
 
+/// Smooth scrolling helper
+pub const SmoothScroll = struct {
+    current_value: f32,
+    target_value: f32,
+    start_value: f32,
+    duration_ms: u64,
+    elapsed_ms: u64,
+    easing: Easing,
+    active: bool,
+
+    pub fn init(initial_value: f32) SmoothScroll {
+        return SmoothScroll{
+            .current_value = initial_value,
+            .target_value = initial_value,
+            .start_value = initial_value,
+            .duration_ms = 0,
+            .elapsed_ms = 0,
+            .easing = .ease_out,
+            .active = false,
+        };
+    }
+
+    pub fn scrollTo(self: *SmoothScroll, target: f32, duration_ms: u64) void {
+        self.start_value = self.current_value;
+        self.target_value = target;
+        self.duration_ms = duration_ms;
+        self.elapsed_ms = 0;
+        self.active = true;
+    }
+
+    pub fn update(self: *SmoothScroll, delta_ms: u64) void {
+        if (!self.active) return;
+
+        self.elapsed_ms += delta_ms;
+        if (self.elapsed_ms >= self.duration_ms) {
+            self.current_value = self.target_value;
+            self.active = false;
+            return;
+        }
+
+        const t = @as(f32, @floatFromInt(self.elapsed_ms)) / @as(f32, @floatFromInt(self.duration_ms));
+        const eased = self.easing.apply(t);
+        self.current_value = self.start_value + (self.target_value - self.start_value) * eased;
+    }
+
+    pub fn getValue(self: *const SmoothScroll) f32 {
+        return self.current_value;
+    }
+
+    pub fn isActive(self: *const SmoothScroll) bool {
+        return self.active;
+    }
+};
+
+/// Fade effect helper
+pub const Fade = struct {
+    opacity: f32,
+    target_opacity: f32,
+    start_opacity: f32,
+    duration_ms: u64,
+    elapsed_ms: u64,
+    easing: Easing,
+    active: bool,
+
+    pub fn init() Fade {
+        return Fade{
+            .opacity = 1.0,
+            .target_opacity = 1.0,
+            .start_opacity = 1.0,
+            .duration_ms = 0,
+            .elapsed_ms = 0,
+            .easing = .ease_in_out,
+            .active = false,
+        };
+    }
+
+    pub fn fadeIn(self: *Fade, duration_ms: u64) void {
+        self.start_opacity = self.opacity;
+        self.target_opacity = 1.0;
+        self.duration_ms = duration_ms;
+        self.elapsed_ms = 0;
+        self.active = true;
+    }
+
+    pub fn fadeOut(self: *Fade, duration_ms: u64) void {
+        self.start_opacity = self.opacity;
+        self.target_opacity = 0.0;
+        self.duration_ms = duration_ms;
+        self.elapsed_ms = 0;
+        self.active = true;
+    }
+
+    pub fn fadeTo(self: *Fade, target: f32, duration_ms: u64) void {
+        self.start_opacity = self.opacity;
+        self.target_opacity = @max(0.0, @min(1.0, target));
+        self.duration_ms = duration_ms;
+        self.elapsed_ms = 0;
+        self.active = true;
+    }
+
+    pub fn update(self: *Fade, delta_ms: u64) void {
+        if (!self.active) return;
+
+        self.elapsed_ms += delta_ms;
+        if (self.elapsed_ms >= self.duration_ms) {
+            self.opacity = self.target_opacity;
+            self.active = false;
+            return;
+        }
+
+        const t = @as(f32, @floatFromInt(self.elapsed_ms)) / @as(f32, @floatFromInt(self.duration_ms));
+        const eased = self.easing.apply(t);
+        self.opacity = self.start_opacity + (self.target_opacity - self.start_opacity) * eased;
+    }
+
+    pub fn getOpacity(self: *const Fade) f32 {
+        return self.opacity;
+    }
+
+    pub fn isActive(self: *const Fade) bool {
+        return self.active;
+    }
+
+    pub fn setEasing(self: *Fade, easing: Easing) void {
+        self.easing = easing;
+    }
+};
+
+test "SmoothScroll" {
+    var scroll = SmoothScroll.init(0.0);
+    try std.testing.expect(scroll.getValue() == 0.0);
+    try std.testing.expect(!scroll.isActive());
+
+    scroll.scrollTo(100.0, 1000);
+    try std.testing.expect(scroll.isActive());
+
+    scroll.update(500); // Half way
+    try std.testing.expect(scroll.getValue() > 0.0);
+    try std.testing.expect(scroll.getValue() < 100.0);
+
+    scroll.update(500); // Complete
+    try std.testing.expect(scroll.getValue() == 100.0);
+    try std.testing.expect(!scroll.isActive());
+}
+
+test "Fade" {
+    var fade = Fade.init();
+    try std.testing.expect(fade.getOpacity() == 1.0);
+    try std.testing.expect(!fade.isActive());
+
+    fade.fadeOut(1000);
+    try std.testing.expect(fade.isActive());
+
+    fade.update(500); // Half way
+    try std.testing.expect(fade.getOpacity() > 0.0);
+    try std.testing.expect(fade.getOpacity() < 1.0);
+
+    fade.update(500); // Complete
+    try std.testing.expect(fade.getOpacity() == 0.0);
+    try std.testing.expect(!fade.isActive());
+}
+
 test "Animation manager" {
     const allocator = std.testing.allocator;
-    
+
     var manager = AnimationManager.init(allocator);
     defer manager.deinit();
-    
+
     var animation = Animation.init(allocator, 1000);
     defer animation.deinit();
     

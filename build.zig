@@ -553,6 +553,31 @@ pub fn build(b: *std.Build) void {
     bench_all_step.dependOn(unicode_bench_step);
     bench_all_step.dependOn(render_bench_step);
 
+    // =============================================================================
+    // v0.6.0 New Features - Essential Widgets
+    // =============================================================================
+
+    // v0.6.0 Feature Demo - showcases all new widgets
+    if (features.advanced or features.basic_widgets) {
+        const v06_demo = b.addExecutable(.{
+            .name = "v0_6_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/v0_6_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        v06_demo.linkLibC();
+        b.installArtifact(v06_demo);
+
+        const run_v06_demo = b.addRunArtifact(v06_demo);
+        const v06_demo_step = b.step("run-demo-v0.6", "Run the v0.6.0 feature showcase");
+        v06_demo_step.dependOn(&run_v06_demo.step);
+    }
+
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
     // The Zig build system is entirely implemented in userland, which means

@@ -39,6 +39,21 @@ pub const SystemMonitor = if (config.enable_system) @import("system_monitor.zig"
 // v0.5.0: Advanced text editor for Grim - always available
 pub const editor = @import("editor/mod.zig");
 
+// v0.6.0: Essential widgets for modern TUI applications - always available
+pub const ScrollView = if (config.enable_advanced) @import("scroll_view.zig").ScrollView else void;
+pub const ListView = if (config.enable_advanced) @import("list_view.zig").ListView else void;
+pub const RichText = if (config.enable_advanced) @import("rich_text.zig").RichText else void;
+pub const Border = if (config.enable_basic_widgets) @import("border.zig").Border else void;
+pub const Spinner = if (config.enable_basic_widgets) @import("spinner.zig").Spinner else void;
+
+// v0.6.0: Flexible layout system - always available
+pub const flex = if (config.enable_advanced) @import("flex.zig") else void;
+pub const FlexRow = if (config.enable_advanced) @import("flex.zig").FlexRow else void;
+pub const FlexColumn = if (config.enable_advanced) @import("flex.zig").FlexColumn else void;
+pub const FlexChild = if (config.enable_advanced) @import("flex.zig").FlexChild else void;
+pub const Alignment = if (config.enable_advanced) @import("flex.zig").Alignment else void;
+pub const Justify = if (config.enable_advanced) @import("flex.zig").Justify else void;
+
 test {
     // Import all widget tests
     _ = @import("text.zig");
@@ -52,7 +67,7 @@ test {
     _ = @import("task_monitor.zig");
     _ = @import("streaming_text.zig");
     _ = @import("code_block.zig");
-    
+
     // Import new widget tests
     _ = @import("universal_package_browser.zig");
     _ = @import("aur_dependencies.zig");
@@ -60,4 +75,12 @@ test {
     _ = @import("command_builder.zig");
     _ = @import("network_topology.zig");
     _ = @import("system_monitor.zig");
+
+    // v0.6.0 widget tests
+    _ = @import("scroll_view.zig");
+    _ = @import("list_view.zig");
+    _ = @import("rich_text.zig");
+    _ = @import("border.zig");
+    _ = @import("spinner.zig");
+    _ = @import("flex.zig");
 }

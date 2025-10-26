@@ -10,6 +10,7 @@ pub const App = @import("app.zig").App;
 pub const AppConfig = @import("app.zig").AppConfig;
 pub const Terminal = @import("terminal.zig").Terminal;
 pub const Event = @import("event.zig").Event;
+pub const Key = @import("event.zig").Key;
 pub const EventLoop = @import("event.zig").EventLoop;
 
 // Widget system - conditionally exported based on build configuration

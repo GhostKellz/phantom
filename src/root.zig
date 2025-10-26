@@ -39,6 +39,7 @@ pub const Style = @import("style.zig").Style;
 // Widget system - v0.6.1
 pub const Widget = @import("widget.zig").Widget;
 pub const SizeConstraints = @import("widget.zig").SizeConstraints;
+pub const Buffer = @import("terminal.zig").Buffer; // Required for Widget.render signature
 
 // Modern UI utilities - always available
 pub const emoji = @import("emoji.zig");

@@ -5,6 +5,23 @@ All notable changes to Phantom TUI Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2025-10-25
+
+### Fixed
+
+- **Buffer export**: Properly exported `Buffer` type from `root.zig` (required for Widget.render signature)
+  - Fixes compilation error: `root source file struct 'root' has no member named 'Buffer'`
+  - Critical fix for Grim editor integration
+  - All widgets use `*Buffer` in render vtable, so Buffer must be publicly accessible
+
+### Technical
+
+- Line 42 in `src/root.zig`: `pub const Buffer = @import("terminal.zig").Buffer;`
+- This was added in v0.6.1 locally but the GitHub tarball didn't include it
+- v0.6.2 ensures the fix is properly published
+
+---
+
 ## [0.6.1] - 2025-10-25
 
 ### Added - Widget System Completion & Composition

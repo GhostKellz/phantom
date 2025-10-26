@@ -5,6 +5,93 @@ All notable changes to Phantom TUI Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] - 2025-10-26
+
+### Added - Event Loop Flexibility
+
+This release provides full control over event handling, addressing the needs of vim-style editors and applications that require custom input handling (Grim editor integration).
+
+#### Event Loop Flexibility
+
+- **AppConfig.add_default_handler**: Optional flag to disable default quit behavior
+  - When `false`, Escape and Ctrl+C do NOT automatically quit the application
+  - Enables vim-style editors where Escape exits insert mode instead of quitting
+  - Default: `true` (maintains 100% backward compatibility)
+  - Essential for Grim editor and other applications with custom keybindings
+
+- **App.runWithoutDefaults()**: Alternative method for full event loop control
+  - Runs the application without adding any default event handlers
+  - Gives complete control over all keyboard input
+  - Use when you want to manually manage the event loop via `event_loop.addHandler()`
+
+#### Philosophy
+
+> "Phantom provides the primitives, you control the flow"
+
+v0.6.3 embraces the principle that developers should have full control over their event loops. Whether you use Phantom's built-in simple event loop, integrate zigzag for high-performance async I/O, or bring your own event system - Phantom now gets out of your way.
+
+### Changed
+
+- `App.run()` now respects `add_default_handler` configuration flag
+- Default behavior unchanged (backward compatible)
+
+### Impact on Grim Editor
+
+- ✅ Vim-style keybindings now fully supported (Escape key handling)
+- ✅ Full control over quit behavior
+- ✅ Custom event handlers no longer conflict with defaults
+- ✅ Opens path for zigzag integration in future releases
+
+### Breaking Changes
+
+**None** - v0.6.3 is 100% backward compatible with v0.6.2.
+
+### Migration Guide
+
+**For applications requiring custom event handling (vim-style editors, REPLs, etc.):**
+
+**Option 1: Config flag (recommended)**
+```zig
+const phantom = @import("phantom");
+
+var app = try phantom.App.init(allocator, .{
+    .title = "Grim Editor",
+    .add_default_handler = false,  // Disable default Escape/Ctrl+C quit
+});
+
+// Add your custom event handler
+try app.event_loop.addHandler(myCustomEventHandler);
+
+try app.run();
+```
+
+**Option 2: Alternative method**
+```zig
+var app = try phantom.App.init(allocator, .{
+    .title = "Grim Editor",
+});
+
+// Add custom handlers before running
+try app.event_loop.addHandler(myCustomEventHandler);
+
+// Run without defaults
+try app.runWithoutDefaults();
+```
+
+**For existing applications:**
+No changes required - default behavior is unchanged.
+
+### Future Integration Path
+
+v0.6.3 prepares the foundation for:
+- **v0.7.0**: Optional zigzag event loop integration
+- **v0.7.0**: Full async runtime support (zsync)
+- **v0.7.0**: Advanced event coalescing and priority queues
+
+The philosophy is clear: Phantom won't force architectural decisions. Use what works for your application.
+
+---
+
 ## [0.6.2] - 2025-10-25
 
 ### Fixed

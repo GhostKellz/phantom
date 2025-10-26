@@ -1,6 +1,6 @@
 //! Text widget for displaying styled text
 const std = @import("std");
-const Widget = @import("../app.zig").Widget;
+const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Event = @import("../event.zig").Event;
 const geometry = @import("../geometry.zig");

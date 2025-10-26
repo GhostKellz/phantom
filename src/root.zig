@@ -36,6 +36,10 @@ pub const Size = @import("geometry.zig").Size;
 pub const Color = @import("style.zig").Color;
 pub const Style = @import("style.zig").Style;
 
+// Widget system - v0.6.1
+pub const Widget = @import("widget.zig").Widget;
+pub const SizeConstraints = @import("widget.zig").SizeConstraints;
+
 // Modern UI utilities - always available
 pub const emoji = @import("emoji.zig");
 

@@ -1,7 +1,7 @@
 //! Border widget for wrapping other widgets with decorative borders
 //! Perfect for floating windows, dialogs, panels, etc.
 const std = @import("std");
-const Widget = @import("../app.zig").Widget;
+const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
 const Event = @import("../event.zig").Event;
@@ -214,7 +214,7 @@ pub const Border = struct {
 
         // Forward events to child
         if (self.child) |child| {
-            return child.vtable.handleEvent(child, event);
+            return child.handleEvent(event);
         }
 
         return false;
@@ -232,7 +232,7 @@ pub const Border = struct {
                     area.width - 2,
                     area.height - 2,
                 );
-                child.vtable.resize(child, inner_area);
+                child.resize(inner_area);
             }
         }
     }

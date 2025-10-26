@@ -5,6 +5,98 @@ All notable changes to Phantom TUI Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2025-10-25
+
+### Added - Widget System Completion & Composition
+
+This release completes the widget system foundation, enabling polymorphic widget trees and advanced composition patterns essential for complex TUI applications like the Grim editor.
+
+#### Core Widget Infrastructure
+
+- **widget.zig**: Dedicated widget module with unified Widget interface
+  - `Widget` base type with vtable pattern for polymorphism
+  - `SizeConstraints` type for layout hints (min/max/preferred sizes)
+  - Helper constructors: `unconstrained()`, `fixed()`, `minimum()`, `preferred()`
+  - Optional vtable methods: `handleEvent`, `resize`, `getConstraints`
+  - Exported from `root.zig` for easy access
+
+#### New Container Widgets
+
+- **Container.zig**: Flexible layout container for child management
+  - Layout modes: `.vertical`, `.horizontal`, `.manual`
+  - Automatic child positioning with flex-grow support
+  - Configurable gap and padding
+  - Event delegation to children
+  - Essential for building complex multi-widget layouts
+
+- **Stack.zig**: Z-index layering for overlays and modals
+  - Render children in order (painters algorithm)
+  - Modal layers that block events to widgets below
+  - `bringToFront()` and `sendToBack()` for z-order control
+  - Essential for floating windows, dialogs, LSP completions, tooltips
+
+- **Tabs.zig**: Tabbed interface widget
+  - Multiple tabs with labels and content widgets
+  - Tab navigation (next/prev/set active)
+  - Closeable tabs with keyboard shortcuts
+  - Tab bar positioning (top/bottom/left/right)
+  - Essential for multi-document editors, settings panels
+
+#### Documentation
+
+- **docs/widgets/WIDGET_GUIDE.md**: Comprehensive widget development guide
+  - How to create custom widgets
+  - VTable method documentation
+  - Size constraints usage
+  - Event handling patterns
+  - Container widget usage
+  - Complete working examples
+
+- **docs/widgets/MIGRATION_V061.md**: Migration guide from v0.6.0
+  - Summary of changes (100% backward compatible)
+  - New capabilities (polymorphic widget trees, modal dialogs, tabbed interfaces)
+  - Common patterns and best practices
+  - Troubleshooting guide
+
+### Changed
+
+- **Widget interface**: Moved from `app.zig` to dedicated `widget.zig` module
+  - Cleaner organization
+  - Better separation of concerns
+  - `render` now uses `*Buffer` instead of `anytype` (fixes comptime issues)
+  - Optional methods properly marked with `?` in vtable
+
+- **ArrayList API**: Updated to Zig 0.16 unmanaged ArrayList pattern
+  - Changed from `.init(allocator)` to `.{}`
+  - All widgets use proper initialization
+
+### Fixed
+
+- **Comptime errors**: Fixed generic `anytype` buffer causing comptime issues
+- **Optional vtable calls**: Widgets now properly check optional methods before calling
+- **@fieldParentPtr**: Updated to Zig 0.16 syntax (2 args with type annotation)
+- **Memory leaks**: All tests pass with zero leaks
+
+### Impact on Grim Editor
+
+This release enables critical Grim editor features:
+
+- **Polymorphic LSP widgets**: Store different LSP UI elements in `ArrayList(*Widget)`
+- **Modal completion menus**: Stack widget for floating LSP completions over editor
+- **Tabbed editing**: Tabs widget for multi-file editing
+- **Complex layouts**: Container widget for status bar + editor + sidebar layouts
+- **Event delegation**: Proper event bubbling through widget hierarchies
+
+### Breaking Changes
+
+None - v0.6.1 is 100% backward compatible with v0.6.0. All changes are additions.
+
+### Migration Guide
+
+See `docs/widgets/MIGRATION_V061.md` for detailed migration instructions and new patterns.
+
+---
+
 ## [0.6.0] - 2025-10-25
 
 ### Added - Essential Widgets & UI Polish

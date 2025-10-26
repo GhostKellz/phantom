@@ -5,10 +5,15 @@ const EventLoop = @import("event.zig").EventLoop;
 const Event = @import("event.zig").Event;
 const geometry = @import("geometry.zig");
 const style = @import("style.zig");
+const widget_mod = @import("widget.zig");
 
 const Size = geometry.Size;
 const Rect = geometry.Rect;
 const Style = style.Style;
+
+// Re-export Widget from widget.zig
+pub const Widget = widget_mod.Widget;
+pub const SizeConstraints = widget_mod.SizeConstraints;
 
 /// Application configuration
 pub const AppConfig = struct {
@@ -27,7 +32,7 @@ pub const App = struct {
     running: bool = false,
     needs_redraw: bool = true,
 
-    // Widget storage (simplified for now)
+    // Widget storage
     widgets: std.ArrayList(*Widget),
 
     pub fn init(allocator: std.mem.Allocator, config: AppConfig) !App {
@@ -41,7 +46,7 @@ pub const App = struct {
             .terminal = terminal,
             .event_loop = event_loop,
             .config = config,
-            .widgets = std.ArrayList(*Widget){},
+            .widgets = .{},
         };
     }
 
@@ -185,34 +190,6 @@ fn appEventHandler(event: Event) !bool {
 
     return false;
 }
-
-/// Base widget trait (simplified interface)
-pub const Widget = struct {
-    vtable: *const WidgetVTable,
-
-    pub const WidgetVTable = struct {
-        render: *const fn (self: *Widget, buffer: *@import("terminal.zig").Buffer, area: Rect) void,
-        handleEvent: *const fn (self: *Widget, event: Event) bool,
-        resize: *const fn (self: *Widget, area: Rect) void,
-        deinit: *const fn (self: *Widget) void,
-    };
-
-    pub fn render(self: *Widget, buffer: *@import("terminal.zig").Buffer, area: Rect) void {
-        self.vtable.render(self, buffer, area);
-    }
-
-    pub fn handleEvent(self: *Widget, event: Event) bool {
-        return self.vtable.handleEvent(self, event);
-    }
-
-    pub fn resize(self: *Widget, area: Rect) void {
-        self.vtable.resize(self, area);
-    }
-
-    pub fn deinit(self: *Widget) void {
-        self.vtable.deinit(self);
-    }
-};
 
 test "App initialization" {
     const allocator = std.testing.allocator;

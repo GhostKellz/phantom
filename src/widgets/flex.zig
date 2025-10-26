@@ -1,7 +1,7 @@
 //! Flexible layout system for modern UI composition
 //! FlexRow and FlexColumn allow responsive, constraint-based layouts
 const std = @import("std");
-const Widget = @import("../app.zig").Widget;
+const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
 const Event = @import("../event.zig").Event;
@@ -221,7 +221,7 @@ pub const FlexRow = struct {
 
         // Forward to children
         for (self.children.items) |child| {
-            if (child.widget.vtable.handleEvent(child.widget, event)) {
+            if (child.widget.handleEvent(event)) {
                 return true;
             }
         }
@@ -233,7 +233,7 @@ pub const FlexRow = struct {
 
         // Resize all children
         for (self.children.items) |child| {
-            child.widget.vtable.resize(child.widget, area);
+            child.widget.resize(area);
         }
     }
 
@@ -422,7 +422,7 @@ pub const FlexColumn = struct {
 
         // Forward to children
         for (self.children.items) |child| {
-            if (child.widget.vtable.handleEvent(child.widget, event)) {
+            if (child.widget.handleEvent(event)) {
                 return true;
             }
         }
@@ -434,7 +434,7 @@ pub const FlexColumn = struct {
 
         // Resize all children
         for (self.children.items) |child| {
-            child.widget.vtable.resize(child.widget, area);
+            child.widget.resize(area);
         }
     }
 

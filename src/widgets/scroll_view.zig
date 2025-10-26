@@ -1,7 +1,7 @@
 //! ScrollView widget for scrollable content areas
 //! Used for LSP diagnostics, file explorers, long lists, etc.
 const std = @import("std");
-const Widget = @import("../app.zig").Widget;
+const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
 const Event = @import("../event.zig").Event;
@@ -390,7 +390,7 @@ pub const ScrollView = struct {
 
         // Forward event to child
         if (self.child) |child| {
-            return child.vtable.handleEvent(child, event);
+            return child.handleEvent(event);
         }
 
         return false;
@@ -405,7 +405,7 @@ pub const ScrollView = struct {
 
         // Resize child if present
         if (self.child) |child| {
-            child.vtable.resize(child, area);
+            child.resize(area);
         }
     }
 

@@ -3,7 +3,7 @@ const std = @import("std");
 const config = @import("phantom_config");
 
 // Core widget types - always available
-pub const Widget = @import("../app.zig").Widget;
+pub const Widget = @import("../widget.zig").Widget;
 
 // Basic widgets - conditionally exported
 pub const Text = if (config.enable_basic_widgets) @import("text.zig").Text else void;
@@ -54,6 +54,10 @@ pub const FlexChild = if (config.enable_advanced) @import("flex.zig").FlexChild 
 pub const Alignment = if (config.enable_advanced) @import("flex.zig").Alignment else void;
 pub const Justify = if (config.enable_advanced) @import("flex.zig").Justify else void;
 
+// v0.6.1: Container widgets for composition - always available
+pub const Stack = if (config.enable_advanced) @import("stack.zig").Stack else void;
+pub const Tabs = if (config.enable_advanced) @import("tabs.zig").Tabs else void;
+
 test {
     // Import all widget tests
     _ = @import("text.zig");
@@ -83,4 +87,9 @@ test {
     _ = @import("border.zig");
     _ = @import("spinner.zig");
     _ = @import("flex.zig");
+
+    // v0.6.1 widget tests
+    _ = @import("container.zig");
+    _ = @import("stack.zig");
+    _ = @import("tabs.zig");
 }

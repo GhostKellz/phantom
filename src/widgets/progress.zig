@@ -1,6 +1,6 @@
 //! Progress bar widget for showing progress/completion
 const std = @import("std");
-const Widget = @import("../app.zig").Widget;
+const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
 const Event = @import("../event.zig").Event;

@@ -113,6 +113,10 @@ pub fn build(b: *std.Build) void {
     // Preset configurations for common use cases
     const preset = b.option([]const u8, "preset", "Use case preset: basic, package-mgr, crypto, system, full (default)") orelse "full";
 
+    // v0.7.0 Event Loop Backend Selection
+    const event_loop = b.option([]const u8, "event-loop", "Event loop backend: simple (default) or zigzag (high-performance)") orelse "simple";
+    const use_zigzag = std.mem.eql(u8, event_loop, "zigzag");
+
     // Individual feature flags (auto-configured based on preset, but can be overridden)
     const enable_basic_widgets = b.option(bool, "basic-widgets", "Enable basic widgets (Text, Block, List, Button, Input, TextArea)") orelse null;
     const enable_data_widgets = b.option(bool, "data-widgets", "Enable data display widgets (ProgressBar, Table, TaskMonitor)") orelse null;
@@ -159,6 +163,27 @@ pub fn build(b: *std.Build) void {
     });
     const zfont_mod = zfont_dep.module("zfont");
 
+    // Get zigzag dependency for high-performance event loop
+    const zigzag_dep = b.dependency("zigzag", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const zigzag_mod = zigzag_dep.module("zigzag");
+
+    // Get grove dependency for Tree-sitter syntax highlighting
+    const grove_dep = b.dependency("grove", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const grove_mod = grove_dep.module("grove");
+
+    // Get zontom dependency for TOML parsing
+    const zontom_dep = b.dependency("zontom", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    const zontom_mod = zontom_dep.module("zontom");
+
     const mod = b.addModule("phantom", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
@@ -166,20 +191,25 @@ pub fn build(b: *std.Build) void {
             .{ .name = "zsync", .module = zsync_mod },
             .{ .name = "gcode", .module = gcode_mod },
             .{ .name = "zfont", .module = zfont_mod },
+            .{ .name = "zigzag", .module = zigzag_mod },
+            .{ .name = "grove", .module = grove_mod },
+            .{ .name = "zontom", .module = zontom_mod },
         },
     });
 
     // Pass feature flags as comptime constants to the module
     // This creates conditional compilation based on build options
     const phantom_mod = b.addModule("phantom_config", .{
-        .root_source_file = b.addWriteFiles().add("phantom_config.zig", 
-            std.fmt.allocPrint(b.allocator, 
+        .root_source_file = b.addWriteFiles().add("phantom_config.zig",
+            std.fmt.allocPrint(b.allocator,
                 \\pub const enable_basic_widgets = {};
                 \\pub const enable_data_widgets = {};
                 \\pub const enable_package_mgmt = {};
                 \\pub const enable_crypto = {};
                 \\pub const enable_system = {};
                 \\pub const enable_advanced = {};
+                \\pub const use_zigzag_event_loop = {};
+                \\pub const event_loop_backend = "{s}";
             , .{
                 features.basic_widgets,
                 features.data_widgets,
@@ -187,6 +217,8 @@ pub fn build(b: *std.Build) void {
                 features.crypto,
                 features.system,
                 features.advanced,
+                use_zigzag,
+                event_loop,
             }) catch @panic("Failed to create config")
         ),
         .target = target,
@@ -486,10 +518,6 @@ pub fn build(b: *std.Build) void {
         fuzzy_search_demo_step.dependOn(&run_fuzzy_search_demo.step);
     }
 
-    // =============================================================================
-    // v0.5.0 New Features
-    // =============================================================================
-
     // Grim Editor Demo - showcases font system, TextEditor, Unicode, GPU
     const grim_demo = b.addExecutable(.{
         .name = "grim_editor_demo",
@@ -553,10 +581,6 @@ pub fn build(b: *std.Build) void {
     bench_all_step.dependOn(unicode_bench_step);
     bench_all_step.dependOn(render_bench_step);
 
-    // =============================================================================
-    // v0.6.0 New Features - Essential Widgets
-    // =============================================================================
-
     // v0.6.0 Feature Demo - showcases all new widgets
     if (features.advanced or features.basic_widgets) {
         const v06_demo = b.addExecutable(.{
@@ -576,6 +600,48 @@ pub fn build(b: *std.Build) void {
         const run_v06_demo = b.addRunArtifact(v06_demo);
         const v06_demo_step = b.step("run-demo-v0.6", "Run the v0.6.0 feature showcase");
         v06_demo_step.dependOn(&run_v06_demo.step);
+    }
+
+    // v0.7.0 Data Visualization Demo - Ratatui parity showcase
+    if (features.data_widgets and features.advanced) {
+        const v07_demo = b.addExecutable(.{
+            .name = "v0_7_data_viz_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/v0_7_data_viz_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        v07_demo.linkLibC();
+        b.installArtifact(v07_demo);
+
+        const run_v07_demo = b.addRunArtifact(v07_demo);
+        const v07_demo_step = b.step("run-demo-v0.7", "Run the v0.7.0 Ratatui parity showcase");
+        v07_demo_step.dependOn(&run_v07_demo.step);
+    }
+
+    // Grove Syntax Highlighting Demo
+    if (features.advanced) {
+        const grove_demo = b.addExecutable(.{
+            .name = "grove_syntax_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/grove_syntax_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        grove_demo.linkLibC();
+        b.installArtifact(grove_demo);
+
+        const run_grove_demo = b.addRunArtifact(grove_demo);
+        const grove_demo_step = b.step("run-grove-demo", "Run the Grove syntax highlighting demo");
+        grove_demo_step.dependOn(&run_grove_demo.step);
     }
 
     // Just like flags, top level steps are also listed in the `--help` menu.

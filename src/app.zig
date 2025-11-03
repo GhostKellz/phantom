@@ -21,7 +21,7 @@ pub const AppConfig = struct {
     tick_rate_ms: u64 = 16, // ~60 FPS
     mouse_enabled: bool = false,
     resize_enabled: bool = true,
-    add_default_handler: bool = true, // NEW v0.6.3: Allow disabling default Escape/Ctrl+C quit
+    add_default_handler: bool = true, // Allow disabling default Escape/Ctrl+C quit
 };
 
 /// Main application structure
@@ -79,7 +79,7 @@ pub const App = struct {
         try self.terminal.enableRawMode();
         defer self.terminal.disableRawMode() catch {};
 
-        // Add default event handler if configured (v0.6.3: optional)
+        // Add default event handler if configured
         if (self.config.add_default_handler) {
             try self.event_loop.addHandler(appEventHandler);
             app_context = self;

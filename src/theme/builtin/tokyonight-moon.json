@@ -1,0 +1,49 @@
+{
+  "name": "Tokyo Night Moon",
+  "description": "A moonlight variant of Tokyo Night",
+  "defs": {
+    "bg": "#222436",
+    "bgDark": "#1e2030",
+    "bgHighlight": "#2f334d",
+    "fg": "#c8d3f5",
+    "fgDark": "#a9b1d6",
+    "comment": "#636da6",
+    "blue": "#82aaff",
+    "cyan": "#86e1fc",
+    "green": "#c3e88d",
+    "magenta": "#c099ff",
+    "orange": "#ff966c",
+    "purple": "#fca7ea",
+    "red": "#ff757f",
+    "teal": "#4fd6be",
+    "yellow": "#ffc777"
+  },
+  "theme": {
+    "primary": "blue",
+    "secondary": "cyan",
+    "accent": "magenta",
+    "error": "red",
+    "warning": "yellow",
+    "success": "green",
+    "info": "cyan",
+    "text": "fg",
+    "textMuted": "comment",
+    "background": "bg",
+    "backgroundPanel": "bgDark",
+    "backgroundElement": "bgHighlight",
+    "border": "bgHighlight",
+    "borderActive": "blue",
+    "borderSubtle": "bgDark"
+  },
+  "syntax": {
+    "keyword": "magenta",
+    "function": "blue",
+    "string": "green",
+    "number": "orange",
+    "comment": "comment",
+    "type": "cyan",
+    "operator": "purple",
+    "variable": "fg",
+    "constant": "orange"
+  }
+}

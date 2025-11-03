@@ -37,18 +37,17 @@ pub const Size = @import("geometry.zig").Size;
 pub const Color = @import("style.zig").Color;
 pub const Style = @import("style.zig").Style;
 
-// Widget system - v0.6.1
+// Widget system
 pub const Widget = @import("widget.zig").Widget;
 pub const SizeConstraints = @import("widget.zig").SizeConstraints;
 pub const Buffer = @import("terminal.zig").Buffer; // Required for Widget.render signature
+pub const Cell = @import("terminal.zig").Cell; // Required for Buffer.setCell
 
 // Modern UI utilities - always available
 pub const emoji = @import("emoji.zig");
 
 // Async runtime - always available
 pub const runtime = @import("runtime.zig");
-
-// ===== v0.5.0 New Features =====
 
 // Font system with zfont + gcode integration
 pub const font = @import("font/mod.zig");
@@ -59,8 +58,6 @@ pub const unicode = @import("unicode.zig");
 // GPU rendering system (Vulkan + CUDA)
 pub const gpu = @import("render/gpu/mod.zig");
 
-// ===== v0.6.0 New Features =====
-
 // Animation system for smooth transitions
 pub const animation = @import("animation.zig");
 
@@ -69,6 +66,33 @@ pub const mouse = @import("mouse.zig");
 
 // Clipboard integration (system copy/paste)
 pub const clipboard = @import("clipboard.zig");
+
+// Event system enhancements
+pub const event_queue = @import("event/mod.zig");
+
+// Async runtime for non-blocking operations
+pub const async_runtime = @import("async/mod.zig");
+
+// Theme system
+pub const theme = @import("theme/mod.zig");
+
+// Text processing
+pub const fuzzy = @import("text/fuzzy.zig");
+pub const unicode_helpers = @import("text/unicode_helpers.zig");
+
+// Resource management
+pub const resource_paths = @import("config/paths.zig");
+
+// Constraint-based layout system
+pub const Constraint = @import("layout/constraint.zig").Constraint;
+pub const ConstraintLayout = @import("layout/constraint.zig").Layout;
+pub const LayoutDirection = @import("layout/constraint.zig").Direction;
+
+// Tree-sitter syntax highlighting
+pub const grove = @import("grove");
+
+// TOML parser
+pub const zontom = @import("zontom");
 
 // For compatibility with existing code
 pub fn bufferedPrint() !void {

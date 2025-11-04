@@ -11,6 +11,96 @@ const Style = phantom.Style;
 const Buffer = phantom.Buffer;
 const Cell = phantom.Cell;
 
+pub const Shape = union(enum) {
+    line: Line,
+    rectangle: Rectangle,
+    circle: Circle,
+    points: Points,
+    text: Text,
+    path: Path,
+};
+
+pub const Line = struct {
+    x1: f64,
+    y1: f64,
+    x2: f64,
+    y2: f64,
+    color: Color,
+    style: LineStyle,
+
+    pub const LineStyle = enum {
+        solid,
+        dashed,
+        dotted,
+    };
+};
+
+pub const Rectangle = struct {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    color: Color,
+    filled: bool,
+};
+
+pub const Circle = struct {
+    x: f64,
+    y: f64,
+    radius: f64,
+    color: Color,
+    filled: bool,
+};
+
+pub const Points = struct {
+    points: []const Point,
+    color: Color,
+    marker: u21,
+};
+
+pub const Point = struct {
+    x: f64,
+    y: f64,
+};
+
+pub const Text = struct {
+    x: f64,
+    y: f64,
+    text: []const u8,
+    style: Style,
+};
+
+pub const Path = struct {
+    points: []const Point,
+    color: Color,
+    closed: bool,
+};
+
+/// Configuration for Canvas widget
+pub const CanvasConfig = struct {
+    width: usize,
+    height: usize,
+    background: ?Color = null,
+    x_scale: f64 = 1.0,
+    y_scale: f64 = 1.0,
+    x_offset: f64 = 0.0,
+    y_offset: f64 = 0.0,
+
+    pub fn default(width: usize, height: usize) CanvasConfig {
+        return .{
+            .width = width,
+            .height = height,
+        };
+    }
+};
+
+/// Custom error types for Canvas
+pub const Error = error{
+    InvalidDimensions,
+    InvalidScale,
+    InvalidShape,
+} || std.mem.Allocator.Error;
+
 /// Canvas widget for custom drawing
 pub const Canvas = struct {
     allocator: std.mem.Allocator,
@@ -18,89 +108,110 @@ pub const Canvas = struct {
     width: usize,
     height: usize,
     background: ?Color,
-    x_scale: f64, // Data coord to canvas coord scale
+    x_scale: f64,
     y_scale: f64,
     x_offset: f64,
     y_offset: f64,
 
-    pub const Shape = union(enum) {
-        line: Line,
-        rectangle: Rectangle,
-        circle: Circle,
-        points: Points,
-        text: Text,
-        path: Path,
-    };
+    /// Initialize Canvas with config
+    pub fn init(allocator: std.mem.Allocator, config: CanvasConfig) Error!Canvas {
+        if (config.width == 0 or config.height == 0) return Error.InvalidDimensions;
+        if (config.x_scale == 0.0 or config.y_scale == 0.0) return Error.InvalidScale;
 
-    pub const Line = struct {
-        x1: f64,
-        y1: f64,
-        x2: f64,
-        y2: f64,
-        color: Color,
-        style: LineStyle,
-
-        pub const LineStyle = enum {
-            solid,
-            dashed,
-            dotted,
-        };
-    };
-
-    pub const Rectangle = struct {
-        x: f64,
-        y: f64,
-        width: f64,
-        height: f64,
-        color: Color,
-        filled: bool,
-    };
-
-    pub const Circle = struct {
-        x: f64,
-        y: f64,
-        radius: f64,
-        color: Color,
-        filled: bool,
-    };
-
-    pub const Points = struct {
-        points: []const Point,
-        color: Color,
-        marker: u21,
-    };
-
-    pub const Point = struct {
-        x: f64,
-        y: f64,
-    };
-
-    pub const Text = struct {
-        x: f64,
-        y: f64,
-        text: []const u8,
-        style: Style,
-    };
-
-    pub const Path = struct {
-        points: []const Point,
-        color: Color,
-        closed: bool,
-    };
-
-    /// Initialize Canvas
-    pub fn init(allocator: std.mem.Allocator, width: usize, height: usize) Canvas {
         return Canvas{
             .allocator = allocator,
             .shapes = .{},
-            .width = width,
-            .height = height,
-            .background = null,
-            .x_scale = 1.0,
-            .y_scale = 1.0,
-            .x_offset = 0.0,
-            .y_offset = 0.0,
+            .width = config.width,
+            .height = config.height,
+            .background = config.background,
+            .x_scale = config.x_scale,
+            .y_scale = config.y_scale,
+            .x_offset = config.x_offset,
+            .y_offset = config.y_offset,
         };
+    }
+
+    /// Builder pattern for Canvas construction
+    pub const Builder = struct {
+        allocator: std.mem.Allocator,
+        config: CanvasConfig,
+        shapes_list: std.ArrayList(Shape),
+
+        pub fn init(allocator: std.mem.Allocator, width: usize, height: usize) Builder {
+            return .{
+                .allocator = allocator,
+                .config = CanvasConfig.default(width, height),
+                .shapes_list = .{},
+            };
+        }
+
+        pub fn setBackground(self: *Builder, color: ?Color) *Builder {
+            self.config.background = color;
+            return self;
+        }
+
+        pub fn setScale(self: *Builder, x_scale: f64, y_scale: f64) *Builder {
+            self.config.x_scale = x_scale;
+            self.config.y_scale = y_scale;
+            return self;
+        }
+
+        pub fn setOffset(self: *Builder, x_offset: f64, y_offset: f64) *Builder {
+            self.config.x_offset = x_offset;
+            self.config.y_offset = y_offset;
+            return self;
+        }
+
+        pub fn addLine(self: *Builder, x1: f64, y1: f64, x2: f64, y2: f64, color: Color) Error!*Builder {
+            try self.shapes_list.append(self.allocator, .{ .line = .{
+                .x1 = x1,
+                .y1 = y1,
+                .x2 = x2,
+                .y2 = y2,
+                .color = color,
+                .style = .solid,
+            } });
+            return self;
+        }
+
+        pub fn addCircle(self: *Builder, x: f64, y: f64, radius: f64, color: Color, filled: bool) Error!*Builder {
+            try self.shapes_list.append(self.allocator, .{ .circle = .{
+                .x = x,
+                .y = y,
+                .radius = radius,
+                .color = color,
+                .filled = filled,
+            } });
+            return self;
+        }
+
+        pub fn addRectangle(self: *Builder, x: f64, y: f64, width: f64, height: f64, color: Color, filled: bool) Error!*Builder {
+            try self.shapes_list.append(self.allocator, .{ .rectangle = .{
+                .x = x,
+                .y = y,
+                .width = width,
+                .height = height,
+                .color = color,
+                .filled = filled,
+            } });
+            return self;
+        }
+
+        pub fn build(self: *Builder) Error!Canvas {
+            var canvas = try Canvas.init(self.allocator, self.config);
+            canvas.shapes = self.shapes_list;
+            self.shapes_list = .{}; // Clear to avoid double-free
+            return canvas;
+        }
+
+        pub fn deinit(self: *Builder) void {
+            self.shapes_list.deinit(self.allocator);
+        }
+    };
+
+    /// Create a builder for fluent API
+    pub fn builder(allocator: std.mem.Allocator, width: usize, height: usize) Builder {
+        return Builder.init(allocator, width, height);
     }
 
     pub fn deinit(self: *Canvas) void {

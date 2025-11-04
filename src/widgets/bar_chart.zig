@@ -10,6 +10,44 @@ const Style = phantom.Style;
 const Buffer = phantom.Buffer;
 const Cell = phantom.Cell;
 
+pub const Orientation = enum {
+    vertical,
+    horizontal,
+};
+
+pub const Dataset = struct {
+    label: []const u8,
+    values: []f64,
+    color: Color,
+};
+
+/// Configuration for BarChart widget
+pub const BarChartConfig = struct {
+    orientation: Orientation = .vertical,
+    bar_width: usize = 3,
+    bar_gap: usize = 1,
+    group_gap: usize = 2,
+    show_values: bool = true,
+    show_labels: bool = true,
+    max_value: ?f64 = null,
+    title: ?[]const u8 = null,
+    title_style: Style = Style.default().withBold(),
+    label_style: Style = Style.default(),
+    value_style: Style = Style.default(),
+
+    pub fn default() BarChartConfig {
+        return .{};
+    }
+};
+
+/// Custom error types for BarChart
+pub const Error = error{
+    NoDatasets,
+    InvalidBarWidth,
+    InvalidMaxValue,
+    DatasetSizeMismatch,
+} || std.mem.Allocator.Error;
+
 /// BarChart widget for data visualization
 pub const BarChart = struct {
     allocator: std.mem.Allocator,
@@ -26,34 +64,108 @@ pub const BarChart = struct {
     label_style: Style,
     value_style: Style,
 
-    pub const Orientation = enum {
-        vertical,
-        horizontal,
-    };
+    /// Initialize BarChart with config
+    pub fn init(allocator: std.mem.Allocator, config: BarChartConfig) Error!BarChart {
+        if (config.bar_width == 0) return Error.InvalidBarWidth;
+        if (config.max_value) |max| {
+            if (max <= 0.0) return Error.InvalidMaxValue;
+        }
 
-    pub const Dataset = struct {
-        label: []const u8,
-        values: []f64,
-        color: Color,
-    };
-
-    /// Initialize BarChart
-    pub fn init(allocator: std.mem.Allocator) BarChart {
         return BarChart{
             .allocator = allocator,
             .datasets = .{},
-            .orientation = .vertical,
-            .bar_width = 3,
-            .bar_gap = 1,
-            .group_gap = 2,
-            .show_values = true,
-            .show_labels = true,
-            .max_value = null,
-            .title = null,
-            .title_style = Style.default().withBold(),
-            .label_style = Style.default(),
-            .value_style = Style.default(),
+            .orientation = config.orientation,
+            .bar_width = config.bar_width,
+            .bar_gap = config.bar_gap,
+            .group_gap = config.group_gap,
+            .show_values = config.show_values,
+            .show_labels = config.show_labels,
+            .max_value = config.max_value,
+            .title = config.title,
+            .title_style = config.title_style,
+            .label_style = config.label_style,
+            .value_style = config.value_style,
         };
+    }
+
+    /// Builder pattern for complex bar chart construction
+    pub const Builder = struct {
+        allocator: std.mem.Allocator,
+        config: BarChartConfig,
+        datasets_list: std.ArrayList(Dataset),
+
+        pub fn init(allocator: std.mem.Allocator) Builder {
+            return .{
+                .allocator = allocator,
+                .config = BarChartConfig.default(),
+                .datasets_list = .{},
+            };
+        }
+
+        pub fn setTitle(self: *Builder, title: []const u8) *Builder {
+            self.config.title = title;
+            return self;
+        }
+
+        pub fn setOrientation(self: *Builder, orientation: Orientation) *Builder {
+            self.config.orientation = orientation;
+            return self;
+        }
+
+        pub fn setBarWidth(self: *Builder, width: usize) *Builder {
+            self.config.bar_width = @max(1, width);
+            return self;
+        }
+
+        pub fn setBarGap(self: *Builder, gap: usize) *Builder {
+            self.config.bar_gap = gap;
+            return self;
+        }
+
+        pub fn setGroupGap(self: *Builder, gap: usize) *Builder {
+            self.config.group_gap = gap;
+            return self;
+        }
+
+        pub fn setShowValues(self: *Builder, show: bool) *Builder {
+            self.config.show_values = show;
+            return self;
+        }
+
+        pub fn setShowLabels(self: *Builder, show: bool) *Builder {
+            self.config.show_labels = show;
+            return self;
+        }
+
+        pub fn setMaxValue(self: *Builder, max: ?f64) *Builder {
+            self.config.max_value = max;
+            return self;
+        }
+
+        pub fn addDataset(self: *Builder, label: []const u8, values: []f64, color: Color) Error!*Builder {
+            try self.datasets_list.append(self.allocator, Dataset{
+                .label = label,
+                .values = values,
+                .color = color,
+            });
+            return self;
+        }
+
+        pub fn build(self: *Builder) Error!BarChart {
+            var chart = try BarChart.init(self.allocator, self.config);
+            chart.datasets = self.datasets_list;
+            self.datasets_list = .{}; // Clear to avoid double-free
+            return chart;
+        }
+
+        pub fn deinit(self: *Builder) void {
+            self.datasets_list.deinit(self.allocator);
+        }
+    };
+
+    /// Create a builder for fluent API
+    pub fn builder(allocator: std.mem.Allocator) Builder {
+        return Builder.init(allocator);
     }
 
     pub fn deinit(self: *BarChart) void {
@@ -314,22 +426,45 @@ pub const BarChart = struct {
 };
 
 // Tests
-test "BarChart initialization" {
+test "BarChart initialization with config" {
     const testing = std.testing;
 
-    var chart = BarChart.init(testing.allocator);
+    var chart = try BarChart.init(testing.allocator, BarChartConfig.default());
     defer chart.deinit();
 
-    try testing.expectEqual(BarChart.Orientation.vertical, chart.orientation);
+    try testing.expectEqual(Orientation.vertical, chart.orientation);
     try testing.expectEqual(@as(usize, 3), chart.bar_width);
     try testing.expect(chart.show_values);
     try testing.expect(chart.show_labels);
 }
 
+test "BarChart builder pattern" {
+    const testing = std.testing;
+
+    const values = [_]f64{ 10.0, 20.0, 30.0 };
+
+    var builder = BarChart.builder(testing.allocator);
+    defer builder.deinit();
+
+    _ = builder.setTitle("CPU Usage")
+        .setOrientation(.horizontal)
+        .setBarWidth(5)
+        .setShowValues(true);
+
+    _ = try builder.addDataset("Series 1", &values, Color.blue);
+
+    var chart = try builder.build();
+    defer chart.deinit();
+
+    try testing.expectEqual(@as(usize, 1), chart.datasets.items.len);
+    try testing.expectEqual(Orientation.horizontal, chart.orientation);
+    try testing.expectEqual(@as(usize, 5), chart.bar_width);
+}
+
 test "BarChart add dataset" {
     const testing = std.testing;
 
-    var chart = BarChart.init(testing.allocator);
+    var chart = try BarChart.init(testing.allocator, BarChartConfig.default());
     defer chart.deinit();
 
     const values = [_]f64{ 10.0, 20.0, 30.0 };
@@ -342,7 +477,7 @@ test "BarChart add dataset" {
 test "BarChart calculate max value" {
     const testing = std.testing;
 
-    var chart = BarChart.init(testing.allocator);
+    var chart = try BarChart.init(testing.allocator, BarChartConfig.default());
     defer chart.deinit();
 
     const values1 = [_]f64{ 10.0, 20.0, 30.0 };
@@ -359,14 +494,28 @@ test "BarChart calculate max value" {
 test "BarChart with explicit max value" {
     const testing = std.testing;
 
-    var chart = BarChart.init(testing.allocator);
-    defer chart.deinit();
+    const config = BarChartConfig{
+        .max_value = 100.0,
+    };
 
-    chart.setMaxValue(100.0);
+    var chart = try BarChart.init(testing.allocator, config);
+    defer chart.deinit();
 
     const values = [_]f64{ 10.0, 20.0, 30.0 };
     try chart.addDataset("Test", &values, Color.red);
 
     const max = chart.calculateMaxValue();
     try testing.expectEqual(@as(f64, 100.0), max);
+}
+
+test "BarChart error validation" {
+    const testing = std.testing;
+
+    // Test invalid bar width
+    const bad_config = BarChartConfig{
+        .bar_width = 0,
+    };
+
+    const result = BarChart.init(testing.allocator, bad_config);
+    try testing.expectError(Error.InvalidBarWidth, result);
 }

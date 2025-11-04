@@ -11,6 +11,64 @@ const Style = phantom.Style;
 const Buffer = phantom.Buffer;
 const Cell = phantom.Cell;
 
+pub const ChartType = enum {
+    line,
+    scatter,
+    both,
+};
+
+pub const Point = struct {
+    x: f64,
+    y: f64,
+};
+
+pub const Dataset = struct {
+    label: []const u8,
+    points: []Point,
+    color: Color,
+    marker: u21, // Unicode character for scatter points
+};
+
+pub const Axis = struct {
+    label: []const u8,
+    min: f64,
+    max: f64,
+    auto_scale: bool,
+
+    pub fn init(label: []const u8) Axis {
+        return Axis{
+            .label = label,
+            .min = 0.0,
+            .max = 1.0,
+            .auto_scale = true,
+        };
+    }
+};
+
+/// Configuration for Chart widget
+pub const ChartConfig = struct {
+    x_axis_label: []const u8 = "X",
+    y_axis_label: []const u8 = "Y",
+    chart_type: ChartType = .line,
+    show_legend: bool = true,
+    show_grid: bool = true,
+    title: ?[]const u8 = null,
+    title_style: Style = Style.default().withBold(),
+    axis_style: Style = Style.default(),
+    grid_style: Style = Style.default().withFg(Color.bright_black),
+
+    pub fn default() ChartConfig {
+        return .{};
+    }
+};
+
+/// Custom error types for Chart
+pub const Error = error{
+    NoDatasets,
+    InvalidAxisRange,
+    InvalidDataPoint,
+} || std.mem.Allocator.Error;
+
 /// Chart widget for line and scatter plots
 pub const Chart = struct {
     allocator: std.mem.Allocator,
@@ -25,55 +83,100 @@ pub const Chart = struct {
     axis_style: Style,
     grid_style: Style,
 
-    pub const ChartType = enum {
-        line,
-        scatter,
-        both,
-    };
-
-    pub const Point = struct {
-        x: f64,
-        y: f64,
-    };
-
-    pub const Dataset = struct {
-        label: []const u8,
-        points: []Point,
-        color: Color,
-        marker: u21, // Unicode character for scatter points
-    };
-
-    pub const Axis = struct {
-        label: []const u8,
-        min: f64,
-        max: f64,
-        auto_scale: bool,
-
-        pub fn init(label: []const u8) Axis {
-            return Axis{
-                .label = label,
-                .min = 0.0,
-                .max = 1.0,
-                .auto_scale = true,
-            };
-        }
-    };
-
-    /// Initialize Chart
-    pub fn init(allocator: std.mem.Allocator) Chart {
+    /// Initialize Chart with config
+    pub fn init(allocator: std.mem.Allocator, config: ChartConfig) Error!Chart {
         return Chart{
             .allocator = allocator,
             .datasets = .{},
-            .x_axis = Axis.init("X"),
-            .y_axis = Axis.init("Y"),
-            .chart_type = .line,
-            .show_legend = true,
-            .show_grid = true,
-            .title = null,
-            .title_style = Style.default().withBold(),
-            .axis_style = Style.default(),
-            .grid_style = Style.default().withFg(Color.bright_black),
+            .x_axis = Axis.init(config.x_axis_label),
+            .y_axis = Axis.init(config.y_axis_label),
+            .chart_type = config.chart_type,
+            .show_legend = config.show_legend,
+            .show_grid = config.show_grid,
+            .title = config.title,
+            .title_style = config.title_style,
+            .axis_style = config.axis_style,
+            .grid_style = config.grid_style,
         };
+    }
+
+    /// Builder pattern for complex chart construction
+    pub const Builder = struct {
+        allocator: std.mem.Allocator,
+        config: ChartConfig,
+        datasets_list: std.ArrayList(Dataset),
+
+        pub fn init(allocator: std.mem.Allocator) Builder {
+            return .{
+                .allocator = allocator,
+                .config = ChartConfig.default(),
+                .datasets_list = .{},
+            };
+        }
+
+        pub fn setTitle(self: *Builder, title: []const u8) *Builder {
+            self.config.title = title;
+            return self;
+        }
+
+        pub fn setXAxisLabel(self: *Builder, label: []const u8) *Builder {
+            self.config.x_axis_label = label;
+            return self;
+        }
+
+        pub fn setYAxisLabel(self: *Builder, label: []const u8) *Builder {
+            self.config.y_axis_label = label;
+            return self;
+        }
+
+        pub fn setChartType(self: *Builder, chart_type: ChartType) *Builder {
+            self.config.chart_type = chart_type;
+            return self;
+        }
+
+        pub fn setShowLegend(self: *Builder, show: bool) *Builder {
+            self.config.show_legend = show;
+            return self;
+        }
+
+        pub fn setShowGrid(self: *Builder, show: bool) *Builder {
+            self.config.show_grid = show;
+            return self;
+        }
+
+        pub fn addDataset(self: *Builder, label: []const u8, points: []Point, color: Color, marker: u21) Error!*Builder {
+            try self.datasets_list.append(self.allocator, Dataset{
+                .label = label,
+                .points = points,
+                .color = color,
+                .marker = marker,
+            });
+            return self;
+        }
+
+        pub fn build(self: *Builder) Error!Chart {
+            var chart = try Chart.init(self.allocator, self.config);
+
+            // Transfer datasets
+            chart.datasets = self.datasets_list;
+            self.datasets_list = .{}; // Clear to avoid double-free
+
+            // Auto-scale axes if needed
+            if (chart.x_axis.auto_scale or chart.y_axis.auto_scale) {
+                chart.calculateAxisBounds();
+            }
+
+            return chart;
+        }
+
+        pub fn deinit(self: *Builder) void {
+            self.datasets_list.deinit(self.allocator);
+        }
+    };
+
+    /// Create a builder for fluent API
+    pub fn builder(allocator: std.mem.Allocator) Builder {
+        return Builder.init(allocator);
     }
 
     pub fn deinit(self: *Chart) void {
@@ -400,24 +503,52 @@ pub const Chart = struct {
 };
 
 // Tests
-test "Chart initialization" {
+test "Chart initialization with config" {
     const testing = std.testing;
 
-    var chart = Chart.init(testing.allocator);
+    var chart = try Chart.init(testing.allocator, ChartConfig.default());
     defer chart.deinit();
 
-    try testing.expectEqual(Chart.ChartType.line, chart.chart_type);
+    try testing.expectEqual(ChartType.line, chart.chart_type);
     try testing.expect(chart.show_legend);
     try testing.expect(chart.show_grid);
+}
+
+test "Chart builder pattern" {
+    const testing = std.testing;
+
+    const points = [_]Point{
+        .{ .x = 0.0, .y = 0.0 },
+        .{ .x = 1.0, .y = 10.0 },
+        .{ .x = 2.0, .y = 5.0 },
+    };
+
+    var builder = Chart.builder(testing.allocator);
+    defer builder.deinit();
+
+    _ = builder.setTitle("Test Chart")
+        .setXAxisLabel("Time")
+        .setYAxisLabel("Value")
+        .setChartType(.both)
+        .setShowLegend(true);
+
+    _ = try builder.addDataset("Series 1", &points, Color.red, '●');
+
+    var chart = try builder.build();
+    defer chart.deinit();
+
+    try testing.expectEqual(@as(usize, 1), chart.datasets.items.len);
+    try testing.expectEqual(ChartType.both, chart.chart_type);
+    try testing.expectEqualStrings("Test Chart", chart.title.?);
 }
 
 test "Chart add dataset with auto-scale" {
     const testing = std.testing;
 
-    var chart = Chart.init(testing.allocator);
+    var chart = try Chart.init(testing.allocator, ChartConfig.default());
     defer chart.deinit();
 
-    const points = [_]Chart.Point{
+    const points = [_]Point{
         .{ .x = 0.0, .y = 0.0 },
         .{ .x = 1.0, .y = 10.0 },
         .{ .x = 2.0, .y = 5.0 },
@@ -435,11 +566,11 @@ test "Chart add dataset with auto-scale" {
 test "Chart coordinate mapping" {
     const testing = std.testing;
 
-    var chart = Chart.init(testing.allocator);
+    var chart = try Chart.init(testing.allocator, ChartConfig.default());
     defer chart.deinit();
 
-    chart.setXAxis("X", 0.0, 10.0);
-    chart.setYAxis("Y", 0.0, 100.0);
+    _ = chart.setXAxis("X", 0.0, 10.0);
+    _ = chart.setYAxis("Y", 0.0, 100.0);
 
     const area = Rect{ .x = 0, .y = 0, .width = 100, .height = 50 };
 

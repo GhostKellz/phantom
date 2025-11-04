@@ -30,6 +30,44 @@ pub const RenderFn = *const fn (
     hovered: bool,
 ) void;
 
+/// Configuration for ListView
+pub const ListViewConfig = struct {
+    /// Initial viewport height (will be updated on render)
+    viewport_height: u16 = 10,
+
+    /// Lines per item (for multi-line items)
+    item_height: u16 = 1,
+
+    /// Style for normal items
+    item_style: Style = Style.default(),
+
+    /// Style for selected item
+    selected_style: Style = Style.default().withBg(style.Color.blue),
+
+    /// Style for hovered item (mouse)
+    hovered_style: Style = Style.default().withBg(style.Color.bright_black),
+
+    /// Style for item icons
+    icon_style: Style = Style.default().withFg(style.Color.bright_cyan),
+
+    /// Style for secondary text
+    secondary_style: Style = Style.default().withFg(style.Color.bright_black),
+
+    /// Custom render function (optional)
+    custom_render: ?RenderFn = null,
+
+    pub fn default() ListViewConfig {
+        return .{};
+    }
+};
+
+/// Custom error types for ListView
+pub const Error = error{
+    ItemNotFound,
+    IndexOutOfBounds,
+    InvalidFilter,
+} || std.mem.Allocator.Error;
+
 /// ListView with virtualization - only renders visible items
 pub const ListView = struct {
     widget: Widget,
@@ -56,14 +94,14 @@ pub const ListView = struct {
 
     /// Virtualization settings
     viewport_height: u16,
-    item_height: u16 = 1,  // Lines per item
+    item_height: u16,
 
     /// Custom render function (optional)
-    custom_render: ?RenderFn = null,
+    custom_render: ?RenderFn,
 
     /// Filter/search
-    filter: ?[]const u8 = null,
-    filtered_indices: ?std.ArrayList(usize) = null,
+    filter: ?[]const u8,
+    filtered_indices: ?std.ArrayList(usize),
 
     const vtable = Widget.WidgetVTable{
         .render = render,
@@ -72,7 +110,8 @@ pub const ListView = struct {
         .deinit = deinit,
     };
 
-    pub fn init(allocator: std.mem.Allocator) !*ListView {
+    /// Initialize ListView with config
+    pub fn init(allocator: std.mem.Allocator, config: ListViewConfig) Error!*ListView {
         const list = try allocator.create(ListView);
         list.* = ListView{
             .widget = Widget{ .vtable = &vtable },
@@ -81,12 +120,16 @@ pub const ListView = struct {
             .selected_index = null,
             .hovered_index = null,
             .scroll_offset = 0,
-            .item_style = Style.default(),
-            .selected_style = Style.default().withBg(style.Color.blue),
-            .hovered_style = Style.default().withBg(style.Color.bright_black),
-            .icon_style = Style.default().withFg(style.Color.bright_cyan),
-            .secondary_style = Style.default().withFg(style.Color.bright_black),
-            .viewport_height = 10,
+            .item_style = config.item_style,
+            .selected_style = config.selected_style,
+            .hovered_style = config.hovered_style,
+            .icon_style = config.icon_style,
+            .secondary_style = config.secondary_style,
+            .viewport_height = config.viewport_height,
+            .item_height = config.item_height,
+            .custom_render = config.custom_render,
+            .filter = null,
+            .filtered_indices = null,
         };
         return list;
     }
@@ -441,16 +484,32 @@ pub const ListView = struct {
 test "ListView creation" {
     const allocator = std.testing.allocator;
 
-    const list = try ListView.init(allocator);
+    const list = try ListView.init(allocator, ListViewConfig.default());
     defer list.widget.vtable.deinit(&list.widget);
 
     try std.testing.expect(list.items.items.len == 0);
 }
 
+test "ListView with custom config" {
+    const allocator = std.testing.allocator;
+
+    const config = ListViewConfig{
+        .viewport_height = 20,
+        .item_height = 2,
+        .selected_style = Style.default().withBg(style.Color.green),
+    };
+
+    const list = try ListView.init(allocator, config);
+    defer list.widget.vtable.deinit(&list.widget);
+
+    try std.testing.expect(list.viewport_height == 20);
+    try std.testing.expect(list.item_height == 2);
+}
+
 test "ListView virtualization" {
     const allocator = std.testing.allocator;
 
-    const list = try ListView.init(allocator);
+    const list = try ListView.init(allocator, ListViewConfig.default());
     defer list.widget.vtable.deinit(&list.widget);
 
     // Add 1000 items
@@ -467,7 +526,7 @@ test "ListView virtualization" {
 test "ListView filtering" {
     const allocator = std.testing.allocator;
 
-    const list = try ListView.init(allocator);
+    const list = try ListView.init(allocator, ListViewConfig.default());
     defer list.widget.vtable.deinit(&list.widget);
 
     try list.addItemText("apple");

@@ -1,0 +1,61 @@
+{
+  "name": "Phantom Nightfall",
+  "description": "High-contrast dark theme tuned for OLED terminals",
+  "variant": "dark",
+  "origin": "dynamic",
+  "palette": {
+    "background": "#0d1117",
+    "surface": "#161b22",
+    "surface_alt": "#1f2933",
+    "accent": "#7f5af0",
+    "accent_hover": "#8d7af5",
+    "text": "#e5e7eb",
+    "text_muted": "#94a3b8",
+    "success": "#2cb67d",
+    "warning": "#f8d477",
+    "danger": "#ef4565",
+    "info": "#3da9fc",
+    "border": "#30363d",
+    "border_muted": "#1e2430"
+  },
+  "tokens": {
+    "background": "background",
+    "surface": "surface",
+    "surface_alt": "surface_alt",
+    "accent": "accent",
+    "accent_hover": "accent_hover",
+    "text": "text",
+    "text_muted": "text_muted",
+    "success": "success",
+    "warning": "warning",
+    "danger": "danger",
+    "info": "info",
+    "border": "border",
+    "border_muted": "border_muted"
+  },
+  "typography": {
+    "heading": {
+      "family": "JetBrains Mono",
+      "weight": 700,
+      "attributes": ["bold"]
+    },
+    "body": {
+      "family": "Iosevka Term",
+      "weight": 400
+    }
+  },
+  "components": {
+    "button.primary": {
+      "fg": "background",
+      "bg": "accent",
+      "attributes": ["bold"],
+      "typography": "heading"
+    },
+    "input.field": {
+      "fg": "text",
+      "bg": "surface",
+      "attributes": ["italic"],
+      "typography": "body"
+    }
+  }
+}

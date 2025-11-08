@@ -1,0 +1,61 @@
+{
+  "name": "Phantom Daybreak",
+  "description": "Bright, airy palette optimized for daylight work",
+  "variant": "light",
+  "origin": "dynamic",
+  "palette": {
+    "background": "#f5f7fb",
+    "surface": "#ffffff",
+    "surface_alt": "#e4e9f2",
+    "accent": "#5b21b6",
+    "accent_hover": "#6d28d9",
+    "text": "#1f2933",
+    "text_muted": "#52606d",
+    "success": "#047857",
+    "warning": "#b45309",
+    "danger": "#b91c1c",
+    "info": "#0369a1",
+    "border": "#cbd5e1",
+    "border_muted": "#d9e2ec"
+  },
+  "tokens": {
+    "background": "background",
+    "surface": "surface",
+    "surface_alt": "surface_alt",
+    "accent": "accent",
+    "accent_hover": "accent_hover",
+    "text": "text",
+    "text_muted": "text_muted",
+    "success": "success",
+    "warning": "warning",
+    "danger": "danger",
+    "info": "info",
+    "border": "border",
+    "border_muted": "border_muted"
+  },
+  "typography": {
+    "heading": {
+      "family": "Recursive",
+      "weight": 600,
+      "attributes": ["bold"]
+    },
+    "body": {
+      "family": "Inter",
+      "weight": 400
+    }
+  },
+  "components": {
+    "button.primary": {
+      "fg": "surface",
+      "bg": "accent",
+      "attributes": ["bold"],
+      "typography": "heading"
+    },
+    "notice.warning": {
+      "fg": "background",
+      "bg": "warning",
+      "attributes": ["bold"],
+      "typography": "body"
+    }
+  }
+}

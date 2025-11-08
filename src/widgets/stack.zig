@@ -108,6 +108,16 @@ pub const Stack = struct {
         self.children.clearRetainingCapacity();
     }
 
+    /// Update the target area for a child widget.
+    pub fn setChildArea(self: *Stack, child: *Widget, area: Rect) void {
+        for (self.children.items) |*stack_child| {
+            if (stack_child.widget == child) {
+                stack_child.area = area;
+                return;
+            }
+        }
+    }
+
     fn render(widget: *Widget, buffer: *Buffer, _: Rect) void {
         const self: *Stack = @fieldParentPtr("widget", widget);
 

@@ -375,10 +375,10 @@ zig build
 # Should compile without errors
 ```
 
-### 2. Run v0.6.0 Demo
+### 2. Run Feature Showcase Demo (formerly v0.6.0 Demo)
 
 ```bash
-zig build run-v0_6_demo
+zig build demo-feature-showcase
 
 # Should work exactly as before
 ```
@@ -448,7 +448,7 @@ try stack.addModalChild(&modal.widget, area);
 ## Getting Help
 
 - **Widget Guide**: `docs/widgets/WIDGET_GUIDE.md`
-- **Examples**: `examples/v0_6_demo.zig`
+- **Examples**: `examples/feature_showcase_demo.zig`
 - **API Reference**: `src/widget.zig`
 - **Issues**: https://github.com/ghostkellz/phantom/issues
 

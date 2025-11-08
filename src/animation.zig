@@ -9,6 +9,408 @@ const Rect = geometry.Rect;
 const Style = style.Style;
 const Color = style.Color;
 
+pub const TimelineId = u64;
+pub const TransitionId = u64;
+pub const TransitionPhase = enum { entering, updating, exiting };
+
+pub const TransitionEvent = union(enum) {
+    started: TransitionPhase,
+    finished: TransitionPhase,
+    cancelled,
+};
+
+pub const TransitionCurve = enum {
+    linear,
+    ease,
+    ease_in,
+    ease_out,
+    ease_in_out,
+    custom,
+
+    pub fn toEasing(self: TransitionCurve, fallback: Easing) Easing {
+        return switch (self) {
+            .linear => .linear,
+            .ease => .ease_in_out,
+            .ease_in => .ease_in,
+            .ease_out => .ease_out,
+            .ease_in_out => .ease_in_out,
+            .custom => fallback,
+        };
+    }
+};
+
+pub const TransitionState = enum {
+    idle,
+    running,
+    completed,
+    cancelled,
+};
+
+pub const TransitionKind = enum {
+    opacity,
+    position,
+    size,
+    rect,
+    scale,
+    float,
+    custom,
+};
+
+pub const TimelineDirection = enum {
+    normal,
+    reverse,
+    alternate,
+};
+
+pub const TransitionSpec = struct {
+    duration_ms: u64 = 180,
+    delay_ms: u64 = 0,
+    curve: TransitionCurve = .ease,
+    direction: TimelineDirection = .normal,
+    phase: TransitionPhase = .updating,
+    repeat_count: u32 = 1,
+    auto_remove: bool = true,
+};
+
+pub const TransitionTrack = struct {
+    id: u32,
+    kind: TransitionKind,
+    easing: Easing,
+    start_value: AnimationValue,
+    end_value: AnimationValue,
+    current_value: AnimationValue,
+
+    pub fn init(id: u32, kind: TransitionKind, start_value: AnimationValue, end_value: AnimationValue, easing: Easing) TransitionTrack {
+        return TransitionTrack{
+            .id = id,
+            .kind = kind,
+            .easing = easing,
+            .start_value = start_value,
+            .end_value = end_value,
+            .current_value = start_value,
+        };
+    }
+};
+
+pub const Transition = struct {
+    allocator: std.mem.Allocator,
+    id: TransitionId,
+    timeline_id: ?TimelineId = null,
+    spec: TransitionSpec,
+    phase: TransitionPhase,
+    state: TransitionState = .idle,
+    progress: f32 = 0.0,
+    driver: Animation,
+    tracks: std.ArrayList(TransitionTrack),
+    listeners: std.ArrayList(ListenerEntry),
+
+    const ListenerEntry = struct {
+        callback: *const fn (transition: *Transition, event: TransitionEvent, context: ?*anyopaque) void,
+        context: ?*anyopaque,
+    };
+
+    pub fn init(allocator: std.mem.Allocator, id: TransitionId, spec: TransitionSpec) !Transition {
+        if (spec.duration_ms == 0) {
+            return error.InvalidDuration;
+        }
+
+        var driver = Animation.init(allocator, spec.duration_ms);
+        try driver.addKeyframe(Keyframe.init(0.0, AnimationValue{ .float = 0.0 }));
+        try driver.addKeyframe(Keyframe.withEasing(1.0, AnimationValue{ .float = 1.0 }, spec.curve.toEasing(.linear)));
+        driver.setDelay(spec.delay_ms);
+        driver.setRepeatCount(spec.repeat_count);
+        driver.setFillMode(.forwards);
+        driver.setDirection(switch (spec.direction) {
+            .normal => .forward,
+            .reverse => .reverse,
+            .alternate => .alternate,
+        });
+
+        return Transition{
+            .allocator = allocator,
+            .id = id,
+            .spec = spec,
+            .phase = spec.phase,
+            .driver = driver,
+            .tracks = std.ArrayList(TransitionTrack).init(allocator),
+            .listeners = std.ArrayList(ListenerEntry).init(allocator),
+        };
+    }
+
+    pub fn deinit(self: *Transition) void {
+        self.tracks.deinit(self.allocator);
+        self.listeners.deinit(self.allocator);
+        self.driver.deinit();
+    }
+
+    pub fn addTrack(self: *Transition, track: TransitionTrack) !void {
+        try self.tracks.append(self.allocator, track);
+    }
+
+    pub fn start(self: *Transition) void {
+        if (self.state == .running) return;
+        self.driver.start();
+        self.state = .running;
+        self.progress = 0.0;
+        self.notify(.{ .started = self.phase });
+    }
+
+    pub fn cancel(self: *Transition) void {
+        if (self.state == .cancelled or self.state == .completed) return;
+        self.state = .cancelled;
+        self.driver.stop();
+        self.notify(.cancelled);
+    }
+
+    pub fn reset(self: *Transition) void {
+        self.driver.reset();
+        self.state = .idle;
+        self.progress = 0.0;
+
+        for (self.tracks.items) |*track| {
+            track.current_value = track.start_value;
+        }
+    }
+
+    pub fn update(self: *Transition) bool {
+        if (self.state != .running) return false;
+
+        const value = self.driver.update();
+        const progress = switch (value) {
+            .float => |f| f,
+            else => self.progress,
+        };
+
+        if (progress == self.progress and !self.driver.isRunning()) {
+            self.state = if (self.driver.isCompleted()) .completed else self.state;
+            if (self.state == .completed) {
+                self.notify(.{ .finished = self.phase });
+            }
+            return false;
+        }
+
+        self.progress = @max(0.0, @min(1.0, progress));
+
+        var changed = false;
+        for (self.tracks.items) |*track| {
+            const eased = track.easing.apply(self.progress);
+            const next_value = track.start_value.lerp(track.end_value, eased);
+            if (!animationValueEqual(track.current_value, next_value)) {
+                track.current_value = next_value;
+                changed = true;
+            }
+        }
+
+        if (self.driver.isCompleted()) {
+            self.state = .completed;
+            self.notify(.{ .finished = self.phase });
+        }
+
+        return changed;
+    }
+
+    pub fn isActive(self: *const Transition) bool {
+        return self.state == .running;
+    }
+
+    pub fn currentValue(self: *const Transition, track_id: u32) ?AnimationValue {
+        for (self.tracks.items) |track| {
+            if (track.id == track_id) return track.current_value;
+        }
+        return null;
+    }
+
+    pub fn currentRect(self: *const Transition) ?Rect {
+        for (self.tracks.items) |track| {
+            if (track.kind == .rect) {
+                return switch (track.current_value) {
+                    .rect => |rect| rect,
+                    else => null,
+                };
+            }
+        }
+        return null;
+    }
+
+    pub fn progressValue(self: *const Transition) f32 {
+        return self.progress;
+    }
+
+    pub fn on(
+        self: *Transition,
+        listener: *const fn (transition: *Transition, event: TransitionEvent, context: ?*anyopaque) void,
+        context: ?*anyopaque,
+    ) !void {
+        try self.listeners.append(self.allocator, .{ .callback = listener, .context = context });
+    }
+
+    fn notify(self: *Transition, event: TransitionEvent) void {
+        for (self.listeners.items) |entry| {
+            entry.callback(self, event, entry.context);
+        }
+    }
+};
+
+pub const TransitionListener = *const fn (transition: *Transition, event: TransitionEvent, context: ?*anyopaque) void;
+
+fn animationValueEqual(a: AnimationValue, b: AnimationValue) bool {
+    return switch (a) {
+        .position => |apos| switch (b) {
+            .position => |bpos| apos.x == bpos.x and apos.y == bpos.y,
+            else => false,
+        },
+        .size => |asz| switch (b) {
+            .size => |bsz| asz.width == bsz.width and asz.height == bsz.height,
+            else => false,
+        },
+        .rect => |arect| switch (b) {
+            .rect => |brect| arect.x == brect.x and arect.y == brect.y and arect.width == brect.width and arect.height == brect.height,
+            else => false,
+        },
+        .float => |af| switch (b) {
+            .float => |bf| std.math.approxEqAbs(f32, af, bf, 0.0001),
+            else => false,
+        },
+        .color => |acolor| switch (b) {
+            .color => |bcolor| std.meta.eql(acolor, bcolor),
+            else => false,
+        },
+        .style => |astyle| switch (b) {
+            .style => |bstyle| styleEqual(astyle, bstyle),
+            else => false,
+        },
+        .int => |ai| switch (b) {
+            .int => |bi| ai == bi,
+            else => false,
+        },
+    };
+}
+
+fn styleEqual(a: Style, b: Style) bool {
+    return a.eq(b);
+}
+
+pub const TransitionManager = struct {
+    allocator: std.mem.Allocator,
+    transitions: std.AutoHashMap(TransitionId, *Transition),
+    next_transition_id: TransitionId = 1,
+    next_timeline_id: TimelineId = 1,
+
+    pub fn init(allocator: std.mem.Allocator) TransitionManager {
+        return TransitionManager{
+            .allocator = allocator,
+            .transitions = std.AutoHashMap(TransitionId, *Transition).init(allocator),
+        };
+    }
+
+    pub fn deinit(self: *TransitionManager) void {
+        var iterator = self.transitions.iterator();
+        while (iterator.next()) |entry| {
+            entry.value_ptr.*.deinit();
+            self.allocator.destroy(entry.value_ptr.*);
+        }
+        self.transitions.deinit();
+    }
+
+    pub fn create(self: *TransitionManager, spec: TransitionSpec) !*Transition {
+        const id = self.next_transition_id;
+        self.next_transition_id += 1;
+
+        const transition = try self.allocator.create(Transition);
+        transition.* = try Transition.init(self.allocator, id, spec);
+        try self.transitions.put(id, transition);
+        return transition;
+    }
+
+    pub fn get(self: *TransitionManager, id: TransitionId) ?*Transition {
+        if (self.transitions.get(id)) |transition| return transition;
+        return null;
+    }
+
+    pub fn update(self: *TransitionManager) void {
+        const Context = struct {
+            manager: *TransitionManager,
+        };
+
+        var context = Context{ .manager = self };
+
+        self.transitions.retain(struct {
+            fn keep(id: TransitionId, transition: *Transition, ctx: *Context) bool {
+                _ = id;
+                const changed = transition.update();
+                _ = changed;
+
+                if ((transition.state == .completed or transition.state == .cancelled) and transition.spec.auto_remove) {
+                    transition.deinit();
+                    ctx.manager.allocator.destroy(transition);
+                    return false;
+                }
+
+                return true;
+            }
+        }.keep, &context);
+    }
+
+    pub fn hasActive(self: *const TransitionManager) bool {
+        var iterator = self.transitions.iterator();
+        while (iterator.next()) |entry| {
+            if (entry.value_ptr.*.isActive()) return true;
+        }
+        return false;
+    }
+
+    pub fn release(self: *TransitionManager, id: TransitionId) void {
+        if (self.transitions.fetchRemove(id)) |removed| {
+            removed.value.deinit();
+            self.allocator.destroy(removed.value);
+        }
+    }
+
+    pub fn beginTimeline(self: *TransitionManager) TimelineId {
+        const id = self.next_timeline_id;
+        self.next_timeline_id += 1;
+        return id;
+    }
+
+    pub fn attachToTimeline(self: *TransitionManager, timeline_id: TimelineId, transition: *Transition) void {
+        _ = self;
+        transition.timeline_id = timeline_id;
+    }
+
+    pub fn cancelTimeline(self: *TransitionManager, timeline_id: TimelineId) void {
+        var iterator = self.transitions.iterator();
+        while (iterator.next()) |entry| {
+            const transition = entry.value_ptr.*;
+            if (transition.timeline_id != null and transition.timeline_id.? == timeline_id) {
+                transition.cancel();
+            }
+        }
+    }
+};
+
+pub const Transitions = struct {
+    pub fn fade(manager: *TransitionManager, from: f32, to: f32, spec: TransitionSpec) !*Transition {
+        const transition = try manager.create(spec);
+        try transition.addTrack(TransitionTrack.init(0, .opacity, AnimationValue{ .float = from }, AnimationValue{ .float = to }, spec.curve.toEasing(.ease_in_out)));
+        transition.start();
+        return transition;
+    }
+
+    pub fn rectMorph(manager: *TransitionManager, from: Rect, to: Rect, spec: TransitionSpec) !*Transition {
+        const transition = try manager.create(spec);
+        try transition.addTrack(TransitionTrack.init(0, .rect, AnimationValue{ .rect = from }, AnimationValue{ .rect = to }, spec.curve.toEasing(.ease_in_out)));
+        transition.start();
+        return transition;
+    }
+
+    pub fn slide(manager: *TransitionManager, from: Position, to: Position, spec: TransitionSpec) !*Transition {
+        const transition = try manager.create(spec);
+        try transition.addTrack(TransitionTrack.init(0, .position, AnimationValue{ .position = from }, AnimationValue{ .position = to }, spec.curve.toEasing(.ease_out)));
+        transition.start();
+        return transition;
+    }
+};
+
 /// Easing functions for animations
 pub const Easing = enum {
     linear,
@@ -23,10 +425,10 @@ pub const Easing = enum {
     ease_in_out_cubic,
     bounce,
     elastic,
-    
+
     pub fn apply(self: Easing, t: f32) f32 {
         const clamped_t = @max(0.0, @min(1.0, t));
-        
+
         return switch (self) {
             .linear => clamped_t,
             .ease_in => clamped_t * clamped_t,
@@ -60,7 +462,7 @@ pub const Easing = enum {
             .bounce => blk: {
                 const n1 = 7.5625;
                 const d1 = 2.75;
-                
+
                 if (clamped_t < 1.0 / d1) {
                     break :blk n1 * clamped_t * clamped_t;
                 } else if (clamped_t < 2.0 / d1) {
@@ -76,7 +478,7 @@ pub const Easing = enum {
             },
             .elastic => blk: {
                 const c4 = (2.0 * std.math.pi) / 3.0;
-                
+
                 if (clamped_t == 0.0) {
                     break :blk 0.0;
                 } else if (clamped_t == 1.0) {
@@ -100,28 +502,17 @@ pub const AnimationValue = union(enum) {
     color: Color,
     style: Style,
     int: i32,
-    
+
     pub fn lerp(self: AnimationValue, other: AnimationValue, t: f32) AnimationValue {
         return switch (self) {
             .position => |pos| AnimationValue{
-                .position = Position.init(
-                    @as(u16, @intFromFloat(@as(f32, @floatFromInt(pos.x)) * (1.0 - t) + @as(f32, @floatFromInt(other.position.x)) * t)),
-                    @as(u16, @intFromFloat(@as(f32, @floatFromInt(pos.y)) * (1.0 - t) + @as(f32, @floatFromInt(other.position.y)) * t))
-                ),
+                .position = Position.init(@as(u16, @intFromFloat(@as(f32, @floatFromInt(pos.x)) * (1.0 - t) + @as(f32, @floatFromInt(other.position.x)) * t)), @as(u16, @intFromFloat(@as(f32, @floatFromInt(pos.y)) * (1.0 - t) + @as(f32, @floatFromInt(other.position.y)) * t))),
             },
             .size => |size| AnimationValue{
-                .size = Size.init(
-                    @as(u16, @intFromFloat(@as(f32, @floatFromInt(size.width)) * (1.0 - t) + @as(f32, @floatFromInt(other.size.width)) * t)),
-                    @as(u16, @intFromFloat(@as(f32, @floatFromInt(size.height)) * (1.0 - t) + @as(f32, @floatFromInt(other.size.height)) * t))
-                ),
+                .size = Size.init(@as(u16, @intFromFloat(@as(f32, @floatFromInt(size.width)) * (1.0 - t) + @as(f32, @floatFromInt(other.size.width)) * t)), @as(u16, @intFromFloat(@as(f32, @floatFromInt(size.height)) * (1.0 - t) + @as(f32, @floatFromInt(other.size.height)) * t))),
             },
             .rect => |rect| AnimationValue{
-                .rect = Rect.init(
-                    @as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.x)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.x)) * t)),
-                    @as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.y)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.y)) * t)),
-                    @as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.width)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.width)) * t)),
-                    @as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.height)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.height)) * t))
-                ),
+                .rect = Rect.init(@as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.x)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.x)) * t)), @as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.y)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.y)) * t)), @as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.width)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.width)) * t)), @as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.height)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.height)) * t))),
             },
             .float => |f| AnimationValue{ .float = f * (1.0 - t) + other.float * t },
             .color => |_| other, // Color interpolation would be complex, just snap for now
@@ -136,14 +527,14 @@ pub const Keyframe = struct {
     time: f32, // 0.0 to 1.0
     value: AnimationValue,
     easing: Easing = .linear,
-    
+
     pub fn init(time: f32, value: AnimationValue) Keyframe {
         return Keyframe{
             .time = @max(0.0, @min(1.0, time)),
             .value = value,
         };
     }
-    
+
     pub fn withEasing(time: f32, value: AnimationValue, easing: Easing) Keyframe {
         return Keyframe{
             .time = @max(0.0, @min(1.0, time)),
@@ -183,41 +574,43 @@ pub const AnimationState = enum {
 /// Animation instance
 pub const Animation = struct {
     allocator: std.mem.Allocator,
-    
+
     // Keyframes
     keyframes: std.ArrayList(Keyframe),
-    
+
     // Timing
     duration_ms: u64,
     delay_ms: u64 = 0,
     repeat_count: u32 = 1, // 0 = infinite
     direction: AnimationDirection = .forward,
     fill_mode: AnimationFillMode = .none,
-    
+
     // State
+    timer: std.time.Timer,
     state: AnimationState = .idle,
     current_time: f32 = 0.0,
     current_iteration: u32 = 0,
-    start_time: i64 = 0,
-    
+    start_time_ns: u64 = 0,
+
     // Callbacks
     on_complete: ?OnCompleteCallback = null,
-    
+
     pub fn init(allocator: std.mem.Allocator, duration_ms: u64) Animation {
         return Animation{
             .allocator = allocator,
             .keyframes = std.ArrayList(Keyframe).init(allocator),
             .duration_ms = duration_ms,
+            .timer = std.time.Timer.start() catch unreachable,
         };
     }
-    
+
     pub fn deinit(self: *Animation) void {
         self.keyframes.deinit(self.allocator);
     }
-    
+
     pub fn addKeyframe(self: *Animation, keyframe: Keyframe) !void {
         try self.keyframes.append(self.allocator, keyframe);
-        
+
         // Sort keyframes by time
         std.sort.block(Keyframe, self.keyframes.items, {}, struct {
             fn lessThan(context: void, a: Keyframe, b: Keyframe) bool {
@@ -226,87 +619,89 @@ pub const Animation = struct {
             }
         }.lessThan);
     }
-    
+
     pub fn setDelay(self: *Animation, delay_ms: u64) void {
         self.delay_ms = delay_ms;
     }
-    
+
     pub fn setRepeatCount(self: *Animation, count: u32) void {
         self.repeat_count = count;
     }
-    
+
     pub fn setDirection(self: *Animation, direction: AnimationDirection) void {
         self.direction = direction;
     }
-    
+
     pub fn setFillMode(self: *Animation, fill_mode: AnimationFillMode) void {
         self.fill_mode = fill_mode;
     }
-    
+
     pub fn setOnComplete(self: *Animation, callback: OnCompleteCallback) void {
         self.on_complete = callback;
     }
-    
+
     pub fn start(self: *Animation) void {
         self.state = .running;
         self.current_time = 0.0;
         self.current_iteration = 0;
-        self.start_time = std.time.milliTimestamp();
+        self.timer.reset();
+        self.start_time_ns = 0;
     }
-    
+
     pub fn pause(self: *Animation) void {
         if (self.state == .running) {
             self.state = .paused;
         }
     }
-    
+
     pub fn resumeAnimation(self: *Animation) void {
         if (self.state == .paused) {
             self.state = .running;
         }
     }
-    
+
     pub fn stop(self: *Animation) void {
         self.state = .idle;
         self.current_time = 0.0;
         self.current_iteration = 0;
     }
-    
+
     pub fn reset(self: *Animation) void {
         self.stop();
     }
-    
+
     pub fn update(self: *Animation) AnimationValue {
         if (self.state != .running) {
             return self.getCurrentValue();
         }
-        
-        const current_time = std.time.milliTimestamp();
-        const elapsed = @as(u64, @intCast(current_time - self.start_time));
-        
+
+        const elapsed_ns = self.timer.read();
+        const elapsed = elapsed_ns / std.time.ns_per_ms;
+
         // Check if we're still in delay period
         if (elapsed < self.delay_ms) {
             return self.getCurrentValue();
         }
-        
+
         // Calculate animation progress
         const animation_elapsed = elapsed - self.delay_ms;
         const progress = @as(f32, @floatFromInt(animation_elapsed)) / @as(f32, @floatFromInt(self.duration_ms));
-        
+
         // Check if animation is complete
         if (progress >= 1.0) {
             self.current_iteration += 1;
-            
+
             // Check if we should repeat
             if (self.repeat_count == 0 or self.current_iteration < self.repeat_count) {
                 // Reset for next iteration
-                self.start_time = current_time;
+                self.timer.reset();
+                self.start_time_ns = 0;
                 self.current_time = 0.0;
             } else {
                 // Animation complete
                 self.state = .completed;
                 self.current_time = 1.0;
-                
+
                 if (self.on_complete) |callback| {
                     callback(self);
                 }
@@ -314,15 +709,15 @@ pub const Animation = struct {
         } else {
             self.current_time = progress;
         }
-        
+
         return self.getCurrentValue();
     }
-    
+
     pub fn getCurrentValue(self: *Animation) AnimationValue {
         if (self.keyframes.items.len == 0) {
             return AnimationValue{ .float = 0.0 };
         }
-        
+
         // Apply direction
         var effective_time = self.current_time;
         switch (self.direction) {
@@ -339,7 +734,7 @@ pub const Animation = struct {
                 }
             },
         }
-        
+
         // Apply fill mode
         if (self.state == .idle) {
             switch (self.fill_mode) {
@@ -354,11 +749,11 @@ pub const Animation = struct {
                 .backwards => return AnimationValue{ .float = 0.0 },
             }
         }
-        
+
         // Find the appropriate keyframes to interpolate between
         var prev_keyframe: ?Keyframe = null;
         var next_keyframe: ?Keyframe = null;
-        
+
         for (self.keyframes.items) |keyframe| {
             if (keyframe.time <= effective_time) {
                 prev_keyframe = keyframe;
@@ -368,7 +763,7 @@ pub const Animation = struct {
                 break;
             }
         }
-        
+
         // Handle edge cases
         if (prev_keyframe == null and next_keyframe == null) {
             return AnimationValue{ .float = 0.0 };
@@ -377,25 +772,25 @@ pub const Animation = struct {
         } else if (next_keyframe == null) {
             return prev_keyframe.?.value;
         }
-        
+
         // Interpolate between keyframes
         const prev = prev_keyframe.?;
         const next = next_keyframe.?;
-        
+
         if (prev.time == next.time) {
             return next.value;
         }
-        
+
         const segment_progress = (effective_time - prev.time) / (next.time - prev.time);
         const eased_progress = prev.easing.apply(segment_progress);
-        
+
         return prev.value.lerp(next.value, eased_progress);
     }
-    
+
     pub fn isRunning(self: *const Animation) bool {
         return self.state == .running;
     }
-    
+
     pub fn isCompleted(self: *const Animation) bool {
         return self.state == .completed;
     }
@@ -405,22 +800,22 @@ pub const Animation = struct {
 pub const AnimationManager = struct {
     allocator: std.mem.Allocator,
     animations: std.ArrayList(*Animation),
-    
+
     pub fn init(allocator: std.mem.Allocator) AnimationManager {
         return AnimationManager{
             .allocator = allocator,
             .animations = std.ArrayList(*Animation).init(allocator),
         };
     }
-    
+
     pub fn deinit(self: *AnimationManager) void {
         self.animations.deinit(self.allocator);
     }
-    
+
     pub fn addAnimation(self: *AnimationManager, animation: *Animation) !void {
         try self.animations.append(self.allocator, animation);
     }
-    
+
     pub fn removeAnimation(self: *AnimationManager, animation: *Animation) void {
         for (self.animations.items, 0..) |anim, i| {
             if (anim == animation) {
@@ -429,12 +824,12 @@ pub const AnimationManager = struct {
             }
         }
     }
-    
+
     pub fn update(self: *AnimationManager) void {
         for (self.animations.items) |animation| {
             _ = animation.update();
         }
-        
+
         // Remove completed animations
         var i: usize = 0;
         while (i < self.animations.items.len) {
@@ -445,11 +840,11 @@ pub const AnimationManager = struct {
             }
         }
     }
-    
+
     pub fn clear(self: *AnimationManager) void {
         self.animations.clearAndFree();
     }
-    
+
     pub fn getAnimationCount(self: *const AnimationManager) usize {
         return self.animations.items.len;
     }
@@ -460,50 +855,50 @@ pub const AnimationBuilder = struct {
     pub fn fadeIn(allocator: std.mem.Allocator, duration_ms: u64) !*Animation {
         var animation = try allocator.create(Animation);
         animation.* = Animation.init(allocator, duration_ms);
-        
+
         try animation.addKeyframe(Keyframe.init(0.0, AnimationValue{ .float = 0.0 }));
         try animation.addKeyframe(Keyframe.withEasing(1.0, AnimationValue{ .float = 1.0 }, .ease_out));
-        
+
         return animation;
     }
-    
+
     pub fn fadeOut(allocator: std.mem.Allocator, duration_ms: u64) !*Animation {
         var animation = try allocator.create(Animation);
         animation.* = Animation.init(allocator, duration_ms);
-        
+
         try animation.addKeyframe(Keyframe.init(0.0, AnimationValue{ .float = 1.0 }));
         try animation.addKeyframe(Keyframe.withEasing(1.0, AnimationValue{ .float = 0.0 }, .ease_in));
-        
+
         return animation;
     }
-    
+
     pub fn slideIn(allocator: std.mem.Allocator, duration_ms: u64, from: Position, to: Position) !*Animation {
         var animation = try allocator.create(Animation);
         animation.* = Animation.init(allocator, duration_ms);
-        
+
         try animation.addKeyframe(Keyframe.init(0.0, AnimationValue{ .position = from }));
         try animation.addKeyframe(Keyframe.withEasing(1.0, AnimationValue{ .position = to }, .ease_out));
-        
+
         return animation;
     }
-    
+
     pub fn bounce(allocator: std.mem.Allocator, duration_ms: u64, start_pos: Position, end_pos: Position) !*Animation {
         var animation = try allocator.create(Animation);
         animation.* = Animation.init(allocator, duration_ms);
-        
+
         try animation.addKeyframe(Keyframe.init(0.0, AnimationValue{ .position = start_pos }));
         try animation.addKeyframe(Keyframe.withEasing(1.0, AnimationValue{ .position = end_pos }, .bounce));
-        
+
         return animation;
     }
-    
+
     pub fn scale(allocator: std.mem.Allocator, duration_ms: u64, from_size: Size, to_size: Size) !*Animation {
         var animation = try allocator.create(Animation);
         animation.* = Animation.init(allocator, duration_ms);
-        
+
         try animation.addKeyframe(Keyframe.init(0.0, AnimationValue{ .size = from_size }));
         try animation.addKeyframe(Keyframe.withEasing(1.0, AnimationValue{ .size = to_size }, .ease_in_out));
-        
+
         return animation;
     }
 };
@@ -512,7 +907,7 @@ test "Easing functions" {
     try std.testing.expect(Easing.linear.apply(0.0) == 0.0);
     try std.testing.expect(Easing.linear.apply(0.5) == 0.5);
     try std.testing.expect(Easing.linear.apply(1.0) == 1.0);
-    
+
     try std.testing.expect(Easing.ease_in.apply(0.0) == 0.0);
     try std.testing.expect(Easing.ease_in.apply(1.0) == 1.0);
 }
@@ -520,7 +915,7 @@ test "Easing functions" {
 test "Animation value interpolation" {
     const pos1 = AnimationValue{ .position = Position.init(0, 0) };
     const pos2 = AnimationValue{ .position = Position.init(10, 10) };
-    
+
     const interpolated = pos1.lerp(pos2, 0.5);
     try std.testing.expect(interpolated.position.x == 5);
     try std.testing.expect(interpolated.position.y == 5);
@@ -528,14 +923,60 @@ test "Animation value interpolation" {
 
 test "Animation keyframes" {
     const allocator = std.testing.allocator;
-    
+
     var animation = Animation.init(allocator, 1000);
     defer animation.deinit();
-    
+
     try animation.addKeyframe(Keyframe.init(0.0, AnimationValue{ .float = 0.0 }));
     try animation.addKeyframe(Keyframe.init(1.0, AnimationValue{ .float = 1.0 }));
-    
+
     try std.testing.expect(animation.keyframes.items.len == 2);
+}
+
+test "Transition rect morph" {
+    const allocator = std.testing.allocator;
+    var manager = TransitionManager.init(allocator);
+    defer manager.deinit();
+
+    const spec = TransitionSpec{
+        .duration_ms = 30,
+        .curve = .ease_out,
+        .phase = .entering,
+        .auto_remove = false,
+    };
+
+    const from = Rect.init(0, 0, 10, 0);
+    const to = Rect.init(0, 0, 10, 10);
+
+    const transition = try Transitions.rectMorph(&manager, from, to, spec);
+
+    std.time.sleep(50 * std.time.ns_per_ms);
+    manager.update();
+
+    const mid_rect = transition.currentRect().?;
+    try std.testing.expect(mid_rect.height > from.height);
+    try std.testing.expect(mid_rect.height <= to.height);
+
+    std.time.sleep(80 * std.time.ns_per_ms);
+    manager.update();
+
+    try std.testing.expect(transition.state == .completed);
+    const final_rect = transition.currentRect().?;
+    try std.testing.expectEqual(to.height, final_rect.height);
+
+    manager.release(transition.id);
+}
+
+test "Transition manager auto remove" {
+    const allocator = std.testing.allocator;
+    var manager = TransitionManager.init(allocator);
+    defer manager.deinit();
+
+    const transition = try Transitions.fade(&manager, 0.0, 1.0, TransitionSpec{ .duration_ms = 10, .auto_remove = true });
+    const id = transition.id;
+    std.time.sleep(50 * std.time.ns_per_ms);
+    manager.update();
+    try std.testing.expect(manager.get(id) == null);
 }
 
 /// Smooth scrolling helper
@@ -708,10 +1149,10 @@ test "Animation manager" {
 
     var animation = Animation.init(allocator, 1000);
     defer animation.deinit();
-    
+
     try manager.addAnimation(&animation);
     try std.testing.expect(manager.getAnimationCount() == 1);
-    
+
     manager.removeAnimation(&animation);
     try std.testing.expect(manager.getAnimationCount() == 0);
 }

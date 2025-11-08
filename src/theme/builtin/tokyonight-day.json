@@ -1,0 +1,85 @@
+{
+  "name": "Tokyo Night Day",
+  "description": "A light counterpart to Tokyo Night with gentle contrast",
+  "variant": "light",
+  "defs": {
+    "bg": "#e1e2e7",
+    "bgDark": "#d0d5e3",
+    "bgHighlight": "#c4c8da",
+    "fg": "#3760bf",
+    "fgDark": "#6172b0",
+    "comment": "#848cb5",
+    "blue": "#2e7de9",
+    "blueSoft": "#7890dd",
+    "cyan": "#007197",
+    "cyanBright": "#07879d",
+    "green": "#587539",
+    "magenta": "#9854f1",
+    "orange": "#b15c00",
+    "purple": "#7847bd",
+    "red": "#f52a65",
+    "teal": "#118c74",
+    "yellow": "#8c6c3e"
+  },
+  "palette": {
+    "surface": "bg",
+    "surfaceAlt": "bgDark",
+    "surfaceHighlight": "#b7c1e3",
+    "muted": "comment",
+    "subtle": "fgDark",
+    "accent": "blue",
+    "accentAlt": "magenta",
+    "accentPop": "orange",
+    "interactive": "cyan",
+    "interactiveHover": "cyanBright",
+    "success": "green",
+    "warning": "yellow",
+    "critical": "red",
+    "info": "teal",
+    "selection": "bgHighlight"
+  },
+  "typography": {
+    "heading": {
+      "family": "JetBrains Mono",
+      "weight": 700,
+      "style": ["bold", "uppercase"],
+      "tracking": 1
+    },
+    "body": {
+      "family": "Iosevka Term",
+      "weight": 400
+    },
+    "mono": {
+      "family": "JetBrains Mono",
+      "weight": 400
+    }
+  },
+  "theme": {
+    "primary": "blue",
+    "secondary": "cyan",
+    "accent": "magenta",
+    "error": "red",
+    "warning": "yellow",
+    "success": "green",
+    "info": "cyan",
+    "text": "fg",
+    "textMuted": "comment",
+    "background": "bg",
+    "backgroundPanel": "bgDark",
+    "backgroundElement": "bgHighlight",
+    "border": "bgHighlight",
+    "borderActive": "blue",
+    "borderSubtle": "bgDark"
+  },
+  "syntax": {
+    "keyword": "purple",
+    "function": "blue",
+    "string": "green",
+    "number": "orange",
+    "comment": "comment",
+    "type": "cyan",
+    "operator": "teal",
+    "variable": "fg",
+    "constant": "orange"
+  }
+}

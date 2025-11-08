@@ -5,6 +5,22 @@ All notable changes to Phantom TUI Framework will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- _TBD_
+
+### Changed
+- _TBD_
+
+### Fixed
+- _TBD_
+
+## [0.8.0-beta] - 2026-??-??
+
+### Added
+- Placeholder entry for upcoming beta release. Update with finalized notes when cutting the beta tag.
+
 ## [0.7.0] - 2025-11-03
 
 ### Added - Ratatui Parity: Data Visualization + Constraint Layouts + Advanced Features
@@ -842,13 +858,13 @@ This release completes Phase 1.1 of the NEXT_GEN.md roadmap, providing all essen
 
 ### Fixed
 
-- Memory leaks in v0_6_demo.zig - Added proper defer statements for all allocated widgets
+- Memory leaks in feature_showcase_demo.zig (formerly v0_6_demo.zig) - Added proper defer statements for all allocated widgets
 - Type mismatch warnings - Added proper `@intCast()` for usize to u16 conversions
 - Variable mutability warnings - Changed unnecessary `var` to `const`
 
 ### Demo
 
-- **v0_6_demo.zig**: Comprehensive demonstration of all v0.6.0 features
+- **feature_showcase_demo.zig** (formerly `v0_6_demo.zig`): Comprehensive demonstration of all v0.6.0 features
   - FlexRow layout with justify and alignment
   - ListView with 1000 virtualized items
   - ScrollView with keyboard and mouse scrolling

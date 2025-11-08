@@ -12,35 +12,35 @@ pub const Theme = struct {
     primary: Color = Color.blue,
     secondary: Color = Color.cyan,
     accent: Color = Color.green,
-    
+
     // Semantic colors
     success: Color = Color.green,
     warning: Color = Color.yellow,
-    error: Color = Color.red,
+    error_color: Color = Color.red,
     info: Color = Color.blue,
-    
+
     // UI colors
     background: Color = Color.black,
     foreground: Color = Color.white,
     muted: Color = Color.bright_black,
-    
+
     // Border colors
     border: Color = Color.bright_blue,
     border_focused: Color = Color.bright_cyan,
     border_disabled: Color = Color.bright_black,
-    
+
     // Text colors
     text: Color = Color.white,
     text_secondary: Color = Color.bright_black,
     text_muted: Color = Color.bright_black,
     text_disabled: Color = Color.bright_black,
-    
+
     // Interactive colors
     hover: Color = Color.bright_blue,
     active: Color = Color.cyan,
     selected: Color = Color.blue,
     disabled: Color = Color.bright_black,
-    
+
     // Syntax highlighting colors (for code blocks)
     syntax_keyword: Color = Color.blue,
     syntax_string: Color = Color.green,
@@ -52,7 +52,7 @@ pub const Theme = struct {
     syntax_function: Color = Color.bright_green,
     syntax_constant: Color = Color.bright_cyan,
     syntax_error: Color = Color.red,
-    
+
     pub fn getStyle(self: *const Theme, component: ThemeComponent) Style {
         return switch (component) {
             // Base styles
@@ -62,52 +62,52 @@ pub const Theme = struct {
             .text_secondary => Style.default().withFg(self.text_secondary),
             .text_muted => Style.default().withFg(self.text_muted),
             .text_disabled => Style.default().withFg(self.text_disabled),
-            
+
             // Interactive styles
             .button => Style.default().withFg(self.foreground).withBg(self.primary),
             .button_hover => Style.default().withFg(self.foreground).withBg(self.hover),
             .button_active => Style.default().withFg(self.foreground).withBg(self.active),
             .button_disabled => Style.default().withFg(self.text_disabled).withBg(self.disabled),
-            
+
             // Input styles
             .input => Style.default().withFg(self.text).withBg(self.background),
             .input_focused => Style.default().withFg(self.text).withBg(self.background),
             .input_placeholder => Style.default().withFg(self.text_muted).withBg(self.background),
             .input_selection => Style.default().withFg(self.foreground).withBg(self.selected),
-            
+
             // Border styles
             .border => Style.default().withFg(self.border),
             .border_focused => Style.default().withFg(self.border_focused),
             .border_disabled => Style.default().withFg(self.border_disabled),
-            
+
             // List styles
             .list_item => Style.default().withFg(self.text).withBg(self.background),
             .list_item_selected => Style.default().withFg(self.foreground).withBg(self.selected),
             .list_item_hover => Style.default().withFg(self.foreground).withBg(self.hover),
-            
+
             // Table styles
             .table_header => Style.default().withFg(self.foreground).withBg(self.primary).withBold(),
             .table_row => Style.default().withFg(self.text).withBg(self.background),
             .table_row_selected => Style.default().withFg(self.foreground).withBg(self.selected),
             .table_row_hover => Style.default().withFg(self.foreground).withBg(self.hover),
-            
+
             // Progress bar styles
             .progress_bar => Style.default().withFg(self.muted).withBg(self.background),
             .progress_fill => Style.default().withFg(self.success).withBg(self.success),
             .progress_text => Style.default().withFg(self.text).withBg(self.background),
-            
+
             // Dialog styles
             .dialog_background => Style.default().withFg(self.text).withBg(self.background),
             .dialog_title => Style.default().withFg(self.foreground).withBg(self.background).withBold(),
             .dialog_border => Style.default().withFg(self.border),
             .dialog_overlay => Style.default().withBg(self.muted),
-            
+
             // Notification styles
             .notification_info => Style.default().withFg(self.foreground).withBg(self.info),
             .notification_success => Style.default().withFg(self.foreground).withBg(self.success),
             .notification_warning => Style.default().withFg(self.background).withBg(self.warning),
-            .notification_error => Style.default().withFg(self.foreground).withBg(self.error),
-            
+            .notification_error => Style.default().withFg(self.foreground).withBg(self.error_color),
+
             // Code block styles
             .code_background => Style.default().withFg(self.text).withBg(self.background),
             .code_keyword => Style.default().withFg(self.syntax_keyword).withBold(),
@@ -120,11 +120,11 @@ pub const Theme = struct {
             .code_function => Style.default().withFg(self.syntax_function),
             .code_constant => Style.default().withFg(self.syntax_constant),
             .code_error => Style.default().withFg(self.syntax_error).withBold(),
-            
+
             // Streaming text styles
             .streaming_text => Style.default().withFg(self.text).withBg(self.background),
             .streaming_cursor => Style.default().withFg(self.background).withBg(self.foreground),
-            
+
             // Context menu styles
             .context_menu_background => Style.default().withFg(self.text).withBg(self.background),
             .context_menu_item => Style.default().withFg(self.text).withBg(self.background),
@@ -145,52 +145,52 @@ pub const ThemeComponent = enum {
     text_secondary,
     text_muted,
     text_disabled,
-    
+
     // Interactive
     button,
     button_hover,
     button_active,
     button_disabled,
-    
+
     // Input
     input,
     input_focused,
     input_placeholder,
     input_selection,
-    
+
     // Border
     border,
     border_focused,
     border_disabled,
-    
+
     // List
     list_item,
     list_item_selected,
     list_item_hover,
-    
+
     // Table
     table_header,
     table_row,
     table_row_selected,
     table_row_hover,
-    
+
     // Progress bar
     progress_bar,
     progress_fill,
     progress_text,
-    
+
     // Dialog
     dialog_background,
     dialog_title,
     dialog_border,
     dialog_overlay,
-    
+
     // Notification
     notification_info,
     notification_success,
     notification_warning,
     notification_error,
-    
+
     // Code block
     code_background,
     code_keyword,
@@ -203,11 +203,11 @@ pub const ThemeComponent = enum {
     code_function,
     code_constant,
     code_error,
-    
+
     // Streaming text
     streaming_text,
     streaming_cursor,
-    
+
     // Context menu
     context_menu_background,
     context_menu_item,
@@ -227,7 +227,7 @@ pub const Themes = struct {
             .accent = Color.green,
             .success = Color.green,
             .warning = Color.yellow,
-            .error = Color.red,
+            .error_color = Color.red,
             .info = Color.blue,
             .background = Color.black,
             .foreground = Color.white,
@@ -255,7 +255,7 @@ pub const Themes = struct {
             .syntax_error = Color.red,
         };
     }
-    
+
     /// Light theme
     pub fn light() Theme {
         return Theme{
@@ -264,7 +264,7 @@ pub const Themes = struct {
             .accent = Color.green,
             .success = Color.green,
             .warning = Color.yellow,
-            .error = Color.red,
+            .error_color = Color.red,
             .info = Color.blue,
             .background = Color.white,
             .foreground = Color.black,
@@ -292,7 +292,7 @@ pub const Themes = struct {
             .syntax_error = Color.red,
         };
     }
-    
+
     /// High contrast theme
     pub fn high_contrast() Theme {
         return Theme{
@@ -301,7 +301,7 @@ pub const Themes = struct {
             .accent = Color.green,
             .success = Color.green,
             .warning = Color.yellow,
-            .error = Color.red,
+            .error_color = Color.red,
             .info = Color.cyan,
             .background = Color.black,
             .foreground = Color.white,
@@ -329,7 +329,7 @@ pub const Themes = struct {
             .syntax_error = Color.red,
         };
     }
-    
+
     /// Monokai theme (popular for code)
     pub fn monokai() Theme {
         return Theme{
@@ -338,7 +338,7 @@ pub const Themes = struct {
             .accent = Color.fromRgb(166, 226, 46), // Green
             .success = Color.fromRgb(166, 226, 46), // Green
             .warning = Color.fromRgb(253, 151, 31), // Orange
-            .error = Color.fromRgb(249, 38, 114), // Pink
+            .error_color = Color.fromRgb(249, 38, 114), // Pink
             .info = Color.fromRgb(102, 217, 239), // Cyan
             .background = Color.fromRgb(39, 40, 34), // Dark gray
             .foreground = Color.fromRgb(248, 248, 242), // Light gray
@@ -366,7 +366,7 @@ pub const Themes = struct {
             .syntax_error = Color.fromRgb(249, 38, 114), // Pink
         };
     }
-    
+
     /// Solarized dark theme
     pub fn solarized_dark() Theme {
         return Theme{
@@ -375,7 +375,7 @@ pub const Themes = struct {
             .accent = Color.fromRgb(133, 153, 0), // Green
             .success = Color.fromRgb(133, 153, 0), // Green
             .warning = Color.fromRgb(181, 137, 0), // Yellow
-            .error = Color.fromRgb(220, 50, 47), // Red
+            .error_color = Color.fromRgb(220, 50, 47), // Red
             .info = Color.fromRgb(38, 139, 210), // Blue
             .background = Color.fromRgb(0, 43, 54), // Base03
             .foreground = Color.fromRgb(131, 148, 150), // Base0
@@ -403,7 +403,7 @@ pub const Themes = struct {
             .syntax_error = Color.fromRgb(220, 50, 47), // Red
         };
     }
-    
+
     /// Gruvbox dark theme
     pub fn gruvbox_dark() Theme {
         return Theme{
@@ -412,7 +412,7 @@ pub const Themes = struct {
             .accent = Color.fromRgb(211, 134, 155), // Purple
             .success = Color.fromRgb(142, 192, 124), // Green
             .warning = Color.fromRgb(250, 189, 47), // Yellow
-            .error = Color.fromRgb(251, 73, 52), // Red
+            .error_color = Color.fromRgb(251, 73, 52), // Red
             .info = Color.fromRgb(131, 165, 152), // Aqua
             .background = Color.fromRgb(40, 40, 40), // bg0
             .foreground = Color.fromRgb(235, 219, 178), // fg0
@@ -445,45 +445,45 @@ pub const Themes = struct {
 /// Theme manager for runtime theme switching
 pub const ThemeManager = struct {
     current_theme: Theme,
-    
+
     pub fn init(initial_theme: Theme) ThemeManager {
         return ThemeManager{
             .current_theme = initial_theme,
         };
     }
-    
+
     pub fn setTheme(self: *ThemeManager, theme: Theme) void {
         self.current_theme = theme;
     }
-    
+
     pub fn getTheme(self: *const ThemeManager) Theme {
         return self.current_theme;
     }
-    
+
     pub fn getStyle(self: *const ThemeManager, component: ThemeComponent) Style {
         return self.current_theme.getStyle(component);
     }
-    
+
     pub fn setDarkTheme(self: *ThemeManager) void {
         self.setTheme(Themes.dark());
     }
-    
+
     pub fn setLightTheme(self: *ThemeManager) void {
         self.setTheme(Themes.light());
     }
-    
+
     pub fn setHighContrastTheme(self: *ThemeManager) void {
         self.setTheme(Themes.high_contrast());
     }
-    
+
     pub fn setMonokaiTheme(self: *ThemeManager) void {
         self.setTheme(Themes.monokai());
     }
-    
+
     pub fn setSolarizedDarkTheme(self: *ThemeManager) void {
         self.setTheme(Themes.solarized_dark());
     }
-    
+
     pub fn setGruvboxDarkTheme(self: *ThemeManager) void {
         self.setTheme(Themes.gruvbox_dark());
     }
@@ -498,23 +498,23 @@ test "Theme creation" {
 
 test "Theme manager" {
     var manager = ThemeManager.init(Themes.dark());
-    
+
     try std.testing.expect(manager.getTheme().primary == Color.blue);
-    
+
     manager.setLightTheme();
     try std.testing.expect(manager.getTheme().background == Color.white);
-    
+
     manager.setHighContrastTheme();
     try std.testing.expect(manager.getTheme().border == Color.white);
 }
 
 test "Theme component styles" {
     const theme = Themes.dark();
-    
+
     const button_style = theme.getStyle(.button);
     try std.testing.expect(button_style.fg.? == Color.white);
     try std.testing.expect(button_style.bg.? == Color.blue);
-    
+
     const text_style = theme.getStyle(.text);
     try std.testing.expect(text_style.fg.? == Color.white);
 }

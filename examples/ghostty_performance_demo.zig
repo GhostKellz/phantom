@@ -97,11 +97,10 @@ pub fn main() !void {
     std.log.info("⚡ Optimized for high-performance terminal rendering\n", .{});
 
     var frame_count: u64 = 0;
-    var last_update = std.time.milliTimestamp();
+    var timer = try std.time.Timer.start();
 
     while (true) {
-        const current_time = std.time.milliTimestamp();
-        const elapsed = @as(f64, @floatFromInt(current_time - last_update)) / 1000.0;
+        const elapsed = @as(f64, @floatFromInt(timer.read())) / 1_000_000_000.0;
 
         if (elapsed >= 0.1) { // Update every 100ms
             frame_count += 1;
@@ -149,8 +148,8 @@ pub fn main() !void {
             system_monitor.updateNetwork(network_stats);
             
             system_monitor.updateTerminalStats(render_fps, frame_time);
-            
-            last_update = current_time;
+
+            timer.reset();
         }
 
         // Render the app

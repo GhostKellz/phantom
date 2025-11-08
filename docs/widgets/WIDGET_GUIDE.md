@@ -720,7 +720,7 @@ pub const MyWidget = struct {
 
 ## Getting Help
 
-- **Examples**: Check `examples/v0_6_demo.zig` for working examples
+- **Examples**: Check `examples/feature_showcase_demo.zig` (formerly `v0_6_demo.zig`) for working examples
 - **Source**: Browse `src/widgets/` for reference implementations
 - **Issues**: https://github.com/ghostkellz/phantom/issues
 

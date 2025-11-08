@@ -17,17 +17,19 @@ pub const ChartType = enum {
     both,
 };
 
-pub const Point = struct {
+const ChartPoint = struct {
     x: f64,
     y: f64,
 };
+pub const Point = ChartPoint;
 
-pub const Dataset = struct {
+const ChartDataset = struct {
     label: []const u8,
     points: []Point,
     color: Color,
     marker: u21, // Unicode character for scatter points
 };
+pub const Dataset = ChartDataset;
 
 pub const Axis = struct {
     label: []const u8,
@@ -71,8 +73,10 @@ pub const Error = error{
 
 /// Chart widget for line and scatter plots
 pub const Chart = struct {
+    pub const Point = ChartPoint;
+    pub const Dataset = ChartDataset;
     allocator: std.mem.Allocator,
-    datasets: std.ArrayList(Dataset),
+    datasets: std.ArrayList(ChartDataset),
     x_axis: Axis,
     y_axis: Axis,
     chart_type: ChartType,
@@ -104,7 +108,7 @@ pub const Chart = struct {
     pub const Builder = struct {
         allocator: std.mem.Allocator,
         config: ChartConfig,
-        datasets_list: std.ArrayList(Dataset),
+        datasets_list: std.ArrayList(ChartDataset),
 
         pub fn init(allocator: std.mem.Allocator) Builder {
             return .{
@@ -144,8 +148,8 @@ pub const Chart = struct {
             return self;
         }
 
-        pub fn addDataset(self: *Builder, label: []const u8, points: []Point, color: Color, marker: u21) Error!*Builder {
-            try self.datasets_list.append(self.allocator, Dataset{
+        pub fn addDataset(self: *Builder, label: []const u8, points: []ChartPoint, color: Color, marker: u21) Error!*Builder {
+            try self.datasets_list.append(self.allocator, ChartDataset{
                 .label = label,
                 .points = points,
                 .color = color,
@@ -184,8 +188,8 @@ pub const Chart = struct {
     }
 
     /// Add a dataset to the chart
-    pub fn addDataset(self: *Chart, label: []const u8, points: []Point, color: Color, marker: u21) !void {
-        try self.datasets.append(self.allocator, Dataset{
+    pub fn addDataset(self: *Chart, label: []const u8, points: []ChartPoint, color: Color, marker: u21) !void {
+        try self.datasets.append(self.allocator, ChartDataset{
             .label = label,
             .points = points,
             .color = color,
@@ -397,7 +401,7 @@ pub const Chart = struct {
     }
 
     /// Draw a dataset (line or scatter or both)
-    fn drawDataset(self: *Chart, buffer: *Buffer, area: Rect, dataset: Dataset) void {
+    fn drawDataset(self: *Chart, buffer: *Buffer, area: Rect, dataset: ChartDataset) void {
         if (dataset.points.len == 0) return;
 
         const style = Style.default().withFg(dataset.color);

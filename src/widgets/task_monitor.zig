@@ -27,13 +27,13 @@ pub const Task = struct {
     status: TaskStatus = .pending,
     progress: f64 = 0.0,
     message: []const u8 = "",
-    start_time: i64 = 0,
+    timer: std.time.Timer,
 
     pub fn init(allocator: std.mem.Allocator, id: []const u8, name: []const u8) !Task {
         return Task{
             .id = try allocator.dupe(u8, id),
             .name = try allocator.dupe(u8, name),
-            .start_time = std.time.milliTimestamp(),
+            .timer = try std.time.Timer.start(),
         };
     }
 
@@ -52,8 +52,8 @@ pub const Task = struct {
         self.message = try allocator.dupe(u8, message);
     }
 
-    pub fn getElapsedTime(self: *const Task) i64 {
-        return std.time.milliTimestamp() - self.start_time;
+    pub fn getElapsedTime(self: *Task) i64 {
+        return @intCast(self.timer.read() / std.time.ns_per_ms);
     }
 
     pub fn getStatusEmoji(self: *const Task) []const u8 {
@@ -251,7 +251,7 @@ pub const TaskMonitor = struct {
         }
     }
 
-    fn renderCompactTask(self: *TaskMonitor, buffer: *Buffer, x: u16, y: u16, width: u16, task: *const Task) void {
+    fn renderCompactTask(self: *TaskMonitor, buffer: *Buffer, x: u16, y: u16, width: u16, task: *Task) void {
         if (width == 0) return;
 
         // Clear line

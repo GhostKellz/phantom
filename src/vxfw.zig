@@ -113,9 +113,11 @@ pub const Tick = struct {
 
     /// Create a tick command that fires after the specified milliseconds
     pub fn in(ms: u32, widget: Widget) Command {
-        const now = std.time.milliTimestamp();
+        // Use nanoTimestamp since we don't have a timer instance here
+        const now_ns = std.time.nanoTimestamp();
+        const now_ms = @as(i64, @intCast(@as(u64, @intCast(now_ns)) / std.time.ns_per_ms));
         return .{ .tick = .{
-            .deadline_ms = now + ms,
+            .deadline_ms = now_ms + ms,
             .widget = widget,
         } };
     }

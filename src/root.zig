@@ -1,6 +1,15 @@
 //! Phantom - The Next-Gen TUI Framework for Zig
-//! A lightning-fast, async-native TUI framework inspired by Rattatui
+//! A lightning-fast, async-native TUI framework inspired by Ratatui
+//!
+//! Version 0.7.1 - Major stability improvements:
+//! - Fixed zsync/runtime crash on exit
+//! - Fixed widget overlapping with automatic vertical layout
+//! - Made runtime.initRuntime() optional (no longer required)
+//! - Improved Ratatui-style API compatibility
 const std = @import("std");
+
+/// Phantom version
+pub const version = "0.7.1";
 
 // Build-time configuration
 pub const phantom_config = @import("phantom_config");
@@ -12,6 +21,9 @@ pub const Terminal = @import("terminal.zig").Terminal;
 pub const Event = @import("event.zig").Event;
 pub const Key = @import("event.zig").Key;
 pub const EventLoop = @import("event.zig").EventLoop;
+pub const terminal_session = @import("terminal/session/mod.zig");
+pub const data = @import("data/list_source.zig");
+pub const data_streaming = @import("data/stream_source.zig");
 
 // Widget system - conditionally exported based on build configuration
 pub const widgets = if (phantom_config.enable_basic_widgets or phantom_config.enable_data_widgets or phantom_config.enable_package_mgmt or phantom_config.enable_crypto or phantom_config.enable_system or phantom_config.enable_advanced) @import("widgets/mod.zig") else struct {};
@@ -36,6 +48,7 @@ pub const Point = @import("geometry.zig").Point;
 pub const Size = @import("geometry.zig").Size;
 pub const Color = @import("style.zig").Color;
 pub const Style = @import("style.zig").Style;
+pub const style_theme = @import("style/theme.zig");
 
 // Widget system
 pub const Widget = @import("widget.zig").Widget;
@@ -48,6 +61,9 @@ pub const emoji = @import("emoji.zig");
 
 // Async runtime - always available
 pub const runtime = @import("runtime.zig");
+
+// Async streaming integration (zsync channels + StreamingText)
+pub const async_streaming = @import("async_streaming.zig");
 
 // Font system with zfont + gcode integration
 pub const font = @import("font/mod.zig");

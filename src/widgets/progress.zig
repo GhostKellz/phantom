@@ -28,7 +28,7 @@ pub const ProgressBar = struct {
     show_eta: bool = false,
 
     // Timing for ETA calculation
-    start_time: i64 = 0,
+    timer: std.time.Timer,
 
     // Styling
     bar_style: Style,
@@ -58,7 +58,7 @@ pub const ProgressBar = struct {
             .bar_style = Style.default(),
             .fill_style = Style.default().withFg(style.Color.green),
             .text_style = Style.default(),
-            .start_time = std.time.milliTimestamp(),
+            .timer = try std.time.Timer.start(),
         };
         return progress;
     }
@@ -84,7 +84,7 @@ pub const ProgressBar = struct {
     pub fn getETA(self: *const ProgressBar) i64 {
         if (self.value <= 0.0) return -1; // Unknown
 
-        const elapsed = std.time.milliTimestamp() - self.start_time;
+        const elapsed = self.timer.read() / std.time.ns_per_ms;
         const progress_ratio = self.value / self.max_value;
 
         if (progress_ratio <= 0.0) return -1;

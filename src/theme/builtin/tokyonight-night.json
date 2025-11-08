@@ -1,6 +1,7 @@
 {
   "name": "Tokyo Night",
   "description": "A clean, dark Tokyo Night theme",
+  "variant": "dark",
   "defs": {
     "bg": "#1a1b26",
     "bgDark": "#16161e",
@@ -17,6 +18,38 @@
     "red": "#f7768e",
     "teal": "#1abc9c",
     "yellow": "#e0af68"
+  },
+  "palette": {
+    "surface": "bg",
+    "surfaceAlt": "bgDark",
+    "surfaceHighlight": "bgHighlight",
+    "muted": "comment",
+    "subtle": "fgDark",
+    "accent": "blue",
+    "accentAlt": "magenta",
+    "accentPop": "orange",
+    "interactive": "cyan",
+    "interactiveHover": "blue",
+    "success": "green",
+    "warning": "yellow",
+    "critical": "red",
+    "info": "teal",
+    "selection": "bgHighlight"
+  },
+  "typography": {
+    "heading": {
+      "family": "JetBrains Mono",
+      "weight": 700,
+      "style": ["bold"]
+    },
+    "body": {
+      "family": "Iosevka Term",
+      "weight": 400
+    },
+    "mono": {
+      "family": "JetBrains Mono",
+      "weight": 400
+    }
   },
   "theme": {
     "primary": "blue",

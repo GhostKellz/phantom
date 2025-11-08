@@ -7,9 +7,9 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Initialize Phantom runtime
-    try phantom.runtime.initRuntime(allocator);
-    defer phantom.runtime.deinitRuntime();
+    // Initialize Phantom async runtime (global singleton)
+    _ = try phantom.async_runtime.startGlobal(allocator, .{});
+    defer phantom.async_runtime.shutdownGlobal();
 
     // Create app
     var app = try phantom.App.init(allocator, phantom.AppConfig{

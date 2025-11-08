@@ -1,6 +1,7 @@
 {
   "name": "Tokyo Night Moon",
   "description": "A moonlight variant of Tokyo Night",
+  "variant": "dark",
   "defs": {
     "bg": "#222436",
     "bgDark": "#1e2030",
@@ -17,6 +18,38 @@
     "red": "#ff757f",
     "teal": "#4fd6be",
     "yellow": "#ffc777"
+  },
+  "palette": {
+    "surface": "bg",
+    "surfaceAlt": "bgDark",
+    "surfaceHighlight": "bgHighlight",
+    "muted": "comment",
+    "subtle": "fgDark",
+    "accent": "blue",
+    "accentAlt": "magenta",
+    "accentPop": "purple",
+    "interactive": "cyan",
+    "interactiveHover": "blue",
+    "success": "green",
+    "warning": "yellow",
+    "critical": "red",
+    "info": "teal",
+    "selection": "bgHighlight"
+  },
+  "typography": {
+    "heading": {
+      "family": "JetBrains Mono",
+      "weight": 700,
+      "style": ["bold"]
+    },
+    "body": {
+      "family": "Iosevka Term",
+      "weight": 400
+    },
+    "mono": {
+      "family": "JetBrains Mono",
+      "weight": 400
+    }
   },
   "theme": {
     "primary": "blue",

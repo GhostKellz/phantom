@@ -1,6 +1,7 @@
 {
   "name": "Ghost Hacker Blue",
   "description": "Customized Tokyo Night with vivid teals, aquas, and mint greens",
+  "variant": "dark",
   "defs": {
     "bg": "#222436",
     "bgDark": "#2d3f76",
@@ -30,6 +31,38 @@
     "orange": "#ff966c",
     "yellow": "#ffc777",
     "goldish": "#d4af37"
+  },
+  "palette": {
+    "surface": "bg",
+    "surfaceAlt": "bgDark",
+    "surfaceHighlight": "bgHighlight",
+    "muted": "comment",
+    "subtle": "blueMoon",
+    "accent": "teal",
+    "accentAlt": "mint",
+    "accentPop": "aquaTealish",
+    "interactive": "blue6",
+    "interactiveHover": "blue3",
+    "success": "mint",
+    "warning": "yellow",
+    "critical": "red1",
+    "info": "blue2",
+    "selection": "bgHighlight"
+  },
+  "typography": {
+    "heading": {
+      "family": "JetBrains Mono",
+      "weight": 700,
+      "style": ["bold"]
+    },
+    "body": {
+      "family": "Iosevka Term",
+      "weight": 400
+    },
+    "mono": {
+      "family": "JetBrains Mono",
+      "weight": 400
+    }
   },
   "theme": {
     "primary": "teal",

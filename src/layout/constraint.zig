@@ -76,6 +76,9 @@ pub const Layout = struct {
 
     /// Split area according to constraints
     pub fn split(self: Layout, allocator: std.mem.Allocator, area: Rect) ![]Rect {
+        comptime {
+            @compileLog("layout.constraint.Layout.split is deprecated; migrate to layout.engine.LayoutBuilder or layout.migration helpers.");
+        }
         if (self.constraints.len == 0) {
             return &[_]Rect{};
         }

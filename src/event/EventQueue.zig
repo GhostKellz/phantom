@@ -3,24 +3,69 @@
 
 const std = @import("std");
 const vxfw = @import("../vxfw.zig");
+const event_types = @import("types.zig");
 
 const Allocator = std.mem.Allocator;
+const Event = event_types.Event;
+const SystemEvent = event_types.SystemEvent;
+
+/// Event priority levels used for scheduling
+pub const EventPriority = enum(u8) {
+    critical = 0, // System events, shutdown
+    high = 1, // User input, focus changes
+    normal = 2, // Redraws, ticks
+    low = 3, // Background updates
+    idle = 4, // Cleanup, statistics
+
+    pub fn fromEvent(event: Event) EventPriority {
+        return switch (event) {
+            .key => .high,
+            .mouse => .high,
+            .system => |sys| switch (sys) {
+                .resize => .critical,
+                .focus_gained, .focus_lost => .high,
+                .suspended, .resumed => .low,
+            },
+            .tick => .normal,
+        };
+    }
+};
+
+const priority_order = [_]EventPriority{ .critical, .high, .normal, .low, .idle };
+const priority_count = priority_order.len;
+
+fn priorityIndex(priority: EventPriority) usize {
+    return switch (priority) {
+        .critical => 0,
+        .high => 1,
+        .normal => 2,
+        .low => 3,
+        .idle => 4,
+    };
+}
 
 /// Thread-safe event queue for managing UI events
 pub const EventQueue = struct {
     allocator: Allocator,
-    events: std.array_list.AlignedManaged(QueuedEvent, null),
+    queues: [priority_count]std.array_list.AlignedManaged(QueuedEvent, null),
     commands: std.array_list.AlignedManaged(vxfw.Command, null),
     mutex: std.Thread.Mutex = .{},
     condition: std.Thread.Condition = .{},
     is_shutdown: bool = false,
     max_queue_size: usize = 10000,
     dropped_events: u64 = 0,
+    total_events: usize = 0,
+    peak_events: usize = 0,
 
     pub fn init(allocator: Allocator) EventQueue {
+        var queues_init: [priority_count]std.array_list.AlignedManaged(QueuedEvent, null) = undefined;
+        inline for (&queues_init) |*subqueue| {
+            subqueue.* = std.array_list.AlignedManaged(QueuedEvent, null).init(allocator);
+        }
+
         return EventQueue{
             .allocator = allocator,
-            .events = std.array_list.AlignedManaged(QueuedEvent, null).init(allocator),
+            .queues = queues_init,
             .commands = std.array_list.AlignedManaged(vxfw.Command, null).init(allocator),
         };
     }
@@ -30,27 +75,29 @@ pub const EventQueue = struct {
         defer self.mutex.unlock();
 
         // Clean up queued events
-        for (self.events.items) |*event| {
-            event.deinit(self.allocator);
+        inline for (&self.queues) |*queue| {
+            for (queue.items) |*event| {
+                event.deinit(self.allocator);
+            }
+            queue.deinit();
         }
-        self.events.deinit();
 
         // Clean up commands
         for (self.commands.items) |*command| {
-            command.deinit(self.allocator);
+            CommandCloneExt.deinit(command.*, self.allocator);
         }
         self.commands.deinit();
     }
 
     /// Push an event to the queue
-    pub fn pushEvent(self: *EventQueue, event: vxfw.Event, priority: EventPriority) !void {
+    pub fn pushEvent(self: *EventQueue, event: Event, priority: EventPriority) !void {
         self.mutex.lock();
         defer self.mutex.unlock();
 
         if (self.is_shutdown) return;
 
         // Check queue size limit
-        if (self.events.items.len >= self.max_queue_size) {
+        if (self.total_events >= self.max_queue_size) {
             // Drop oldest non-critical event
             if (self.dropOldestEvent()) {
                 self.dropped_events += 1;
@@ -60,16 +107,20 @@ pub const EventQueue = struct {
         }
 
         const queued_event = QueuedEvent{
-            .event = try event.clone(self.allocator),
+            .event = event,
             .priority = priority,
             .timestamp = std.time.milliTimestamp(),
         };
 
-        // Insert in priority order
-        try self.insertByPriority(queued_event);
+        try self.pushIntoSubqueue(queued_event);
 
         // Notify waiting threads
         self.condition.signal();
+    }
+
+    /// Push an event with automatically derived priority
+    pub fn pushAuto(self: *EventQueue, event: Event) !void {
+        try self.pushEvent(event, EventPriority.fromEvent(event));
     }
 
     /// Pop the highest priority event from the queue
@@ -77,9 +128,7 @@ pub const EventQueue = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
 
-        if (self.events.items.len == 0) return null;
-
-        return self.events.orderedRemove(0);
+        return self.popEventUnlocked();
     }
 
     /// Wait for an event (blocking)
@@ -92,7 +141,7 @@ pub const EventQueue = struct {
         else
             null;
 
-        while (self.events.items.len == 0 and !self.is_shutdown) {
+        while (self.total_events == 0 and !self.is_shutdown) {
             if (deadline) |d| {
                 const now = std.time.milliTimestamp();
                 if (now >= d) break;
@@ -104,11 +153,7 @@ pub const EventQueue = struct {
             }
         }
 
-        if (self.events.items.len > 0) {
-            return self.events.orderedRemove(0);
-        }
-
-        return null;
+        return self.popEventUnlocked();
     }
 
     /// Push a command to the command queue
@@ -118,7 +163,7 @@ pub const EventQueue = struct {
 
         if (self.is_shutdown) return;
 
-        try self.commands.append(try command.clone(self.allocator));
+            try self.commands.append(try CommandCloneExt.clone(command, self.allocator));
         self.condition.signal();
     }
 
@@ -136,14 +181,14 @@ pub const EventQueue = struct {
     pub fn isEmpty(self: *EventQueue) bool {
         self.mutex.lock();
         defer self.mutex.unlock();
-        return self.events.items.len == 0 and self.commands.items.len == 0;
+        return self.total_events == 0 and self.commands.items.len == 0;
     }
 
     /// Get queue size
     pub fn size(self: *EventQueue) usize {
         self.mutex.lock();
         defer self.mutex.unlock();
-        return self.events.items.len;
+        return self.total_events;
     }
 
     /// Get command queue size
@@ -158,13 +203,17 @@ pub const EventQueue = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
 
-        for (self.events.items) |*event| {
-            event.deinit(self.allocator);
+        inline for (&self.queues) |*queue| {
+            for (queue.items) |*event| {
+                event.deinit(self.allocator);
+            }
+            queue.clearRetainingCapacity();
         }
-        self.events.clearRetainingCapacity();
+        self.total_events = 0;
+        self.peak_events = 0;
 
         for (self.commands.items) |*command| {
-            command.deinit(self.allocator);
+            CommandCloneExt.deinit(command.*, self.allocator);
         }
         self.commands.clearRetainingCapacity();
     }
@@ -184,84 +233,77 @@ pub const EventQueue = struct {
         defer self.mutex.unlock();
 
         return QueueStats{
-            .event_count = self.events.items.len,
+            .event_count = self.total_events,
             .command_count = self.commands.items.len,
             .dropped_events = self.dropped_events,
             .is_shutdown = self.is_shutdown,
+            .peak_event_count = self.peak_events,
         };
-    }
-
-    /// Insert event maintaining priority order
-    fn insertByPriority(self: *EventQueue, event: QueuedEvent) !void {
-        const priority_value = @intFromEnum(event.priority);
-
-        // Find insertion point
-        var insert_index: usize = 0;
-        for (self.events.items, 0..) |existing, i| {
-            if (@intFromEnum(existing.priority) > priority_value) {
-                insert_index = i;
-                break;
-            }
-            insert_index = i + 1;
-        }
-
-        try self.events.insert(insert_index, event);
     }
 
     /// Drop the oldest non-critical event
     fn dropOldestEvent(self: *EventQueue) bool {
-        // Find oldest non-critical event
-        var oldest_index: ?usize = null;
-        var oldest_time: i64 = std.math.maxInt(i64);
+        var best_priority: ?usize = null;
+        var best_index: ?usize = null;
+        var best_timestamp: i64 = std.math.maxInt(i64);
 
-        for (self.events.items, 0..) |event, i| {
-            if (event.priority != .critical and event.timestamp < oldest_time) {
-                oldest_time = event.timestamp;
-                oldest_index = i;
+        inline for (priority_order, 0..) |priority, p_idx| {
+            if (priority == .critical) continue;
+            const queue = &self.queues[p_idx];
+            for (queue.items, 0..) |event, i| {
+                if (event.timestamp < best_timestamp) {
+                    best_timestamp = event.timestamp;
+                    best_priority = p_idx;
+                    best_index = i;
+                }
             }
         }
 
-        if (oldest_index) |index| {
-            var event = self.events.orderedRemove(index);
+        if (best_priority) |p_idx| {
+            var event = self.queues[p_idx].orderedRemove(best_index.?);
             event.deinit(self.allocator);
+            self.total_events -= 1;
             return true;
         }
 
         return false;
     }
+
+    fn pushIntoSubqueue(self: *EventQueue, event: QueuedEvent) !void {
+        const idx = priorityIndex(event.priority);
+        self.queues[idx].append(event) catch |err| {
+            var cleanup = event;
+            cleanup.deinit(self.allocator);
+            return err;
+        };
+        self.total_events += 1;
+        if (self.total_events > self.peak_events) {
+            self.peak_events = self.total_events;
+        }
+    }
+
+    fn popEventUnlocked(self: *EventQueue) ?QueuedEvent {
+        inline for (priority_order) |priority| {
+            const idx = priorityIndex(priority);
+            if (self.queues[idx].items.len > 0) {
+                const event = self.queues[idx].orderedRemove(0);
+                self.total_events -= 1;
+                return event;
+            }
+        }
+        return null;
+    }
 };
 
 /// Queued event with priority and timestamp
 pub const QueuedEvent = struct {
-    event: vxfw.Event,
+    event: Event,
     priority: EventPriority,
     timestamp: i64,
 
     pub fn deinit(self: *QueuedEvent, allocator: Allocator) void {
-        self.event.deinit(allocator);
-    }
-};
-
-/// Event priority levels
-pub const EventPriority = enum(u8) {
-    critical = 0,  // System events, shutdown
-    high = 1,      // User input, focus changes
-    normal = 2,    // Redraws, ticks
-    low = 3,       // Background updates
-    idle = 4,      // Cleanup, statistics
-
-    pub fn fromEvent(event: vxfw.Event) EventPriority {
-        return switch (event) {
-            .key_press, .key_release, .mouse => .high,
-            .focus_in, .focus_out => .high,
-            .paste_start, .paste_end, .paste => .high,
-            .winsize => .critical,
-            .tick => .normal,
-            .init => .critical,
-            .mouse_enter, .mouse_leave => .normal,
-            .color_report, .color_scheme => .low,
-            .user => .normal,
-        };
+        _ = self;
+        _ = allocator;
     }
 };
 
@@ -271,6 +313,7 @@ pub const QueueStats = struct {
     command_count: usize,
     dropped_events: u64,
     is_shutdown: bool,
+    peak_event_count: usize,
 };
 
 /// Event queue errors
@@ -282,17 +325,17 @@ pub const EventQueueError = error{
 
 /// Event filter for processing
 pub const EventFilter = struct {
-    filter_fn: *const fn (vxfw.Event) bool,
+    filter_fn: *const fn (Event) bool,
     name: []const u8,
 
-    pub fn init(name: []const u8, filter_fn: *const fn (vxfw.Event) bool) EventFilter {
+    pub fn init(name: []const u8, filter_fn: *const fn (Event) bool) EventFilter {
         return EventFilter{
             .filter_fn = filter_fn,
             .name = name,
         };
     }
 
-    pub fn matches(self: EventFilter, event: vxfw.Event) bool {
+    pub fn matches(self: EventFilter, event: Event) bool {
         return self.filter_fn(event);
     }
 };
@@ -338,23 +381,27 @@ pub const FilteredEventQueue = struct {
         queue.mutex.lock();
         defer queue.mutex.unlock();
 
-        var i: usize = 0;
-        while (i < queue.events.items.len) {
-            const event = &queue.events.items[i];
+        inline for (priority_order) |priority| {
+            const idx = priorityIndex(priority);
+            var i: usize = 0;
+            while (i < queue.queues[idx].items.len) {
+                const event = &queue.queues[idx].items[i];
 
-            // Check if event matches any filter
-            var matches = false;
-            for (self.filters.items) |filter| {
-                if (filter.matches(event.event)) {
-                    matches = true;
-                    break;
+                var matches = false;
+                for (self.filters.items) |filter| {
+                    if (filter.matches(event.event)) {
+                        matches = true;
+                        break;
+                    }
                 }
-            }
 
-            if (matches) {
-                return queue.events.orderedRemove(i);
+                if (matches) {
+                    const removed = queue.queues[idx].orderedRemove(i);
+                    queue.total_events -= 1;
+                    return removed;
+                }
+                i += 1;
             }
-            i += 1;
         }
 
         return null;
@@ -403,41 +450,8 @@ pub const EventProcessor = struct {
     }
 };
 
-// Extension methods for vxfw.Event and vxfw.Command
-const EventExtensions = struct {
-    fn cloneEvent(event: vxfw.Event, allocator: Allocator) !vxfw.Event {
-        return switch (event) {
-            .key_press => |key| vxfw.Event{ .key_press = key },
-            .key_release => |key| vxfw.Event{ .key_release = key },
-            .mouse => |mouse| vxfw.Event{ .mouse = mouse },
-            .focus_in => vxfw.Event.focus_in,
-            .focus_out => vxfw.Event.focus_out,
-            .paste_start => vxfw.Event.paste_start,
-            .paste_end => vxfw.Event.paste_end,
-            .paste => |data| vxfw.Event{ .paste = try allocator.dupe(u8, data) },
-            .color_report => |report| vxfw.Event{ .color_report = report },
-            .color_scheme => |scheme| vxfw.Event{ .color_scheme = scheme },
-            .winsize => |size| vxfw.Event{ .winsize = size },
-            .tick => vxfw.Event.tick,
-            .init => vxfw.Event.init,
-            .mouse_enter => vxfw.Event.mouse_enter,
-            .mouse_leave => vxfw.Event.mouse_leave,
-            .user => |user| vxfw.Event{ .user = .{
-                .name = try allocator.dupe(u8, user.name),
-                .data = user.data,
-            } },
-        };
-    }
-
-    fn deinitEvent(event: vxfw.Event, allocator: Allocator) void {
-        switch (event) {
-            .paste => |data| allocator.free(data),
-            .user => |user| allocator.free(user.name),
-            else => {},
-        }
-    }
-
-    fn cloneCommand(command: vxfw.Command, allocator: Allocator) !vxfw.Command {
+pub const CommandCloneExt = struct {
+    pub fn clone(command: vxfw.Command, allocator: Allocator) !vxfw.Command {
         return switch (command) {
             .tick => |tick| vxfw.Command{ .tick = tick },
             .set_mouse_shape => |shape| vxfw.Command{ .set_mouse_shape = shape },
@@ -454,7 +468,7 @@ const EventExtensions = struct {
         };
     }
 
-    fn deinitCommand(command: vxfw.Command, allocator: Allocator) void {
+    pub fn deinit(command: vxfw.Command, allocator: Allocator) void {
         switch (command) {
             .copy_to_clipboard => |text| allocator.free(text),
             .set_title => |title| allocator.free(title),
@@ -467,26 +481,12 @@ const EventExtensions = struct {
     }
 };
 
-// Add clone and deinit methods to Event and Command
-pub const EventCloneExt = struct {
-    pub fn clone(event: vxfw.Event, allocator: Allocator) !vxfw.Event {
-        return EventExtensions.cloneEvent(event, allocator);
+pub fn destroyCommands(commands: []vxfw.Command, allocator: Allocator) void {
+    for (commands) |command| {
+        CommandCloneExt.deinit(command, allocator);
     }
-
-    pub fn deinit(event: vxfw.Event, allocator: Allocator) void {
-        EventExtensions.deinitEvent(event, allocator);
-    }
-};
-
-pub const CommandCloneExt = struct {
-    pub fn clone(command: vxfw.Command, allocator: Allocator) !vxfw.Command {
-        return EventExtensions.cloneCommand(command, allocator);
-    }
-
-    pub fn deinit(command: vxfw.Command, allocator: Allocator) void {
-        EventExtensions.deinitCommand(command, allocator);
-    }
-};
+    allocator.free(commands);
+}
 
 test "EventQueue basic operations" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
@@ -496,7 +496,7 @@ test "EventQueue basic operations" {
     defer queue.deinit();
 
     // Test pushing and popping events
-    try queue.pushEvent(vxfw.Event.tick, .normal);
+    try queue.pushEvent(Event.fromTick(), .normal);
     try std.testing.expect(!queue.isEmpty());
     try std.testing.expectEqual(@as(usize, 1), queue.size());
 
@@ -513,22 +513,43 @@ test "EventQueue priority ordering" {
     defer queue.deinit();
 
     // Push events in reverse priority order
-    try queue.pushEvent(vxfw.Event.tick, .normal);
-    try queue.pushEvent(vxfw.Event.focus_in, .high);
-    try queue.pushEvent(vxfw.Event.init, .critical);
+    try queue.pushEvent(Event.fromTick(), .normal);
+    try queue.pushEvent(Event.fromSystem(SystemEvent.focus_gained), .high);
+    try queue.pushEvent(Event.fromSystem(SystemEvent.resize), .critical);
 
     // Should pop in priority order (critical first)
     const first = queue.popEvent().?;
-    try std.testing.expectEqual(vxfw.Event.init, first.event);
+    try std.testing.expect(first.event == .system);
+    try std.testing.expectEqual(SystemEvent.resize, first.event.system);
     first.deinit(arena.allocator());
 
     const second = queue.popEvent().?;
-    try std.testing.expectEqual(vxfw.Event.focus_in, second.event);
+    try std.testing.expect(second.event == .system);
+    try std.testing.expectEqual(SystemEvent.focus_gained, second.event.system);
     second.deinit(arena.allocator());
 
     const third = queue.popEvent().?;
-    try std.testing.expectEqual(vxfw.Event.tick, third.event);
+    try std.testing.expect(third.event == .tick);
     third.deinit(arena.allocator());
+}
+
+test "EventQueue pushAuto infers priority" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var queue = EventQueue.init(arena.allocator());
+    defer queue.deinit();
+
+    try queue.pushEvent(Event.fromTick(), .normal);
+    try queue.pushAuto(Event.fromSystem(SystemEvent.focus_gained));
+
+    const first = queue.popEvent().?;
+    try std.testing.expectEqual(EventPriority.high, first.priority);
+    first.deinit(arena.allocator());
+
+    const second = queue.popEvent().?;
+    try std.testing.expect(second.event == .tick);
+    second.deinit(arena.allocator());
 }
 
 test "EventFilter functionality" {
@@ -543,21 +564,21 @@ test "EventFilter functionality" {
 
     // Add filter for key events only
     const key_filter = EventFilter.init("keys", struct {
-        fn filterKeyEvents(event: vxfw.Event) bool {
-            return event == .key_press or event == .key_release;
+        fn filterKeyEvents(event: Event) bool {
+            return event == .key;
         }
     }.filterKeyEvents);
 
     try filtered.addFilter(key_filter);
 
     // Add mixed events
-    const key_event = vxfw.Event{ .key_press = .{ .key = .enter } };
+    const key_event = Event.fromKey(event_types.Key.enter);
     try queue.pushEvent(key_event, .high);
-    try queue.pushEvent(vxfw.Event.tick, .normal);
+    try queue.pushEvent(Event.fromTick(), .normal);
 
     // Should only get key event
     const filtered_event = filtered.popFilteredEvent().?;
-    try std.testing.expectEqual(vxfw.Event.key_press, filtered_event.event);
+    try std.testing.expect(filtered_event.event == .key);
     filtered_event.deinit(arena.allocator());
 
     // Tick event should still be in queue

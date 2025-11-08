@@ -105,7 +105,7 @@ fn benchmarkFullFrame(allocator: std.mem.Allocator) !void {
     while (frame < frames) : (frame += 1) {
         // Simulate frame rendering (without actually displaying)
         // In real app, this would call terminal rendering
-        std.Thread.sleep(std.time.ns_per_ms); // Simulate some work
+        std.posix.nanosleep(0, std.time.ns_per_ms); // Simulate some work
     }
 
     const elapsed = timer.read();

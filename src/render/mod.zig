@@ -2,8 +2,14 @@
 const std = @import("std");
 
 // Core rendering types
-pub const Renderer = @import("renderer.zig").Renderer;
+const renderer = @import("renderer.zig");
+
+pub const Renderer = renderer.Renderer;
+pub const RendererConfig = renderer.Config;
+pub const RendererStats = renderer.Stats;
+pub const RendererTarget = renderer.Target;
+pub const RendererBackendPreference = renderer.BackendPreference;
 
 test {
-    _ = @import("renderer.zig");
+    _ = renderer;
 }

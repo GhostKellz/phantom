@@ -40,6 +40,9 @@ pub const EventLoop = struct {
     last_render_time: i64 = 0,
     render_budget_ms: u32 = 12, // Leave 4ms for event processing
 
+    // Timer for consistent timing
+    timer: std.time.Timer,
+
     pub fn init(allocator: Allocator) !EventLoop {
         return EventLoop{
             .allocator = allocator,
@@ -49,6 +52,7 @@ pub const EventLoop = struct {
             .pre_frame_hooks = std.array_list.AlignedManaged(FrameHook, null).init(allocator),
             .post_frame_hooks = std.array_list.AlignedManaged(FrameHook, null).init(allocator),
             .input_processor = InputProcessor.init(allocator),
+            .timer = try std.time.Timer.start(),
         };
     }
 
@@ -85,7 +89,7 @@ pub const EventLoop = struct {
 
     /// Schedule a tick event
     pub fn scheduleTick(self: *EventLoop, widget: vxfw.Widget, delay_ms: u32) !void {
-        try self.tick_scheduler.schedule(widget, delay_ms);
+        try self.tick_scheduler.schedule(widget, delay_ms, &self.timer);
     }
 
     /// Schedule a recurring timer
@@ -119,25 +123,26 @@ pub const EventLoop = struct {
         defer self.is_running = false;
 
         // Initialize timing
-        self.last_fps_time = std.time.milliTimestamp();
+        self.timer.reset();
+        self.last_fps_time = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
 
         // Send init event to root widget
         try self.pushEvent(vxfw.Event.init);
 
         while (!self.should_exit) {
-            const frame_start = std.time.milliTimestamp();
+            const frame_start = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
 
             // Process frame
             try self.processFrame();
 
             // Calculate frame timing
-            const frame_end = std.time.milliTimestamp();
+            const frame_end = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
             const frame_duration = frame_end - frame_start;
 
             // Sleep if we finished early
             if (frame_duration < self.frame_time_budget_ms) {
                 const sleep_ms = self.frame_time_budget_ms - @as(u32, @intCast(frame_duration));
-                std.time.sleep(sleep_ms * 1000000); // Convert to nanoseconds
+                std.posix.nanosleep(0, sleep_ms * 1000000); // Convert to nanoseconds
             }
 
             // Update performance metrics
@@ -153,7 +158,7 @@ pub const EventLoop = struct {
 
     /// Process a single frame
     fn processFrame(self: *EventLoop) !void {
-        const frame_start = std.time.milliTimestamp();
+        const frame_start = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
 
         // Run pre-frame hooks
         for (self.pre_frame_hooks.items) |hook| {
@@ -161,7 +166,7 @@ pub const EventLoop = struct {
         }
 
         // Process scheduled ticks
-        try self.tick_scheduler.processTicks(&self.event_queue);
+        try self.tick_scheduler.processTicks(&self.event_queue, &self.timer);
 
         // Process timers
         try self.timer_manager.processTimers();
@@ -172,7 +177,7 @@ pub const EventLoop = struct {
         // Render if needed
         if (self.shouldRender()) {
             try self.render();
-            self.last_render_time = std.time.milliTimestamp();
+            self.last_render_time = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
         }
 
         // Run post-frame hooks
@@ -188,7 +193,7 @@ pub const EventLoop = struct {
         const event_budget_ms = self.frame_time_budget_ms - self.render_budget_ms;
 
         while (true) {
-            const elapsed = std.time.milliTimestamp() - frame_start;
+            const elapsed = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms)) - frame_start;
             if (elapsed >= event_budget_ms) break;
 
             const event = self.event_queue.popEvent() orelse break;
@@ -242,7 +247,8 @@ pub const EventLoop = struct {
     fn processCommand(self: *EventLoop, command: vxfw.Command) !void {
         switch (command) {
             .tick => |tick| {
-                try self.tick_scheduler.schedule(tick.widget, @as(u32, @intCast(tick.deadline_ms - std.time.milliTimestamp())));
+                const now = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
+                try self.tick_scheduler.schedule(tick.widget, @as(u32, @intCast(tick.deadline_ms - now)), &self.timer);
             },
             .request_focus => |widget| {
                 // Handle focus change
@@ -267,7 +273,7 @@ pub const EventLoop = struct {
         if (self.needs_full_redraw) return true;
 
         // Render at target frame rate if needed
-        const now = std.time.milliTimestamp();
+        const now = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
         const elapsed = now - self.last_render_time;
         return elapsed >= self.frame_time_budget_ms;
     }
@@ -343,16 +349,17 @@ const TickScheduler = struct {
         self.pending_ticks.deinit();
     }
 
-    fn schedule(self: *TickScheduler, widget: vxfw.Widget, delay_ms: u32) !void {
-        const deadline = std.time.milliTimestamp() + delay_ms;
+    fn schedule(self: *TickScheduler, widget: vxfw.Widget, delay_ms: u32, timer: *std.time.Timer) !void {
+        const now = @as(i64, @intCast(timer.read() / std.time.ns_per_ms));
+        const deadline = now + delay_ms;
         try self.pending_ticks.add(ScheduledTick{
             .widget = widget,
             .deadline_ms = deadline,
         });
     }
 
-    fn processTicks(self: *TickScheduler, event_queue: *EventQueue) !void {
-        const now = std.time.milliTimestamp();
+    fn processTicks(self: *TickScheduler, event_queue: *EventQueue, timer: *std.time.Timer) !void {
+        const now = @as(i64, @intCast(timer.read() / std.time.ns_per_ms));
 
         while (self.pending_ticks.peek()) |tick| {
             if (tick.deadline_ms > now) break;
@@ -371,6 +378,7 @@ const TickScheduler = struct {
 const TimerManager = struct {
     allocator: Allocator,
     timers: std.array_list.AlignedManaged(Timer, null),
+    timer: std.time.Timer,
 
     const Timer = struct {
         name: []u8,
@@ -385,6 +393,7 @@ const TimerManager = struct {
         return TimerManager{
             .allocator = allocator,
             .timers = std.array_list.AlignedManaged(Timer, null).init(allocator),
+            .timer = std.time.Timer.start() catch unreachable,
         };
     }
 
@@ -396,10 +405,11 @@ const TimerManager = struct {
     }
 
     fn addTimer(self: *TimerManager, name: []const u8, interval_ms: u32, callback: TimerCallback, recurring: bool) !void {
+        const now = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
         const timer = Timer{
             .name = try self.allocator.dupe(u8, name),
             .interval_ms = interval_ms,
-            .last_fire = std.time.milliTimestamp(),
+            .last_fire = now,
             .callback = callback,
             .recurring = recurring,
         };
@@ -407,7 +417,7 @@ const TimerManager = struct {
     }
 
     fn processTimers(self: *TimerManager) !void {
-        const now = std.time.milliTimestamp();
+        const now = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
 
         var i: usize = 0;
         while (i < self.timers.items.len) {
@@ -457,10 +467,12 @@ const InputProcessor = struct {
     key_repeat_rate_ms: u32 = 50,
     last_key_time: i64 = 0,
     last_key: ?vxfw.Key = null,
+    timer: std.time.Timer,
 
     fn init(allocator: Allocator) InputProcessor {
         return InputProcessor{
             .allocator = allocator,
+            .timer = std.time.Timer.start() catch unreachable,
         };
     }
 
@@ -471,7 +483,7 @@ const InputProcessor = struct {
     fn processEvent(self: *InputProcessor, event: vxfw.Event) !vxfw.Event {
         switch (event) {
             .key_press => |key| {
-                const now = std.time.milliTimestamp();
+                const now = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
 
                 // Handle key repeat
                 if (self.last_key) |last| {

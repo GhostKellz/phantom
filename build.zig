@@ -9,6 +9,7 @@ const Features = struct {
     crypto: bool,
     system: bool,
     advanced: bool,
+    terminal_widget: bool,
 };
 
 // Resolve feature flags based on preset or explicit options
@@ -19,10 +20,11 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
     crypto: ?bool,
     system: ?bool,
     advanced: ?bool,
+    terminal_widget: ?bool,
 }) Features {
     // Start with preset defaults
     var features: Features = undefined;
-    
+
     if (std.mem.eql(u8, preset, "basic")) {
         features = Features{
             .basic_widgets = true,
@@ -31,6 +33,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
             .crypto = false,
             .system = false,
             .advanced = false,
+            .terminal_widget = false,
         };
     } else if (std.mem.eql(u8, preset, "package-mgr")) {
         features = Features{
@@ -40,6 +43,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
             .crypto = false,
             .system = false,
             .advanced = true,
+            .terminal_widget = true,
         };
     } else if (std.mem.eql(u8, preset, "crypto")) {
         features = Features{
@@ -49,6 +53,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
             .crypto = true,
             .system = false,
             .advanced = true,
+            .terminal_widget = true,
         };
     } else if (std.mem.eql(u8, preset, "system")) {
         features = Features{
@@ -58,6 +63,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
             .crypto = false,
             .system = true,
             .advanced = true,
+            .terminal_widget = true,
         };
     } else if (std.mem.eql(u8, preset, "full")) {
         features = Features{
@@ -67,6 +73,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
             .crypto = true,
             .system = true,
             .advanced = true,
+            .terminal_widget = true,
         };
     } else {
         // Unknown preset, default to full
@@ -78,6 +85,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
             .crypto = true,
             .system = true,
             .advanced = true,
+            .terminal_widget = true,
         };
     }
 
@@ -88,6 +96,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
     if (explicit.crypto) |val| features.crypto = val;
     if (explicit.system) |val| features.system = val;
     if (explicit.advanced) |val| features.advanced = val;
+    if (explicit.terminal_widget) |val| features.terminal_widget = val;
 
     return features;
 }
@@ -124,6 +133,7 @@ pub fn build(b: *std.Build) void {
     const enable_crypto = b.option(bool, "crypto", "Enable blockchain/crypto widgets (BlockchainPackageBrowser)") orelse null;
     const enable_system = b.option(bool, "system", "Enable system monitoring widgets (SystemMonitor, NetworkTopology, CommandBuilder)") orelse null;
     const enable_advanced = b.option(bool, "advanced", "Enable advanced widgets (StreamingText, CodeBlock, Container)") orelse null;
+    const enable_terminal_widget = b.option(bool, "terminal-widget", "Enable experimental terminal widget (PTY-backed)") orelse null;
 
     // Resolve feature flags based on preset or explicit options
     const features = resolveFeatures(preset, .{
@@ -133,6 +143,7 @@ pub fn build(b: *std.Build) void {
         .crypto = enable_crypto,
         .system = enable_system,
         .advanced = enable_advanced,
+        .terminal_widget = enable_terminal_widget,
     });
 
     // This creates a module, which represents a collection of source files alongside
@@ -200,27 +211,27 @@ pub fn build(b: *std.Build) void {
     // Pass feature flags as comptime constants to the module
     // This creates conditional compilation based on build options
     const phantom_mod = b.addModule("phantom_config", .{
-        .root_source_file = b.addWriteFiles().add("phantom_config.zig",
-            std.fmt.allocPrint(b.allocator,
-                \\pub const enable_basic_widgets = {};
-                \\pub const enable_data_widgets = {};
-                \\pub const enable_package_mgmt = {};
-                \\pub const enable_crypto = {};
-                \\pub const enable_system = {};
-                \\pub const enable_advanced = {};
-                \\pub const use_zigzag_event_loop = {};
-                \\pub const event_loop_backend = "{s}";
-            , .{
-                features.basic_widgets,
-                features.data_widgets,
-                features.package_mgmt,
-                features.crypto,
-                features.system,
-                features.advanced,
-                use_zigzag,
-                event_loop,
-            }) catch @panic("Failed to create config")
-        ),
+        .root_source_file = b.addWriteFiles().add("phantom_config.zig", std.fmt.allocPrint(b.allocator,
+            \\pub const enable_basic_widgets = {};
+            \\pub const enable_data_widgets = {};
+            \\pub const enable_package_mgmt = {};
+            \\pub const enable_crypto = {};
+            \\pub const enable_system = {};
+            \\pub const enable_advanced = {};
+            \\pub const enable_terminal_widget = {};
+            \\pub const use_zigzag_event_loop = {};
+            \\pub const event_loop_backend = "{s}";
+        , .{
+            features.basic_widgets,
+            features.data_widgets,
+            features.package_mgmt,
+            features.crypto,
+            features.system,
+            features.advanced,
+            features.terminal_widget,
+            use_zigzag,
+            event_loop,
+        }) catch @panic("Failed to create config")),
         .target = target,
     });
 
@@ -374,7 +385,7 @@ pub fn build(b: *std.Build) void {
     // ZION CLI Demo - requires basic widgets
     if (features.basic_widgets) {
         const zion_demo = b.addExecutable(.{
-            .name = "zion_cli_demo", 
+            .name = "zion_cli_demo",
             .root_module = b.createModule(.{
                 .root_source_file = b.path("examples/zion_cli_demo.zig"),
                 .target = target,
@@ -476,6 +487,25 @@ pub fn build(b: *std.Build) void {
         package_browser_demo_step.dependOn(&run_package_browser_demo.step);
     }
 
+    // Theme Gallery Demo - manifest hot reload showcase
+    const theme_gallery_demo = b.addExecutable(.{
+        .name = "theme_gallery_demo",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("examples/theme_gallery_demo.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "phantom", .module = mod },
+            },
+        }),
+    });
+    theme_gallery_demo.linkLibC();
+    b.installArtifact(theme_gallery_demo);
+
+    const run_theme_gallery_demo = b.addRunArtifact(theme_gallery_demo);
+    const theme_gallery_demo_step = b.step("demo-theme-gallery", "Run the theme gallery manifest demo");
+    theme_gallery_demo_step.dependOn(&run_theme_gallery_demo.step);
+
     // VXFW Widget Framework Demo - always available
     const vxfw_demo = b.addExecutable(.{
         .name = "vxfw_demo",
@@ -557,6 +587,25 @@ pub fn build(b: *std.Build) void {
     const unicode_bench_step = b.step("bench-unicode", "Run Unicode performance benchmarks");
     unicode_bench_step.dependOn(&run_unicode_bench.step);
 
+    // Layout Engine Sandbox
+    const layout_sandbox = b.addExecutable(.{
+        .name = "layout_sandbox",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("benches/layout_sandbox.zig"),
+            .target = target,
+            .optimize = .ReleaseFast,
+            .imports = &.{
+                .{ .name = "phantom", .module = mod },
+            },
+        }),
+    });
+    layout_sandbox.linkLibC();
+    b.installArtifact(layout_sandbox);
+
+    const run_layout_sandbox = b.addRunArtifact(layout_sandbox);
+    const layout_sandbox_step = b.step("bench-layout", "Run layout engine sandbox benchmark");
+    layout_sandbox_step.dependOn(&run_layout_sandbox.step);
+
     // Rendering Performance Benchmarks
     const render_bench = b.addExecutable(.{
         .name = "render_bench",
@@ -579,14 +628,15 @@ pub fn build(b: *std.Build) void {
     // Run all benchmarks
     const bench_all_step = b.step("bench", "Run all performance benchmarks");
     bench_all_step.dependOn(unicode_bench_step);
+    bench_all_step.dependOn(layout_sandbox_step);
     bench_all_step.dependOn(render_bench_step);
 
-    // v0.6.0 Feature Demo - showcases all new widgets
+    // Feature Showcase Demo - highlights core widgets
     if (features.advanced or features.basic_widgets) {
-        const v06_demo = b.addExecutable(.{
-            .name = "v0_6_demo",
+        const feature_showcase = b.addExecutable(.{
+            .name = "feature_showcase_demo",
             .root_module = b.createModule(.{
-                .root_source_file = b.path("examples/v0_6_demo.zig"),
+                .root_source_file = b.path("examples/feature_showcase_demo.zig"),
                 .target = target,
                 .optimize = optimize,
                 .imports = &.{
@@ -594,20 +644,20 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        v06_demo.linkLibC();
-        b.installArtifact(v06_demo);
+        feature_showcase.linkLibC();
+        b.installArtifact(feature_showcase);
 
-        const run_v06_demo = b.addRunArtifact(v06_demo);
-        const v06_demo_step = b.step("run-demo-v0.6", "Run the v0.6.0 feature showcase");
-        v06_demo_step.dependOn(&run_v06_demo.step);
+        const run_feature_showcase = b.addRunArtifact(feature_showcase);
+        const feature_showcase_step = b.step("demo-feature-showcase", "Run the feature showcase demo");
+        feature_showcase_step.dependOn(&run_feature_showcase.step);
     }
 
-    // v0.7.0 Data Visualization Demo - Ratatui parity showcase
+    // Data Visualization Demo - Ratatui parity showcase
     if (features.data_widgets and features.advanced) {
-        const v07_demo = b.addExecutable(.{
-            .name = "v0_7_data_viz_demo",
+        const data_viz_demo = b.addExecutable(.{
+            .name = "data_visualization_demo",
             .root_module = b.createModule(.{
-                .root_source_file = b.path("examples/v0_7_data_viz_demo.zig"),
+                .root_source_file = b.path("examples/data_visualization_demo.zig"),
                 .target = target,
                 .optimize = optimize,
                 .imports = &.{
@@ -615,12 +665,50 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        v07_demo.linkLibC();
-        b.installArtifact(v07_demo);
+        data_viz_demo.linkLibC();
+        b.installArtifact(data_viz_demo);
 
-        const run_v07_demo = b.addRunArtifact(v07_demo);
-        const v07_demo_step = b.step("run-demo-v0.7", "Run the v0.7.0 Ratatui parity showcase");
-        v07_demo_step.dependOn(&run_v07_demo.step);
+        const run_data_viz_demo = b.addRunArtifact(data_viz_demo);
+        const data_viz_demo_step = b.step("demo-data-visualization", "Run the data visualization demo");
+        data_viz_demo_step.dependOn(&run_data_viz_demo.step);
+
+        const dashboard_demo = b.addExecutable(.{
+            .name = "data_dashboard_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/data_dashboard_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        dashboard_demo.linkLibC();
+        b.installArtifact(dashboard_demo);
+
+        const run_dashboard_demo = b.addRunArtifact(dashboard_demo);
+        const dashboard_demo_step = b.step("demo-data-dashboard", "Run the data-bound dashboard demo");
+        dashboard_demo_step.dependOn(&run_dashboard_demo.step);
+    }
+
+    // Stability Test Demo
+    if (features.basic_widgets) {
+        const stability_test = b.addExecutable(.{
+            .name = "stability_test_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/stability_test_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        b.installArtifact(stability_test);
+
+        const run_stability_test = b.addRunArtifact(stability_test);
+        const stability_test_step = b.step("demo-stability-test", "Run the stability test demo");
+        stability_test_step.dependOn(&run_stability_test.step);
     }
 
     // Grove Syntax Highlighting Demo
@@ -642,6 +730,26 @@ pub fn build(b: *std.Build) void {
         const run_grove_demo = b.addRunArtifact(grove_demo);
         const grove_demo_step = b.step("run-grove-demo", "Run the Grove syntax highlighting demo");
         grove_demo_step.dependOn(&run_grove_demo.step);
+    }
+
+    if (features.advanced and features.data_widgets) {
+        const terminal_session_demo = b.addExecutable(.{
+            .name = "terminal_session_integration",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/terminal_session_integration.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        terminal_session_demo.linkLibC();
+        b.installArtifact(terminal_session_demo);
+
+        const run_terminal_session_demo = b.addRunArtifact(terminal_session_demo);
+        const terminal_session_demo_step = b.step("demo-terminal-session", "Run the terminal session integration demo");
+        terminal_session_demo_step.dependOn(&run_terminal_session_demo.step);
     }
 
     // Just like flags, top level steps are also listed in the `--help` menu.

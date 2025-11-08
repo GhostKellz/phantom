@@ -1,0 +1,40 @@
+name: CI
+
+on:
+	push:
+		branches: ["main", "release/*"]
+	pull_request:
+		branches: ["*"]
+
+jobs:
+	build-and-test:
+		name: zig build test (${{ matrix.os }})
+		runs-on: ${{ matrix.os }}
+		strategy:
+			fail-fast: false
+			matrix:
+				os: [ubuntu-latest, macos-latest, windows-latest]
+		steps:
+			- name: Checkout repository
+				uses: actions/checkout@v4
+
+			- name: Set up Zig
+				uses: goto-bus-stop/setup-zig@v2
+				with:
+					version: 0.12.0
+
+			- name: Configure cache (zig-cache)
+				uses: actions/cache@v4
+				with:
+					path: |-
+						zig-cache
+						zig-out
+					key: ${{ runner.os }}-zig-${{ hashFiles('build.zig', 'build.zig.zon') }}
+					restore-keys: |
+						${{ runner.os }}-zig-
+
+			- name: Build tests
+				run: zig build
+
+			- name: Run test suite
+				run: zig build test

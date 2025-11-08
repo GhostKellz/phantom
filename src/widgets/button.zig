@@ -9,6 +9,7 @@ const MouseEvent = @import("../event.zig").MouseEvent;
 const MouseButton = @import("../event.zig").MouseButton;
 const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
+const theme_mod = @import("../theme/mod.zig");
 
 const Rect = geometry.Rect;
 const Style = style.Style;
@@ -26,16 +27,16 @@ pub const Button = struct {
     pressed_style: Style,
     focused_style: Style,
     disabled_style: Style,
-    
+
     // State
     is_hovered: bool = false,
     is_pressed: bool = false,
     is_focused: bool = false,
     is_disabled: bool = false,
-    
+
     // Callback
     on_click: ?OnClickFn = null,
-    
+
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
 
@@ -58,7 +59,55 @@ pub const Button = struct {
             .focused_style = Style.default().withBg(style.Color.green),
             .disabled_style = Style.default().withFg(style.Color.bright_black),
         };
+        button.applyThemeDefaults();
         return button;
+    }
+
+    fn applyThemeDefaults(self: *Button) void {
+        const manager = theme_mod.ThemeManager.global() orelse return;
+        const theme = manager.getActiveTheme();
+        const component_key = "button.primary";
+
+        var base_fg = theme.colors.background;
+        var base_bg = theme.colors.accent;
+        var base_attributes = style.Attributes.none();
+
+        if (theme.getComponentStyle(component_key)) |component| {
+            if (component.fg) |fg| base_fg = fg;
+            if (component.bg) |bg| base_bg = bg;
+            base_attributes = component.attributes;
+        }
+
+        if (theme.getComponentTypography(component_key)) |preset| {
+            base_attributes = preset.attributes;
+        }
+
+        var normal_style = Style.default();
+        normal_style.fg = base_fg;
+        normal_style.bg = base_bg;
+        normal_style.attributes = base_attributes;
+        self.normal_style = normal_style;
+
+        var hover_style = normal_style;
+        hover_style.bg = theme.getPaletteColor("accent_hover") orelse theme.colors.secondary;
+        self.hover_style = hover_style;
+
+        var pressed_style = normal_style;
+        pressed_style.bg = theme.colors.secondary;
+        pressed_style.attributes.bold = true;
+        self.pressed_style = pressed_style;
+
+        var focused_style = normal_style;
+        focused_style.bg = theme.getPaletteColor("surface_alt") orelse base_bg;
+        focused_style.attributes.underline = true;
+        self.focused_style = focused_style;
+
+        var disabled_style = Style.default();
+        disabled_style.fg = theme.colors.text_muted;
+        disabled_style.bg = theme.getPaletteColor("surface") orelse theme.colors.background_panel;
+        disabled_style.attributes = style.Attributes.none();
+        disabled_style.attributes.dim = true;
+        self.disabled_style = disabled_style;
     }
 
     pub fn setText(self: *Button, text: []const u8) !void {
@@ -116,23 +165,23 @@ pub const Button = struct {
         if (area.height == 0 or area.width == 0) return;
 
         const current_style = self.getCurrentStyle();
-        
+
         // Fill button background
         buffer.fill(area, Cell.withStyle(current_style));
-        
+
         // Calculate text position (center the text)
         const text_len = std.unicode.utf8CountCodepoints(self.text) catch self.text.len;
-        const text_x = if (area.width > text_len) 
+        const text_x = if (area.width > text_len)
             area.x + @as(u16, @intCast((area.width - text_len) / 2))
-        else 
+        else
             area.x;
         const text_y = area.y + area.height / 2;
-        
+
         // Render button text
         if (text_y < area.y + area.height) {
             buffer.writeText(text_x, text_y, self.text, current_style);
         }
-        
+
         // Draw button border (simple box drawing)
         if (area.width > 2 and area.height > 2) {
             // Top and bottom borders
@@ -141,14 +190,14 @@ pub const Button = struct {
                 buffer.setCell(x, area.y, Cell.init('─', current_style));
                 buffer.setCell(x, area.y + area.height - 1, Cell.init('─', current_style));
             }
-            
+
             // Left and right borders
             var y = area.y;
             while (y < area.y + area.height) : (y += 1) {
                 buffer.setCell(area.x, y, Cell.init('│', current_style));
                 buffer.setCell(area.x + area.width - 1, y, Cell.init('│', current_style));
             }
-            
+
             // Corners
             buffer.setCell(area.x, area.y, Cell.init('┌', current_style));
             buffer.setCell(area.x + area.width - 1, area.y, Cell.init('┐', current_style));
@@ -159,7 +208,7 @@ pub const Button = struct {
 
     fn handleEvent(widget: *Widget, event: Event) bool {
         const self: *Button = @fieldParentPtr("widget", widget);
-        
+
         if (self.is_disabled) return false;
 
         switch (event) {
@@ -183,8 +232,8 @@ pub const Button = struct {
             .mouse => |mouse| {
                 const pos = mouse.position;
                 const in_bounds = pos.x >= self.area.x and pos.x < self.area.x + self.area.width and
-                                pos.y >= self.area.y and pos.y < self.area.y + self.area.height;
-                
+                    pos.y >= self.area.y and pos.y < self.area.y + self.area.height;
+
                 if (in_bounds) {
                     switch (mouse.button) {
                         .left => {
@@ -202,7 +251,7 @@ pub const Button = struct {
                         },
                         else => {},
                     }
-                    
+
                     if (!self.is_hovered) {
                         self.is_hovered = true;
                         return true;

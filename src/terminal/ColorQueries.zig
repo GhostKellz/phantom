@@ -12,6 +12,7 @@ pub const ColorQueryManager = struct {
     pending_queries: std.HashMap(QueryType, QueryContext, QueryTypeContext, std.hash_map.default_max_load_percentage),
     color_cache: std.HashMap(ColorType, Color, ColorTypeContext, std.hash_map.default_max_load_percentage),
     response_timeout_ms: u32 = 1000,
+    timer: std.time.Timer,
 
     const QueryTypeContext = struct {
         pub fn hash(self: @This(), key: QueryType) u64 {
@@ -35,11 +36,12 @@ pub const ColorQueryManager = struct {
         }
     };
 
-    pub fn init(allocator: Allocator) ColorQueryManager {
+    pub fn init(allocator: Allocator) !ColorQueryManager {
         return ColorQueryManager{
             .allocator = allocator,
             .pending_queries = std.HashMap(QueryType, QueryContext, QueryTypeContext, std.hash_map.default_max_load_percentage).init(allocator),
             .color_cache = std.HashMap(ColorType, Color, ColorTypeContext, std.hash_map.default_max_load_percentage).init(allocator),
+            .timer = try std.time.Timer.start(),
         };
     }
 
@@ -54,7 +56,7 @@ pub const ColorQueryManager = struct {
 
         // Store query context
         try self.pending_queries.put(query_type, QueryContext{
-            .timestamp = std.time.milliTimestamp(),
+            .timestamp = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms)),
             .callback = null,
         });
 
@@ -173,7 +175,7 @@ pub const ColorQueryManager = struct {
 
     /// Clean up expired queries
     pub fn cleanupExpiredQueries(self: *ColorQueryManager) void {
-        const current_time = std.time.milliTimestamp();
+        const current_time = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
 
         var iterator = self.pending_queries.iterator();
         while (iterator.next()) |entry| {
@@ -500,7 +502,7 @@ test "ColorQueryManager" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
-    var manager = ColorQueryManager.init(arena.allocator());
+    var manager = try ColorQueryManager.init(arena.allocator());
     defer manager.deinit();
 
     // Test query generation

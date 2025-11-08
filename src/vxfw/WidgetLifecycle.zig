@@ -79,6 +79,7 @@ pub const LifecycleManager = struct {
     focused_widget: ?vxfw.Widget = null,
     next_tick_id: u32 = 1,
     tick_timers: std.array_list.AlignedManaged(TickTimer, null),
+    timer: std.time.Timer,
 
     const ManagedWidget = struct {
         widget: vxfw.Widget,
@@ -96,11 +97,12 @@ pub const LifecycleManager = struct {
         last_fire_ms: i64,
     };
 
-    pub fn init(allocator: Allocator) LifecycleManager {
+    pub fn init(allocator: Allocator) !LifecycleManager {
         return LifecycleManager{
             .allocator = allocator,
             .widgets = std.array_list.AlignedManaged(ManagedWidget, null).init(allocator),
             .tick_timers = std.array_list.AlignedManaged(TickTimer, null).init(allocator),
+            .timer = try std.time.Timer.start(),
         };
     }
 
@@ -208,7 +210,7 @@ pub const LifecycleManager = struct {
             .widget = widget,
             .tick_id = tick_id,
             .interval_ms = interval_ms,
-            .last_fire_ms = std.time.milliTimestamp(),
+            .last_fire_ms = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms)),
         };
 
         try self.tick_timers.append(self.allocator, timer);
@@ -223,7 +225,7 @@ pub const LifecycleManager = struct {
 
     /// Process tick events and send to widgets that need them
     pub fn processTicks(self: *LifecycleManager) !void {
-        const now_ms = std.time.milliTimestamp();
+        const now_ms = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
 
         for (self.tick_timers.items) |*timer| {
             if (now_ms - timer.last_fire_ms >= timer.interval_ms) {
@@ -370,7 +372,7 @@ pub const LifecycleManager = struct {
             },
             .tick => |tick| {
                 // Schedule a one-time tick event
-                const delay: u32 = @intCast(tick.deadline_ms - std.time.milliTimestamp());
+                const delay: u32 = @intCast(@max(0, tick.deadline_ms - @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms))));
                 _ = try self.scheduleTickEvents(tick.widget, delay);
             },
             else => {
@@ -382,7 +384,7 @@ pub const LifecycleManager = struct {
 };
 
 test "Widget lifecycle management" {
-    var lifecycle = LifecycleManager.init(std.testing.allocator);
+    var lifecycle = try LifecycleManager.init(std.testing.allocator);
     defer lifecycle.deinit();
 
     // Create a test widget

@@ -26,11 +26,12 @@ pub const StreamingText = struct {
     lines: std.ArrayList([]const u8),
     
     // Streaming state
+    timer: std.time.Timer,
     is_streaming: bool = false,
     typing_speed: u64 = 50, // Characters per second
     chunk_buffer: std.ArrayList(u8),
     current_chunk_index: usize = 0,
-    last_update_time: i64 = 0,
+    last_update_time: u64 = 0,
     
     // Scrolling
     scroll_offset: usize = 0,
@@ -68,6 +69,7 @@ pub const StreamingText = struct {
             .text = std.ArrayList(u8){},
             .lines = std.ArrayList([]const u8){},
             .chunk_buffer = std.ArrayList(u8){},
+            .timer = try std.time.Timer.start(),
             .text_style = Style.default(),
             .streaming_style = Style.default().withFg(style.Color.cyan),
             .cursor_style = Style.default().withFg(style.Color.white).withBg(style.Color.blue),
@@ -88,7 +90,7 @@ pub const StreamingText = struct {
 
     pub fn startStreaming(self: *StreamingText) void {
         self.is_streaming = true;
-        self.last_update_time = std.time.milliTimestamp();
+        self.last_update_time = self.timer.read() / std.time.ns_per_ms;
     }
 
     pub fn stopStreaming(self: *StreamingText) void {
@@ -258,8 +260,8 @@ pub const StreamingText = struct {
 
     fn updateStreaming(self: *StreamingText) !void {
         if (!self.is_streaming or self.chunk_buffer.items.len == 0) return;
-        
-        const current_time = std.time.milliTimestamp();
+
+        const current_time = self.timer.read() / std.time.ns_per_ms;
         const time_diff = current_time - self.last_update_time;
         
         if (time_diff < (1000 / self.typing_speed)) return; // Not enough time passed

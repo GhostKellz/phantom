@@ -15,9 +15,9 @@ const Style = style.Style;
 /// List item with rich content
 pub const ListViewItem = struct {
     text: []const u8,
-    secondary_text: ?[]const u8 = null,  // Right-aligned secondary text
-    icon: ?u21 = null,                    // Optional icon/glyph
-    metadata: ?*anyopaque = null,         // User data
+    secondary_text: ?[]const u8 = null, // Right-aligned secondary text
+    icon: ?u21 = null, // Optional icon/glyph
+    metadata: ?*anyopaque = null, // User data
     style: Style = Style.default(),
 };
 
@@ -85,6 +85,11 @@ pub const ListView = struct {
     /// Scroll offset (first visible item)
     scroll_offset: usize,
 
+    /// Virtualization control
+    virtual_enabled: bool = false,
+    virtual_total_count: usize = 0,
+    virtual_window_start: usize = 0,
+
     /// Styles
     item_style: Style,
     selected_style: Style,
@@ -120,6 +125,9 @@ pub const ListView = struct {
             .selected_index = null,
             .hovered_index = null,
             .scroll_offset = 0,
+            .virtual_enabled = false,
+            .virtual_total_count = 0,
+            .virtual_window_start = 0,
             .item_style = config.item_style,
             .selected_style = config.selected_style,
             .hovered_style = config.hovered_style,
@@ -175,6 +183,45 @@ pub const ListView = struct {
             fi.deinit(self.allocator);
             self.filtered_indices = null;
         }
+
+        self.virtual_enabled = false;
+        self.virtual_total_count = 0;
+        self.virtual_window_start = 0;
+    }
+
+    pub fn setVirtualTotal(self: *ListView, total: usize) void {
+        self.virtual_enabled = true;
+        self.virtual_total_count = total;
+        if (total == 0) {
+            self.scroll_offset = 0;
+            self.selected_index = null;
+            self.hovered_index = null;
+        } else {
+            if (self.scroll_offset >= total) {
+                self.scroll_offset = total - 1;
+            }
+            if (self.selected_index) |idx| {
+                if (idx >= total) {
+                    self.selected_index = total - 1;
+                }
+            }
+            if (self.hovered_index) |idx| {
+                if (idx >= total) {
+                    self.hovered_index = null;
+                }
+            }
+        }
+    }
+
+    pub fn setVirtualWindowStart(self: *ListView, start: usize) void {
+        if (!self.virtual_enabled) return;
+        self.virtual_window_start = start;
+    }
+
+    pub fn disableVirtualization(self: *ListView) void {
+        self.virtual_enabled = false;
+        self.virtual_total_count = 0;
+        self.virtual_window_start = 0;
     }
 
     pub fn selectNext(self: *ListView) void {
@@ -244,6 +291,18 @@ pub const ListView = struct {
             return;
         }
 
+        if (self.virtual_enabled) {
+            if (self.filter) |existing| {
+                self.allocator.free(existing);
+                self.filter = null;
+            }
+            if (self.filtered_indices) |*fi| {
+                fi.deinit(self.allocator);
+                self.filtered_indices = null;
+            }
+            return;
+        }
+
         self.filter = try self.allocator.dupe(u8, filter);
 
         // Build filtered indices
@@ -269,6 +328,9 @@ pub const ListView = struct {
     }
 
     fn getVisibleItemCount(self: *const ListView) usize {
+        if (self.virtual_enabled) {
+            return self.virtual_total_count;
+        }
         if (self.filtered_indices) |fi| {
             return fi.items.len;
         }
@@ -276,6 +338,13 @@ pub const ListView = struct {
     }
 
     fn getVisibleItem(self: *const ListView, index: usize) ?*const ListViewItem {
+        if (self.virtual_enabled) {
+            const window_start = self.virtual_window_start;
+            if (index < window_start) return null;
+            const local_index = index - window_start;
+            if (local_index >= self.items.items.len) return null;
+            return &self.items.items[local_index];
+        }
         if (self.filtered_indices) |fi| {
             if (index >= fi.items.len) return null;
             const real_index = fi.items[index];
@@ -521,6 +590,34 @@ test "ListView virtualization" {
 
     try std.testing.expect(list.items.items.len == 1000);
     try std.testing.expect(list.selected_index.? == 0);
+}
+
+test "ListView virtualization maps window indices" {
+    const allocator = std.testing.allocator;
+
+    const list = try ListView.init(allocator, ListViewConfig.default());
+    defer list.widget.vtable.deinit(&list.widget);
+
+    list.setVirtualTotal(50);
+    try std.testing.expectEqual(@as(usize, 50), list.getVisibleItemCount());
+
+    const makeItem = struct {
+        fn append(lv: *ListView, text: []const u8) !void {
+            const copy = try lv.allocator.dupe(u8, text);
+            try lv.items.append(lv.allocator, ListViewItem{ .text = copy });
+        }
+    };
+
+    try makeItem.append(list, "ten");
+    try makeItem.append(list, "eleven");
+    try makeItem.append(list, "twelve");
+
+    list.setVirtualWindowStart(10);
+    list.scroll_offset = 10;
+
+    const maybe_item = list.getVisibleItem(10);
+    try std.testing.expect(maybe_item != null);
+    try std.testing.expectEqualStrings("ten", maybe_item.?.text);
 }
 
 test "ListView filtering" {

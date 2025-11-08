@@ -10,6 +10,7 @@ const MouseButton = @import("../event.zig").MouseButton;
 const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
 const clipboard = @import("../clipboard.zig");
+const theme_mod = @import("../theme/mod.zig");
 
 const Rect = geometry.Rect;
 const Style = style.Style;
@@ -22,35 +23,35 @@ pub const OnSubmitFn = *const fn (input: *Input, text: []const u8) void;
 pub const Input = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
-    
+
     // Text content
     text: std.ArrayList(u8),
     placeholder: []const u8,
-    
+
     // Cursor and selection
     cursor_pos: usize = 0,
     selection_start: ?usize = null,
     scroll_offset: usize = 0,
-    
+
     // Styling
     normal_style: Style,
     focused_style: Style,
     placeholder_style: Style,
     selection_style: Style,
-    
+
     // State
     is_focused: bool = false,
     is_password: bool = false,
     password_char: u21 = '*',
     max_length: ?usize = null,
-    
+
     // Callbacks
     on_change: ?OnChangeFn = null,
     on_submit: ?OnSubmitFn = null,
-    
+
     // Clipboard
     clipboard_manager: ?*clipboard.ClipboardManager = null,
-    
+
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
 
@@ -73,7 +74,54 @@ pub const Input = struct {
             .placeholder_style = Style.default().withFg(style.Color.bright_black),
             .selection_style = Style.default().withBg(style.Color.cyan),
         };
+        input.applyThemeDefaults();
         return input;
+    }
+
+    fn applyThemeDefaults(self: *Input) void {
+        const manager = theme_mod.ThemeManager.global() orelse return;
+        const theme = manager.getActiveTheme();
+        const component_key = "input.field";
+
+        const surface = theme.getPaletteColor("surface") orelse theme.colors.background_panel;
+        const surface_alt = theme.getPaletteColor("surface_alt") orelse theme.colors.background_element;
+
+        var base_fg = theme.colors.text;
+        var base_bg = surface;
+        var base_attributes = style.Attributes.none();
+
+        if (theme.getComponentStyle(component_key)) |component| {
+            if (component.fg) |fg| base_fg = fg;
+            if (component.bg) |bg| base_bg = bg;
+            base_attributes = component.attributes;
+        }
+
+        if (theme.getComponentTypography(component_key)) |preset| {
+            base_attributes = preset.attributes;
+        }
+
+        var normal_style = Style.default();
+        normal_style.fg = base_fg;
+        normal_style.bg = base_bg;
+        normal_style.attributes = base_attributes;
+        self.normal_style = normal_style;
+
+        var focused_style = normal_style;
+        focused_style.bg = surface_alt;
+        focused_style.attributes.underline = true;
+        self.focused_style = focused_style;
+
+        var placeholder_style = normal_style;
+        placeholder_style.fg = theme.colors.text_muted;
+        placeholder_style.attributes = normal_style.attributes;
+        placeholder_style.attributes.italic = true;
+        self.placeholder_style = placeholder_style;
+
+        var selection_style = Style.default();
+        selection_style.bg = theme.colors.accent;
+        selection_style.fg = theme.colors.background;
+        selection_style.attributes = normal_style.attributes;
+        self.selection_style = selection_style;
     }
 
     pub fn setPlaceholder(self: *Input, placeholder: []const u8) !void {
@@ -146,11 +194,11 @@ pub const Input = struct {
         self.selection_start = 0;
         self.cursor_pos = self.text.items.len;
     }
-    
+
     pub fn setClipboardManager(self: *Input, manager: *clipboard.ClipboardManager) void {
         self.clipboard_manager = manager;
     }
-    
+
     pub fn copyToClipboard(self: *Input) void {
         if (self.clipboard_manager) |manager| {
             const text = self.getSelectedText();
@@ -159,7 +207,7 @@ pub const Input = struct {
             }
         }
     }
-    
+
     pub fn pasteFromClipboard(self: *Input) void {
         if (self.clipboard_manager) |manager| {
             if (manager.paste()) |text| {
@@ -168,7 +216,7 @@ pub const Input = struct {
             }
         }
     }
-    
+
     pub fn cutToClipboard(self: *Input) void {
         if (self.clipboard_manager) |manager| {
             const text = self.getSelectedText();
@@ -178,7 +226,7 @@ pub const Input = struct {
             }
         }
     }
-    
+
     pub fn getSelectedText(self: *Input) []const u8 {
         if (self.selection_start) |start| {
             const end = self.cursor_pos;
@@ -190,36 +238,36 @@ pub const Input = struct {
         }
         return "";
     }
-    
+
     pub fn insertText(self: *Input, text: []const u8) !void {
         if (self.selection_start != null) {
             self.deleteSelection();
         }
-        
+
         for (text) |char| {
             if (char >= 32 and char <= 126) { // Printable ASCII
                 try self.insertChar(char);
             }
         }
     }
-    
+
     pub fn deleteSelection(self: *Input) void {
         if (self.selection_start) |start| {
             const end = self.cursor_pos;
             if (start != end) {
                 const selection_start = @min(start, end);
                 const selection_end = @max(start, end);
-                
+
                 // Remove selected text
                 const new_text = self.allocator.alloc(u8, self.text.items.len - (selection_end - selection_start)) catch return;
                 defer self.allocator.free(new_text);
-                
+
                 @memcpy(new_text[0..selection_start], self.text.items[0..selection_start]);
                 @memcpy(new_text[selection_start..], self.text.items[selection_end..]);
-                
+
                 self.text.clearAndFree(self.allocator);
                 self.text.appendSlice(self.allocator, new_text) catch return;
-                
+
                 self.cursor_pos = selection_start;
                 self.selection_start = null;
                 self.updateScrollOffset();
@@ -248,23 +296,23 @@ pub const Input = struct {
         // Convert unicode codepoint to UTF-8
         var utf8_bytes: [4]u8 = undefined;
         const len = std.unicode.utf8Encode(c, &utf8_bytes) catch return;
-        
+
         // Delete selected text first
         if (self.selection_start) |start| {
             const end = self.cursor_pos;
             const delete_start = @min(start, end);
             const delete_end = @max(start, end);
-            
+
             _ = self.text.orderedRemove(delete_start);
             var i = delete_start;
             while (i < delete_end - 1) : (i += 1) {
                 _ = self.text.orderedRemove(delete_start);
             }
-            
+
             self.cursor_pos = delete_start;
             self.selection_start = null;
         }
-        
+
         // Insert new character
         try self.text.insertSlice(self.allocator, self.cursor_pos, utf8_bytes[0..len]);
         self.cursor_pos += len;
@@ -278,12 +326,12 @@ pub const Input = struct {
             const end = self.cursor_pos;
             const delete_start = @min(start, end);
             const delete_end = @max(start, end);
-            
+
             var i = delete_start;
             while (i < delete_end) : (i += 1) {
                 _ = self.text.orderedRemove(delete_start);
             }
-            
+
             self.cursor_pos = delete_start;
             self.selection_start = null;
         } else if (self.cursor_pos > 0) {
@@ -291,7 +339,7 @@ pub const Input = struct {
             _ = self.text.orderedRemove(self.cursor_pos - 1);
             self.cursor_pos -= 1;
         }
-        
+
         self.updateScrollOffset();
         self.notifyChange();
     }
@@ -332,7 +380,7 @@ pub const Input = struct {
 
     fn updateScrollOffset(self: *Input) void {
         const visible_width = if (self.area.width > 2) self.area.width - 2 else 0;
-        
+
         if (self.cursor_pos < self.scroll_offset) {
             self.scroll_offset = self.cursor_pos;
         } else if (self.cursor_pos >= self.scroll_offset + visible_width) {
@@ -347,10 +395,10 @@ pub const Input = struct {
         if (area.height == 0 or area.width == 0) return;
 
         const current_style = if (self.is_focused) self.focused_style else self.normal_style;
-        
+
         // Fill input background
         buffer.fill(area, Cell.withStyle(current_style));
-        
+
         // Draw border
         if (area.width > 2 and area.height > 0) {
             // Top and bottom borders
@@ -361,14 +409,14 @@ pub const Input = struct {
                     buffer.setCell(x, area.y + area.height - 1, Cell.init('─', current_style));
                 }
             }
-            
+
             // Left and right borders
             var y = area.y;
             while (y < area.y + area.height) : (y += 1) {
                 buffer.setCell(area.x, y, Cell.init('│', current_style));
                 buffer.setCell(area.x + area.width - 1, y, Cell.init('│', current_style));
             }
-            
+
             // Corners
             buffer.setCell(area.x, area.y, Cell.init('┌', current_style));
             buffer.setCell(area.x + area.width - 1, area.y, Cell.init('┐', current_style));
@@ -377,12 +425,12 @@ pub const Input = struct {
                 buffer.setCell(area.x + area.width - 1, area.y + area.height - 1, Cell.init('┘', current_style));
             }
         }
-        
+
         // Render text content
         if (area.width > 2 and area.height > 1) {
             const text_area = Rect.init(area.x + 1, area.y + 1, area.width - 2, area.height - 2);
             const text_y = text_area.y + text_area.height / 2;
-            
+
             if (self.text.items.len == 0) {
                 // Show placeholder
                 if (self.placeholder.len > 0) {
@@ -393,10 +441,10 @@ pub const Input = struct {
                 // Show actual text
                 const visible_start = @min(self.scroll_offset, self.text.items.len);
                 const visible_end = @min(visible_start + text_area.width, self.text.items.len);
-                
+
                 if (visible_start < visible_end) {
                     const visible_text = self.text.items[visible_start..visible_end];
-                    
+
                     if (self.is_password) {
                         // Render password characters
                         var i: u16 = 0;
@@ -408,7 +456,7 @@ pub const Input = struct {
                     }
                 }
             }
-            
+
             // Render cursor
             if (self.is_focused and self.cursor_pos >= self.scroll_offset) {
                 const cursor_x = text_area.x + @as(u16, @intCast(self.cursor_pos - self.scroll_offset));
@@ -487,11 +535,11 @@ pub const Input = struct {
             .mouse => |mouse| {
                 const pos = mouse.position;
                 const in_bounds = pos.x >= self.area.x and pos.x < self.area.x + self.area.width and
-                                pos.y >= self.area.y and pos.y < self.area.y + self.area.height;
-                
+                    pos.y >= self.area.y and pos.y < self.area.y + self.area.height;
+
                 if (in_bounds and mouse.button == .left and mouse.pressed) {
                     self.is_focused = true;
-                    
+
                     // Calculate cursor position from mouse click
                     if (self.area.width > 2 and self.area.height > 1) {
                         const text_x = pos.x - (self.area.x + 1);
@@ -499,7 +547,7 @@ pub const Input = struct {
                         self.cursor_pos = new_cursor_pos;
                         self.selection_start = null;
                     }
-                    
+
                     return true;
                 } else if (!in_bounds and mouse.button == .left and mouse.pressed) {
                     self.is_focused = false;
@@ -568,16 +616,16 @@ test "Input widget cursor movement" {
     defer input.widget.deinit();
 
     try input.setText("Hello");
-    
+
     input.moveCursorHome();
     try std.testing.expect(input.cursor_pos == 0);
-    
+
     input.moveCursorEnd();
     try std.testing.expect(input.cursor_pos == 5);
-    
+
     input.moveCursorLeft();
     try std.testing.expect(input.cursor_pos == 4);
-    
+
     input.moveCursorRight();
     try std.testing.expect(input.cursor_pos == 5);
 }

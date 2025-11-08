@@ -49,7 +49,7 @@ pub const Presets = struct {
 
     /// Create a time series line chart
     pub fn timeSeriesChart(allocator: std.mem.Allocator, title: []const u8) Chart {
-        var chart = Chart.init(allocator);
+        var chart = Chart.init(allocator, .{}) catch unreachable;
         _ = chart.setTitle(title)
             .setChartType(.line)
             .setShowGrid(true)
@@ -59,7 +59,7 @@ pub const Presets = struct {
 
     /// Create a scatter plot chart
     pub fn scatterChart(allocator: std.mem.Allocator, title: []const u8) Chart {
-        var chart = Chart.init(allocator);
+        var chart = Chart.init(allocator, .{}) catch unreachable;
         _ = chart.setTitle(title)
             .setChartType(.scatter)
             .setShowGrid(true)
@@ -69,7 +69,7 @@ pub const Presets = struct {
 
     /// Create a resource usage bar chart (CPU, Memory, Disk, Network)
     pub fn resourceBarChart(allocator: std.mem.Allocator) BarChart {
-        var chart = BarChart.init(allocator);
+        var chart = BarChart.init(allocator, .{}) catch unreachable;
         _ = chart.setOrientation(.horizontal)
             .setShowValues(true)
             .setShowLabels(true)
@@ -79,7 +79,7 @@ pub const Presets = struct {
 
     /// Create a comparison bar chart (vertical)
     pub fn comparisonBarChart(allocator: std.mem.Allocator, title: []const u8) BarChart {
-        var chart = BarChart.init(allocator);
+        var chart = BarChart.init(allocator, .{}) catch unreachable;
         _ = chart.setOrientation(.vertical)
             .setShowValues(true)
             .setShowLabels(true)
@@ -113,9 +113,9 @@ pub const DashboardLayouts = struct {
     pub fn classic(allocator: std.mem.Allocator, area: phantom.Rect) ![]phantom.Rect {
         // Vertical split: header, body, footer
         const vertical = phantom.ConstraintLayout.init(.vertical, &[_]phantom.Constraint{
-            .{ .length = 3 },   // Header
-            .{ .fill = 1 },     // Body
-            .{ .length = 1 },   // Footer
+            .{ .length = 3 }, // Header
+            .{ .fill = 1 }, // Body
+            .{ .length = 1 }, // Footer
         });
         const v_areas = try vertical.split(allocator, area);
 
@@ -144,9 +144,9 @@ pub const DashboardLayouts = struct {
     pub fn monitoring(allocator: std.mem.Allocator, area: phantom.Rect) ![]phantom.Rect {
         // Vertical: title, grid, status
         const vertical = phantom.ConstraintLayout.init(.vertical, &[_]phantom.Constraint{
-            .{ .length = 2 },   // Title
-            .{ .fill = 1 },     // Grid area
-            .{ .length = 1 },   // Status
+            .{ .length = 2 }, // Title
+            .{ .fill = 1 }, // Grid area
+            .{ .length = 1 }, // Status
         });
         const v_areas = try vertical.split(allocator, area);
 
@@ -173,12 +173,12 @@ pub const DashboardLayouts = struct {
 
         // Combine results
         var result = try allocator.alloc(phantom.Rect, 6);
-        result[0] = v_areas[0];  // Title
-        result[1] = top[0];      // Top left
-        result[2] = top[1];      // Top right
-        result[3] = bottom[0];   // Bottom left
-        result[4] = bottom[1];   // Bottom right
-        result[5] = v_areas[2];  // Status
+        result[0] = v_areas[0]; // Title
+        result[1] = top[0]; // Top left
+        result[2] = top[1]; // Top right
+        result[3] = bottom[0]; // Bottom left
+        result[4] = bottom[1]; // Bottom right
+        result[5] = v_areas[2]; // Status
 
         allocator.free(v_areas);
         allocator.free(grid_v);
@@ -192,9 +192,9 @@ pub const DashboardLayouts = struct {
     /// Returns: [header, messages_area, input_area]
     pub fn chatInterface(allocator: std.mem.Allocator, area: phantom.Rect) ![]phantom.Rect {
         const layout = phantom.ConstraintLayout.init(.vertical, &[_]phantom.Constraint{
-            .{ .length = 3 },   // Header (title, model info)
-            .{ .fill = 1 },     // Messages area (scrollable)
-            .{ .length = 3 },   // Input area
+            .{ .length = 3 }, // Header (title, model info)
+            .{ .fill = 1 }, // Messages area (scrollable)
+            .{ .length = 3 }, // Input area
         });
         return layout.split(allocator, area);
     }
@@ -203,9 +203,9 @@ pub const DashboardLayouts = struct {
     /// Returns: [title, editor_area, status_line]
     pub fn editorLayout(allocator: std.mem.Allocator, area: phantom.Rect) ![]phantom.Rect {
         const layout = phantom.ConstraintLayout.init(.vertical, &[_]phantom.Constraint{
-            .{ .length = 1 },   // Title
-            .{ .fill = 1 },     // Editor
-            .{ .length = 2 },   // Status line
+            .{ .length = 1 }, // Title
+            .{ .fill = 1 }, // Editor
+            .{ .length = 2 }, // Status line
         });
         return layout.split(allocator, area);
     }

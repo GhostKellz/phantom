@@ -27,10 +27,11 @@ pub const EventCoalescer = struct {
     config: CoalescingConfig,
 
     // Coalescing state
-    last_resize_time: ?i64 = null,
+    timer: std.time.Timer,
+    last_resize_time: ?u64 = null,
     last_resize_event: ?Event = null,
 
-    last_mouse_move_time: ?i64 = null,
+    last_mouse_move_time: ?u64 = null,
     last_mouse_move_pos: ?Position = null,
     last_mouse_move_event: ?Event = null,
 
@@ -38,6 +39,7 @@ pub const EventCoalescer = struct {
         return EventCoalescer{
             .allocator = allocator,
             .config = CoalescingConfig{},
+            .timer = std.time.Timer.start() catch unreachable,
         };
     }
 
@@ -45,6 +47,7 @@ pub const EventCoalescer = struct {
         return EventCoalescer{
             .allocator = allocator,
             .config = config,
+            .timer = std.time.Timer.start() catch unreachable,
         };
     }
 
@@ -55,7 +58,7 @@ pub const EventCoalescer = struct {
     /// Process a single event, returning whether it should be dispatched now
     /// If the event is coalesced, it's stored internally and will be dispatched later
     pub fn processEvent(self: *EventCoalescer, event: Event) CoalesceResult {
-        const now = std.time.milliTimestamp();
+        const now = self.timer.read() / std.time.ns_per_ms;
 
         switch (event) {
             .system => |sys| {
@@ -78,7 +81,7 @@ pub const EventCoalescer = struct {
 
     /// Flush any pending coalesced events that have passed their debounce time
     pub fn flushPending(self: *EventCoalescer, events: *std.ArrayList(Event)) !void {
-        const now = std.time.milliTimestamp();
+        const now = self.timer.read() / std.time.ns_per_ms;
 
         // Flush resize event if debounce time elapsed
         if (self.last_resize_event) |event| {
@@ -112,14 +115,14 @@ pub const EventCoalescer = struct {
         };
     }
 
-    fn handleResizeEvent(self: *EventCoalescer, event: Event, now: i64) CoalesceResult {
+    fn handleResizeEvent(self: *EventCoalescer, event: Event, now: u64) CoalesceResult {
         // Store the latest resize event
         self.last_resize_event = event;
         self.last_resize_time = now;
         return .coalesced;
     }
 
-    fn handleMouseMoveEvent(self: *EventCoalescer, event: Event, pos: Position, now: i64) CoalesceResult {
+    fn handleMouseMoveEvent(self: *EventCoalescer, event: Event, pos: Position, now: u64) CoalesceResult {
         // If this is a different position, update the stored event
         if (self.last_mouse_move_pos == null or
             !self.last_mouse_move_pos.?.equals(pos)) {
@@ -175,7 +178,7 @@ test "EventCoalescer resize coalescing" {
     defer events.deinit();
 
     // Wait for debounce time
-    std.time.sleep(60 * std.time.ns_per_ms);
+    std.posix.nanosleep(0, 60 * std.time.ns_per_ms);
 
     try coalescer.flushPending(&events);
 
@@ -225,7 +228,7 @@ test "EventCoalescer mouse move coalescing" {
     var events = std.ArrayList(Event).init(testing.allocator);
     defer events.deinit();
 
-    std.time.sleep(20 * std.time.ns_per_ms);
+    std.posix.nanosleep(0, 20 * std.time.ns_per_ms);
     try coalescer.flushPending(&events);
 
     // Should have only the last mouse position

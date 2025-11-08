@@ -139,8 +139,7 @@ fn renderResourceBarChart(buffer: *phantom.Buffer, area: phantom.Rect) !void {
     var chart = phantom.widgets.Presets.resourceBarChart(buffer.allocator);
     defer chart.deinit();
 
-    const values = [_]f64{ global_state.cpu_usage, global_state.memory_usage, global_state.disk_usage,
-                           global_state.network_in * 10, global_state.network_out * 10 };
+    const values = [_]f64{ global_state.cpu_usage, global_state.memory_usage, global_state.disk_usage, global_state.network_in * 10, global_state.network_out * 10 };
     try chart.addDataset("Usage", @constCast(&values), phantom.Color.green);
 
     chart.render(buffer, area);
@@ -189,7 +188,7 @@ fn renderTimeSeriesChart(buffer: *phantom.Buffer, area: phantom.Rect) !void {
 }
 
 fn renderCanvasDemo(buffer: *phantom.Buffer, area: phantom.Rect) !void {
-    var canvas = phantom.widgets.Canvas.init(buffer.allocator, 40, 20);
+    var canvas = try phantom.widgets.Canvas.init(buffer.allocator, .{ .width = 40, .height = 20 });
     defer canvas.deinit();
 
     // Draw some shapes
@@ -214,19 +213,13 @@ fn renderCanvasDemo(buffer: *phantom.Buffer, area: phantom.Rect) !void {
 
 fn renderStatusBar(buffer: *phantom.Buffer, area: phantom.Rect) !void {
     // Show frame counter and sparklines
-    const status = try std.fmt.allocPrint(buffer.allocator,
-        "Frame: {d} | CPU Trend:", .{global_state.frame});
+    const status = try std.fmt.allocPrint(buffer.allocator, "Frame: {d} | CPU Trend:", .{global_state.frame});
     defer buffer.allocator.free(status);
 
     buffer.writeText(area.x, area.y, status, phantom.Style.default().withFg(phantom.Color.bright_black));
 
     // Sparkline showing recent CPU history
     var spark = phantom.widgets.Presets.statusBarSparkline(buffer.allocator, @constCast(&global_state.metrics_history));
-    const spark_area = phantom.Rect{
-        .x = area.x + @as(u16, @intCast(status.len)) + 2,
-        .y = area.y,
-        .width = area.width - @as(u16, @intCast(status.len)) - 2,
-        .height = 1
-    };
+    const spark_area = phantom.Rect{ .x = area.x + @as(u16, @intCast(status.len)) + 2, .y = area.y, .width = area.width - @as(u16, @intCast(status.len)) - 2, .height = 1 };
     spark.render(buffer, spark_area);
 }

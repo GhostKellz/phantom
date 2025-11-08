@@ -15,6 +15,7 @@ max_cache_size: usize,
 current_cache_size: usize,
 gpu_cache: ?GPUGlyphCache,
 statistics: CacheStatistics,
+timer: std.time.Timer,
 
 pub const GlyphKey = struct {
     codepoint: u21,
@@ -195,6 +196,7 @@ pub fn init(allocator: Allocator, config: CacheConfig) !Self {
         .current_cache_size = 0,
         .gpu_cache = null,
         .statistics = .{},
+        .timer = try std.time.Timer.start(),
     };
 
     // Initialize GPU cache if enabled
@@ -250,7 +252,7 @@ pub fn put(self: *Self, key: GlyphKey, glyph_data: GlyphData) !void {
         .lru_node = .{},
         .key = key,
         .size_bytes = size_bytes,
-        .last_access_time = std.time.milliTimestamp(),
+        .last_access_time = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms)),
         .access_count = 1,
     };
 
@@ -315,7 +317,7 @@ fn touchEntry(self: *Self, entry: *CacheEntry) void {
     self.lru_list.remove(&entry.lru_node);
     self.lru_list.append(&entry.lru_node);
 
-    entry.last_access_time = std.time.milliTimestamp();
+    entry.last_access_time = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms));
     entry.access_count += 1;
 }
 

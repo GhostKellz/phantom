@@ -3,6 +3,7 @@
 
 const std = @import("std");
 const phantom = @import("../root.zig");
+const time_utils = @import("../time/utils.zig");
 const Rect = phantom.Rect;
 const Position = phantom.Position;
 const Color = phantom.Color;
@@ -49,7 +50,7 @@ pub const Calendar = struct {
 
     /// Initialize Calendar
     pub fn init(allocator: std.mem.Allocator) Calendar {
-        const now = std.time.timestamp();
+        const now = time_utils.unixTimestampSeconds();
         const epoch_day = @divFloor(now, 86400);
         const date = epochDayToDate(epoch_day);
 
@@ -123,7 +124,7 @@ pub const Calendar = struct {
 
     /// Get today's date
     pub fn getToday() Date {
-        const now = std.time.timestamp();
+        const now = time_utils.unixTimestampSeconds();
         const epoch_day = @divFloor(now, 86400);
         return epochDayToDate(epoch_day);
     }

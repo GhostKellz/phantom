@@ -1,5 +1,6 @@
 //! Input widget for text input fields
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
@@ -25,7 +26,7 @@ pub const Input = struct {
     allocator: std.mem.Allocator,
 
     // Text content
-    text: std.ArrayList(u8),
+    text: ArrayList(u8),
     placeholder: []const u8,
 
     // Cursor and selection
@@ -67,7 +68,7 @@ pub const Input = struct {
         input.* = Input{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .text = std.ArrayList(u8){},
+            .text = ArrayList(u8).init(allocator),
             .placeholder = "",
             .normal_style = Style.default(),
             .focused_style = Style.default().withBg(style.Color.blue),
@@ -129,8 +130,8 @@ pub const Input = struct {
     }
 
     pub fn setText(self: *Input, text: []const u8) !void {
-        self.text.clearAndFree(self.allocator);
-        try self.text.appendSlice(self.allocator, text);
+        self.text.clearAndFree();
+        try self.text.appendSlice(text);
         self.cursor_pos = @min(self.cursor_pos, self.text.items.len);
         self.selection_start = null;
         self.updateScrollOffset();
@@ -183,7 +184,7 @@ pub const Input = struct {
     }
 
     pub fn clear(self: *Input) void {
-        self.text.clearAndFree(self.allocator);
+        self.text.clearAndFree();
         self.cursor_pos = 0;
         self.selection_start = null;
         self.scroll_offset = 0;
@@ -265,8 +266,8 @@ pub const Input = struct {
                 @memcpy(new_text[0..selection_start], self.text.items[0..selection_start]);
                 @memcpy(new_text[selection_start..], self.text.items[selection_end..]);
 
-                self.text.clearAndFree(self.allocator);
-                self.text.appendSlice(self.allocator, new_text) catch return;
+                self.text.clearAndFree();
+                self.text.appendSlice(new_text) catch return;
 
                 self.cursor_pos = selection_start;
                 self.selection_start = null;
@@ -314,7 +315,7 @@ pub const Input = struct {
         }
 
         // Insert new character
-        try self.text.insertSlice(self.allocator, self.cursor_pos, utf8_bytes[0..len]);
+        try self.text.insertSlice(self.cursor_pos, utf8_bytes[0..len]);
         self.cursor_pos += len;
         self.updateScrollOffset();
         self.notifyChange();
@@ -568,7 +569,7 @@ pub const Input = struct {
 
     fn deinit(widget: *Widget) void {
         const self: *Input = @fieldParentPtr("widget", widget);
-        self.text.deinit(self.allocator);
+        self.text.deinit();
         self.allocator.free(self.placeholder);
         self.allocator.destroy(self);
     }

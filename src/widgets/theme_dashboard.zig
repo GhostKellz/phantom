@@ -10,6 +10,7 @@ const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
 const data = @import("../data/list_source.zig");
 const theme_pkg = @import("../theme/mod.zig");
+const time_utils = @import("../time/utils.zig");
 
 const Rect = geometry.Rect;
 const Style = style.Style;
@@ -17,7 +18,7 @@ const Color = style.Color;
 const Theme = theme_pkg.Theme;
 
 fn nowMillis() i64 {
-    return std.time.milliTimestamp() catch 0;
+    return time_utils.unixTimestampMillis();
 }
 
 /// Classifies the provenance of a theme token.

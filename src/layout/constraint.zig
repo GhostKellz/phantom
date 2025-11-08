@@ -2,6 +2,7 @@
 //! Provides declarative space distribution with automatic calculation
 
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const phantom = @import("../root.zig");
 const Rect = phantom.Rect;
 
@@ -75,10 +76,8 @@ pub const Layout = struct {
     }
 
     /// Split area according to constraints
+    /// NOTE: This API is stable but deprecated. Migrate to layout.engine.LayoutBuilder for new code.
     pub fn split(self: Layout, allocator: std.mem.Allocator, area: Rect) ![]Rect {
-        comptime {
-            @compileLog("layout.constraint.Layout.split is deprecated; migrate to layout.engine.LayoutBuilder or layout.migration helpers.");
-        }
         if (self.constraints.len == 0) {
             return &[_]Rect{};
         }
@@ -196,13 +195,13 @@ pub const Layout = struct {
             const remaining_u16: u16 = @intCast(remaining_space);
 
             // Sort fill constraints by priority
-            var fill_items = std.ArrayList(struct { idx: usize, priority: u16 }){};
-            defer fill_items.deinit(allocator);
+            var fill_items = ArrayList(struct { idx: usize, priority: u16 }).init(allocator);
+            defer fill_items.deinit();
 
             for (self.constraints, 0..) |constraint, i| {
                 switch (constraint) {
-                    .fill => |priority| try fill_items.append(allocator, .{ .idx = i, .priority = priority }),
-                    .min => try fill_items.append(allocator, .{ .idx = i, .priority = 1 }),
+                    .fill => |priority| try fill_items.append(.{ .idx = i, .priority = priority }),
+                    .min => try fill_items.append(.{ .idx = i, .priority = 1 }),
                     else => {},
                 }
             }

@@ -2,6 +2,7 @@
 //! Provides variable registration, constraint management, and basic solving
 
 const std = @import("std");
+const ArrayListUnmanaged = std.ArrayListUnmanaged;
 const Rect = @import("../../geometry.zig").Rect;
 
 pub const Strength = enum(u8) {
@@ -64,9 +65,9 @@ pub const SolveError = error{
 
 pub const ConstraintSpace = struct {
     allocator: std.mem.Allocator,
-    variables: std.ArrayListUnmanaged(u8),
-    constraints: std.ArrayListUnmanaged(Constraint),
-    non_negative: std.ArrayListUnmanaged(Variable),
+    variables: ArrayListUnmanaged(u8),
+    constraints: ArrayListUnmanaged(Constraint),
+    non_negative: ArrayListUnmanaged(Variable),
 
     pub fn init(allocator: std.mem.Allocator) ConstraintSpace {
         return ConstraintSpace{
@@ -92,7 +93,7 @@ pub const ConstraintSpace = struct {
     }
 
     pub fn addConstraint(self: *ConstraintSpace, spec: ConstraintSpec) !void {
-        var terms_buffer = std.ArrayListUnmanaged(Term){};
+        var terms_buffer = ArrayListUnmanaged(Term){};
         defer terms_buffer.deinit(self.allocator);
 
         try terms_buffer.ensureTotalCapacity(self.allocator, spec.terms.len + 1);

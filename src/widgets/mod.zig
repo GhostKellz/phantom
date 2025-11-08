@@ -78,6 +78,9 @@ pub const BarChart = if (config.enable_data_widgets) @import("bar_chart.zig").Ba
 pub const Chart = if (config.enable_data_widgets) @import("chart.zig").Chart else void;
 pub const Gauge = if (config.enable_data_widgets) @import("gauge.zig").Gauge else void;
 pub const Sparkline = if (config.enable_data_widgets) @import("sparkline.zig").Sparkline else void;
+pub const Scrollbar = if (config.enable_basic_widgets) @import("scrollbar.zig").Scrollbar else void;
+pub const ScrollbarState = if (config.enable_basic_widgets) @import("scrollbar.zig").ScrollbarState else void;
+pub const ScrollbarOrientation = if (config.enable_basic_widgets) @import("scrollbar.zig").ScrollbarOrientation else void;
 pub const Calendar = if (config.enable_advanced) @import("calendar.zig").Calendar else void;
 pub const Canvas = if (config.enable_advanced) @import("canvas.zig").Canvas else void;
 

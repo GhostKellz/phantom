@@ -1,5 +1,6 @@
 //! Animation system for Phantom TUI
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const geometry = @import("geometry.zig");
 const style = @import("style.zig");
 
@@ -101,8 +102,8 @@ pub const Transition = struct {
     state: TransitionState = .idle,
     progress: f32 = 0.0,
     driver: Animation,
-    tracks: std.ArrayList(TransitionTrack),
-    listeners: std.ArrayList(ListenerEntry),
+    tracks: ArrayList(TransitionTrack),
+    listeners: ArrayList(ListenerEntry),
 
     const ListenerEntry = struct {
         callback: *const fn (transition: *Transition, event: TransitionEvent, context: ?*anyopaque) void,
@@ -132,19 +133,19 @@ pub const Transition = struct {
             .spec = spec,
             .phase = spec.phase,
             .driver = driver,
-            .tracks = std.ArrayList(TransitionTrack).init(allocator),
-            .listeners = std.ArrayList(ListenerEntry).init(allocator),
+            .tracks = ArrayList(TransitionTrack).init(allocator),
+            .listeners = ArrayList(ListenerEntry).init(allocator),
         };
     }
 
     pub fn deinit(self: *Transition) void {
-        self.tracks.deinit(self.allocator);
-        self.listeners.deinit(self.allocator);
+        self.tracks.deinit();
+        self.listeners.deinit();
         self.driver.deinit();
     }
 
     pub fn addTrack(self: *Transition, track: TransitionTrack) !void {
-        try self.tracks.append(self.allocator, track);
+        try self.tracks.append(track);
     }
 
     pub fn start(self: *Transition) void {
@@ -241,7 +242,7 @@ pub const Transition = struct {
         listener: *const fn (transition: *Transition, event: TransitionEvent, context: ?*anyopaque) void,
         context: ?*anyopaque,
     ) !void {
-        try self.listeners.append(self.allocator, .{ .callback = listener, .context = context });
+        try self.listeners.append(.{ .callback = listener, .context = context });
     }
 
     fn notify(self: *Transition, event: TransitionEvent) void {
@@ -328,27 +329,27 @@ pub const TransitionManager = struct {
     }
 
     pub fn update(self: *TransitionManager) void {
-        const Context = struct {
-            manager: *TransitionManager,
-        };
+        // Iterate and remove completed/cancelled transitions
+        var it = self.transitions.iterator();
+        var to_remove = ArrayList(TransitionId).init(self.allocator);
+        defer to_remove.deinit();
 
-        var context = Context{ .manager = self };
+        while (it.next()) |entry| {
+            const id = entry.key_ptr.*;
+            const transition = entry.value_ptr.*;
+            const changed = transition.update();
+            _ = changed;
 
-        self.transitions.retain(struct {
-            fn keep(id: TransitionId, transition: *Transition, ctx: *Context) bool {
-                _ = id;
-                const changed = transition.update();
-                _ = changed;
-
-                if ((transition.state == .completed or transition.state == .cancelled) and transition.spec.auto_remove) {
-                    transition.deinit();
-                    ctx.manager.allocator.destroy(transition);
-                    return false;
-                }
-
-                return true;
+            if ((transition.state == .completed or transition.state == .cancelled) and transition.spec.auto_remove) {
+                transition.deinit();
+                self.allocator.destroy(transition);
+                to_remove.append(id) catch {}; // Best effort
             }
-        }.keep, &context);
+        }
+
+        for (to_remove.items) |id| {
+            _ = self.transitions.remove(id);
+        }
     }
 
     pub fn hasActive(self: *const TransitionManager) bool {
@@ -576,7 +577,7 @@ pub const Animation = struct {
     allocator: std.mem.Allocator,
 
     // Keyframes
-    keyframes: std.ArrayList(Keyframe),
+    keyframes: ArrayList(Keyframe),
 
     // Timing
     duration_ms: u64,
@@ -598,18 +599,18 @@ pub const Animation = struct {
     pub fn init(allocator: std.mem.Allocator, duration_ms: u64) Animation {
         return Animation{
             .allocator = allocator,
-            .keyframes = std.ArrayList(Keyframe).init(allocator),
+            .keyframes = ArrayList(Keyframe).init(allocator),
             .duration_ms = duration_ms,
             .timer = std.time.Timer.start() catch unreachable,
         };
     }
 
     pub fn deinit(self: *Animation) void {
-        self.keyframes.deinit(self.allocator);
+        self.keyframes.deinit();
     }
 
     pub fn addKeyframe(self: *Animation, keyframe: Keyframe) !void {
-        try self.keyframes.append(self.allocator, keyframe);
+        try self.keyframes.append(keyframe);
 
         // Sort keyframes by time
         std.sort.block(Keyframe, self.keyframes.items, {}, struct {
@@ -799,21 +800,21 @@ pub const Animation = struct {
 /// Animation manager for handling multiple animations
 pub const AnimationManager = struct {
     allocator: std.mem.Allocator,
-    animations: std.ArrayList(*Animation),
+    animations: ArrayList(*Animation),
 
     pub fn init(allocator: std.mem.Allocator) AnimationManager {
         return AnimationManager{
             .allocator = allocator,
-            .animations = std.ArrayList(*Animation).init(allocator),
+            .animations = ArrayList(*Animation).init(allocator),
         };
     }
 
     pub fn deinit(self: *AnimationManager) void {
-        self.animations.deinit(self.allocator);
+        self.animations.deinit();
     }
 
     pub fn addAnimation(self: *AnimationManager, animation: *Animation) !void {
-        try self.animations.append(self.allocator, animation);
+        try self.animations.append(animation);
     }
 
     pub fn removeAnimation(self: *AnimationManager, animation: *Animation) void {

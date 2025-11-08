@@ -1,5 +1,6 @@
 //! Toast overlay widget for transient notifications.
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const SizeConstraints = @import("../widget.zig").SizeConstraints;
 const Buffer = @import("../terminal.zig").Buffer;
@@ -8,13 +9,16 @@ const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
 const Event = @import("../event.zig").Event;
 const Key = @import("../event.zig").Key;
+const time_utils = @import("../time/utils.zig");
 
 const Rect = geometry.Rect;
 const Style = style.Style;
 const math = std.math;
 
 fn nowMillis() usize {
-    return @as(usize, @intCast(std.time.milliTimestamp() catch 0));
+    const ts = time_utils.unixTimestampMillis();
+    const clamped = if (ts < 0) 0 else ts;
+    return @intCast(clamped);
 }
 
 pub const ToastOverlay = struct {
@@ -51,7 +55,7 @@ pub const ToastOverlay = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
     config: Config,
-    toasts: std.ArrayList(Toast),
+    toasts: ArrayList(Toast),
 
     const Toast = struct {
         message: []u8,
@@ -73,7 +77,7 @@ pub const ToastOverlay = struct {
             .widget = .{ .vtable = &vtable },
             .allocator = allocator,
             .config = config,
-            .toasts = std.ArrayList(Toast).init(allocator),
+            .toasts = ArrayList(Toast).init(allocator),
         };
         return self;
     }

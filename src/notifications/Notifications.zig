@@ -3,6 +3,7 @@
 
 const std = @import("std");
 const vxfw = @import("../vxfw.zig");
+const time_utils = @import("../time/utils.zig");
 
 const Allocator = std.mem.Allocator;
 
@@ -63,7 +64,7 @@ pub const NotificationManager = struct {
             .id = id,
             .title = try self.allocator.dupe(u8, notification.title),
             .message = try self.allocator.dupe(u8, notification.message),
-            .timestamp = std.time.timestamp(),
+            .timestamp = time_utils.unixTimestampSeconds(),
         };
         try self.notifications.append(active);
 
@@ -153,19 +154,16 @@ pub const NotificationManager = struct {
         defer arena.deinit();
 
         // Build D-Bus command
-        const dbus_cmd = try std.fmt.allocPrint(arena.allocator(),
-            "dbus-send --session --dest=org.freedesktop.Notifications " ++
+        const dbus_cmd = try std.fmt.allocPrint(arena.allocator(), "dbus-send --session --dest=org.freedesktop.Notifications " ++
             "/org/freedesktop/Notifications org.freedesktop.Notifications.Notify " ++
             "string:'{s}' uint32:0 string:'{s}' string:'{s}' string:'{s}' " ++
-            "array:string: dict:string:variant: int32:{d}",
-            .{
-                self.app_name,
-                notification.icon orelse "",
-                notification.title,
-                notification.message,
-                notification.timeout_ms,
-            }
-        );
+            "array:string: dict:string:variant: int32:{d}", .{
+            self.app_name,
+            notification.icon orelse "",
+            notification.title,
+            notification.message,
+            notification.timeout_ms,
+        });
 
         var cmd_args = [_][]const u8{ "sh", "-c", dbus_cmd };
         var child = std.ChildProcess.init(&cmd_args, self.allocator);
@@ -182,8 +180,7 @@ pub const NotificationManager = struct {
         defer arena.deinit();
 
         // Use PowerShell to show toast notification
-        const ps_script = try std.fmt.allocPrint(arena.allocator(),
-            "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, " ++
+        const ps_script = try std.fmt.allocPrint(arena.allocator(), "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, " ++
             "ContentType = WindowsRuntime] > $null; " ++
             "$template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent(" ++
             "[Windows.UI.Notifications.ToastTemplateType]::ToastText02); " ++
@@ -191,9 +188,7 @@ pub const NotificationManager = struct {
             "$toastXml.GetElementsByTagName('text')[0].AppendChild($toastXml.CreateTextNode('{s}')) > $null; " ++
             "$toastXml.GetElementsByTagName('text')[1].AppendChild($toastXml.CreateTextNode('{s}')) > $null; " ++
             "$toast = [Windows.UI.Notifications.ToastNotification]::new($toastXml); " ++
-            "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{s}').Show($toast)",
-            .{ notification.title, notification.message, self.app_name }
-        );
+            "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('{s}').Show($toast)", .{ notification.title, notification.message, self.app_name });
 
         var cmd_args = [_][]const u8{ "powershell", "-Command", ps_script };
         var child = std.ChildProcess.init(&cmd_args, self.allocator);
@@ -213,10 +208,7 @@ pub const NotificationManager = struct {
         try cmd_args.append("osascript");
         try cmd_args.append("-e");
 
-        const script = try std.fmt.allocPrint(arena.allocator(),
-            "display notification \"{s}\" with title \"{s}\"",
-            .{ notification.message, notification.title }
-        );
+        const script = try std.fmt.allocPrint(arena.allocator(), "display notification \"{s}\" with title \"{s}\"", .{ notification.message, notification.title });
         try cmd_args.append(script);
 
         var child = std.ChildProcess.init(cmd_args.items, self.allocator);
@@ -244,16 +236,12 @@ pub const NotificationManager = struct {
     }
 
     fn closeDbus(self: *NotificationManager, id: NotificationId) !void {
-
         var arena = std.heap.ArenaAllocator.init(self.allocator);
         defer arena.deinit();
 
-        const dbus_cmd = try std.fmt.allocPrint(arena.allocator(),
-            "dbus-send --session --dest=org.freedesktop.Notifications " ++
+        const dbus_cmd = try std.fmt.allocPrint(arena.allocator(), "dbus-send --session --dest=org.freedesktop.Notifications " ++
             "/org/freedesktop/Notifications org.freedesktop.Notifications.CloseNotification " ++
-            "uint32:{d}",
-            .{id}
-        );
+            "uint32:{d}", .{id});
 
         var cmd_args = [_][]const u8{ "sh", "-c", dbus_cmd };
         var child = std.ChildProcess.init(&cmd_args, self.allocator);
@@ -277,7 +265,7 @@ pub const NotificationManager = struct {
     /// Generate unique notification ID
     fn generateId(self: *NotificationManager) NotificationId {
         _ = self;
-        return @as(NotificationId, @intCast(std.time.timestamp()));
+        return @as(NotificationId, @intCast(time_utils.unixTimestampSeconds()));
     }
 };
 
@@ -323,12 +311,12 @@ fn commandExists(allocator: Allocator, command: []const u8) bool {
 
 /// Notification backend types
 pub const NotificationBackend = enum {
-    libnotify,  // Linux - notify-send
-    dbus,       // Linux - D-Bus notifications
-    windows,    // Windows - Toast notifications
-    macos,      // macOS - osascript
+    libnotify, // Linux - notify-send
+    dbus, // Linux - D-Bus notifications
+    windows, // Windows - Toast notifications
+    macos, // macOS - osascript
     terminal_bell, // Fallback - terminal bell
-    none,       // No support
+    none, // No support
 };
 
 /// Notification configuration

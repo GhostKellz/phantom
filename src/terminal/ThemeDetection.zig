@@ -2,6 +2,7 @@
 //! Provides comprehensive theme detection using multiple methods
 
 const std = @import("std");
+const time_utils = @import("../time/utils.zig");
 const vxfw = @import("../vxfw.zig");
 const ColorQueries = @import("ColorQueries.zig");
 
@@ -112,11 +113,7 @@ pub const ThemeDetector = struct {
                 .theme = if (is_light) .light else .dark,
                 .confidence = confidence,
                 .method = .background_color,
-                .details = try std.fmt.allocPrint(
-                    self.allocator,
-                    "Background luminance: {d:.2}, RGB: ({d}, {d}, {d})",
-                    .{ luminance, bg_color.r, bg_color.g, bg_color.b }
-                ),
+                .details = try std.fmt.allocPrint(self.allocator, "Background luminance: {d:.2}, RGB: ({d}, {d}, {d})", .{ luminance, bg_color.r, bg_color.g, bg_color.b }),
             };
         }
 
@@ -132,9 +129,9 @@ pub const ThemeDetector = struct {
     fn detectFromEnvironment(self: *ThemeDetector) MethodResult {
         // Check common environment variables
         const env_vars = [_][]const u8{
-            "COLORFGBG",        // Terminal colors
-            "TERM_THEME",       // Custom theme variable
-            "GTK_THEME",        // GTK theme
+            "COLORFGBG", // Terminal colors
+            "TERM_THEME", // Custom theme variable
+            "GTK_THEME", // GTK theme
             "QT_STYLE_OVERRIDE", // Qt theme
         };
 
@@ -146,11 +143,7 @@ pub const ThemeDetector = struct {
                         .theme = theme,
                         .confidence = 0.7,
                         .method = .environment_variable,
-                        .details = try std.fmt.allocPrint(
-                            self.allocator,
-                            "{s}={s}",
-                            .{ var_name, value }
-                        ),
+                        .details = try std.fmt.allocPrint(self.allocator, "{s}={s}", .{ var_name, value }),
                     };
                 }
             }
@@ -226,7 +219,7 @@ pub const ThemeDetector = struct {
 
     /// Detect theme based on time of day
     fn detectFromTime(self: *ThemeDetector) MethodResult {
-        const timestamp = std.time.timestamp();
+        const timestamp = time_utils.unixTimestampSeconds();
         const seconds_since_midnight = @mod(timestamp, 86400); // 24 hours in seconds
         const hour = @divFloor(seconds_since_midnight, 3600);
 
@@ -299,11 +292,7 @@ pub const ThemeDetector = struct {
                 .theme = if (is_dark) .dark else .light,
                 .confidence = 0.9,
                 .method = .system_preference,
-                .details = try std.fmt.allocPrint(
-                    self.allocator,
-                    "macOS dark mode: {s}",
-                    .{output_str}
-                ),
+                .details = try std.fmt.allocPrint(self.allocator, "macOS dark mode: {s}", .{output_str}),
             };
         } else |_| {}
 
@@ -393,7 +382,7 @@ fn parseThemeFromValue(value: []const u8) Theme {
 
     // Check COLORFGBG format: "15;0" (light fg, dark bg) means dark theme
     if (std.mem.indexOf(u8, value, ";")) |semicolon| {
-        const bg_str = value[semicolon + 1..];
+        const bg_str = value[semicolon + 1 ..];
         if (std.fmt.parseInt(u8, bg_str, 10)) |bg_color| {
             // Low values (0-7) typically indicate dark background
             return if (bg_color < 8) .dark else .light;
@@ -430,11 +419,11 @@ pub const Theme = enum {
 
 /// Detection method types
 pub const DetectionMethod = enum {
-    background_color,     // Use terminal background color
+    background_color, // Use terminal background color
     environment_variable, // Check environment variables
-    terminal_specific,    // Terminal-specific detection
-    system_preference,    // OS-level theme preference
-    time_based,          // Time-of-day heuristic
+    terminal_specific, // Terminal-specific detection
+    system_preference, // OS-level theme preference
+    time_based, // Time-of-day heuristic
 };
 
 /// Result of a single detection method

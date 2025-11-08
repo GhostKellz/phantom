@@ -1,17 +1,21 @@
 //! Data source bound status widgets (indicators, badges, overlays).
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Event = @import("../event.zig").Event;
 const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
 const data = @import("../data/list_source.zig");
+const time_utils = @import("../time/utils.zig");
 
 const Rect = geometry.Rect;
 const Style = style.Style;
 
 fn nowMillis() usize {
-    return @as(usize, @intCast(std.time.milliTimestamp() catch 0));
+    const ts = time_utils.unixTimestampMillis();
+    const clamped = if (ts < 0) 0 else ts;
+    return @intCast(clamped);
 }
 
 /// Animated indicator reflecting a `ListDataSource` lifecycle state.
@@ -319,7 +323,7 @@ pub fn DataEventOverlay(comptime Item: type) type {
         observer: ObserverType,
         registered: bool = false,
         config: Config,
-        entries: std.ArrayList([]u8),
+        entries: ArrayList([]u8),
 
         const vtable = Widget.WidgetVTable{
             .render = render,
@@ -337,7 +341,7 @@ pub fn DataEventOverlay(comptime Item: type) type {
                 .source = source,
                 .observer = observer,
                 .config = config,
-                .entries = std.ArrayList([]u8).init(allocator),
+                .entries = ArrayList([]u8).init(allocator),
             };
 
             self.source.subscribe(&self.observer);

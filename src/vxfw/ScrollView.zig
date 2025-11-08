@@ -117,19 +117,27 @@ pub fn handleEvent(self: *ScrollView, ctx: vxfw.EventContext) Allocator.Error!vx
             if (ctx.isMouseEvent() != null) {
                 switch (mouse.button) {
                     .wheel_up => {
-                        // TODO: Make ScrollView properly mutable for scroll state
+                        if (self.scroll_y >= 3) {
+                            self.scroll_y -= 3;
+                        } else {
+                            self.scroll_y = 0;
+                        }
                         try commands.append(.redraw);
                     },
                     .wheel_down => {
-                        // TODO: Make ScrollView properly mutable for scroll state
+                        self.scroll_y += 3;
                         try commands.append(.redraw);
                     },
                     .wheel_left => {
-                        // TODO: Make ScrollView properly mutable for scroll state
+                        if (self.scroll_x >= 3) {
+                            self.scroll_x -= 3;
+                        } else {
+                            self.scroll_x = 0;
+                        }
                         try commands.append(.redraw);
                     },
                     .wheel_right => {
-                        // TODO: Make ScrollView properly mutable for scroll state
+                        self.scroll_x += 3;
                         try commands.append(.redraw);
                     },
                     else => {},
@@ -140,31 +148,40 @@ pub fn handleEvent(self: *ScrollView, ctx: vxfw.EventContext) Allocator.Error!vx
             if (ctx.has_focus) {
                 switch (key.key) {
                     .up => {
-                        // TODO: Make ScrollView properly mutable for scroll state
+                        if (self.scroll_y > 0) {
+                            self.scroll_y -= 1;
+                        }
                         try commands.append(.redraw);
                     },
                     .down => {
-                        // TODO: Make ScrollView properly mutable for scroll state
+                        self.scroll_y += 1;
                         try commands.append(.redraw);
                     },
                     .left => {
-                        // TODO: Make ScrollView properly mutable for scroll state
+                        if (self.scroll_x > 0) {
+                            self.scroll_x -= 1;
+                        }
                         try commands.append(.redraw);
                     },
                     .right => {
-                        // TODO: Make ScrollView properly mutable for scroll state
+                        self.scroll_x += 1;
                         try commands.append(.redraw);
                     },
                     .page_up => {
-                        // TODO: Make ScrollView properly mutable for scroll state
+                        if (self.scroll_y >= 10) {
+                            self.scroll_y -= 10;
+                        } else {
+                            self.scroll_y = 0;
+                        }
                         try commands.append(.redraw);
                     },
                     .page_down => {
-                        // TODO: Make ScrollView properly mutable for scroll state
+                        self.scroll_y += 10;
                         try commands.append(.redraw);
                     },
                     .home => {
-                        // TODO: Make ScrollView properly mutable for scroll state
+                        self.scroll_y = 0;
+                        self.scroll_x = 0;
                         try commands.append(.redraw);
                     },
                     else => {},

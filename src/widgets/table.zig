@@ -1,5 +1,6 @@
 //! Table widget for displaying tabular data
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
@@ -20,7 +21,7 @@ pub const Column = struct {
     min_width: u16 = 1,
     max_width: ?u16 = null,
     alignment: Alignment = .left,
-    
+
     pub const Alignment = enum {
         left,
         center,
@@ -32,11 +33,11 @@ pub const Column = struct {
 pub const Row = struct {
     cells: []const []const u8,
     style: Style = Style.default(),
-    
+
     pub fn init(cells: []const []const u8) Row {
         return Row{ .cells = cells };
     }
-    
+
     pub fn withStyle(cells: []const []const u8, row_style: Style) Row {
         return Row{ .cells = cells, .style = row_style };
     }
@@ -46,34 +47,34 @@ pub const Row = struct {
 pub const Table = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
-    
+
     // Data
-    columns: std.ArrayList(Column),
-    rows: std.ArrayList(Row),
-    
+    columns: ArrayList(Column),
+    rows: ArrayList(Row),
+
     // Selection
     selected_row: ?usize = null,
     selected_col: ?usize = null,
-    
+
     // Scrolling
     scroll_offset_row: usize = 0,
     scroll_offset_col: usize = 0,
-    
+
     // Styling
     header_style: Style,
     row_style: Style,
     selected_style: Style,
     border_style: Style,
-    
+
     // Configuration
     show_header: bool = true,
     show_borders: bool = true,
     selectable: bool = true,
     column_spacing: u16 = 1,
-    
+
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
-    calculated_widths: std.ArrayList(u16),
+    calculated_widths: ArrayList(u16),
 
     const vtable = Widget.WidgetVTable{
         .render = render,
@@ -87,56 +88,56 @@ pub const Table = struct {
         table.* = Table{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .columns = std.ArrayList(Column).init(allocator),
-            .rows = std.ArrayList(Row).init(allocator),
+            .columns = ArrayList(Column).init(allocator),
+            .rows = ArrayList(Row).init(allocator),
             .header_style = Style.default().withBold(),
             .row_style = Style.default(),
             .selected_style = Style.default().withBg(style.Color.blue),
             .border_style = Style.default(),
-            .calculated_widths = std.ArrayList(u16).init(allocator),
+            .calculated_widths = ArrayList(u16).init(allocator),
         };
         return table;
     }
 
     pub fn addColumn(self: *Table, column: Column) !void {
-        try self.columns.append(self.allocator, column);
-        try self.calculated_widths.append(self.allocator, 0);
+        try self.columns.append(column);
+        try self.calculated_widths.append(0);
     }
 
     pub fn addRow(self: *Table, row: Row) !void {
-        try self.rows.append(self.allocator, row);
+        try self.rows.append(row);
         if (self.selectable and self.selected_row == null and self.rows.items.len > 0) {
             self.selected_row = 0;
         }
     }
 
     pub fn setColumns(self: *Table, columns: []const Column) !void {
-        self.columns.clearAndFree(self.allocator);
-        self.calculated_widths.clearAndFree(self.allocator);
-        
+        self.columns.clearAndFree();
+        self.calculated_widths.clearAndFree();
+
         for (columns) |column| {
             try self.addColumn(column);
         }
     }
 
     pub fn setRows(self: *Table, rows: []const Row) !void {
-        self.rows.clearAndFree(self.allocator);
-        
+        self.rows.clearAndFree();
+
         for (rows) |row| {
             try self.addRow(row);
         }
     }
 
     pub fn clear(self: *Table) void {
-        self.rows.clearAndFree(self.allocator);
+        self.rows.clearAndFree();
         self.selected_row = null;
         self.scroll_offset_row = 0;
         self.scroll_offset_col = 0;
     }
 
     pub fn clearColumns(self: *Table) void {
-        self.columns.clearAndFree(self.allocator);
-        self.calculated_widths.clearAndFree(self.allocator);
+        self.columns.clearAndFree();
+        self.calculated_widths.clearAndFree();
         self.clear();
     }
 
@@ -177,7 +178,7 @@ pub const Table = struct {
 
     pub fn selectNext(self: *Table) void {
         if (!self.selectable or self.rows.items.len == 0) return;
-        
+
         if (self.selected_row) |row| {
             if (row + 1 < self.rows.items.len) {
                 self.selected_row = row + 1;
@@ -189,7 +190,7 @@ pub const Table = struct {
 
     pub fn selectPrevious(self: *Table) void {
         if (!self.selectable or self.rows.items.len == 0) return;
-        
+
         if (self.selected_row) |row| {
             if (row > 0) {
                 self.selected_row = row - 1;
@@ -210,64 +211,66 @@ pub const Table = struct {
 
     fn calculateColumnWidths(self: *Table) void {
         if (self.columns.items.len == 0) return;
-        
+
         const available_width = if (self.area.width > 2) self.area.width - 2 else 0;
-        var total_spacing = if (self.columns.items.len > 1) 
-            (self.columns.items.len - 1) * self.column_spacing else 0;
-        
+        var total_spacing = if (self.columns.items.len > 1)
+            (self.columns.items.len - 1) * self.column_spacing
+        else
+            0;
+
         if (self.show_borders) {
             total_spacing += @as(u16, @intCast(self.columns.items.len + 1));
         }
-        
+
         const content_width = if (available_width > total_spacing) available_width - total_spacing else 0;
-        
+
         // Reset calculated widths
         for (self.calculated_widths.items) |*width| {
             width.* = 0;
         }
-        
+
         // Calculate minimum widths from content
         for (self.columns.items, 0..) |column, col_idx| {
             var min_width = column.min_width;
-            
+
             // Check header width
             if (self.show_header) {
                 min_width = @max(min_width, @as(u16, @intCast(column.title.len)));
             }
-            
+
             // Check data widths
             for (self.rows.items) |row| {
                 if (col_idx < row.cells.len) {
                     min_width = @max(min_width, @as(u16, @intCast(row.cells[col_idx].len)));
                 }
             }
-            
+
             // Apply column constraints
             if (column.max_width) |max_width| {
                 min_width = @min(min_width, max_width);
             }
-            
+
             if (column.width) |fixed_width| {
                 min_width = fixed_width;
             }
-            
+
             self.calculated_widths.items[col_idx] = min_width;
         }
-        
+
         // Distribute remaining space
         var total_min_width: u16 = 0;
         for (self.calculated_widths.items) |width| {
             total_min_width += width;
         }
-        
+
         if (total_min_width < content_width) {
             const remaining = content_width - total_min_width;
             const per_column = remaining / @as(u16, @intCast(self.columns.items.len));
-            
+
             for (self.calculated_widths.items, 0..) |*width, col_idx| {
                 const column = self.columns.items[col_idx];
                 const additional = if (col_idx < self.columns.items.len - 1) per_column else remaining - per_column * col_idx;
-                
+
                 if (column.max_width) |max_width| {
                     width.* = @min(width.* + additional, max_width);
                 } else {
@@ -279,21 +282,21 @@ pub const Table = struct {
 
     fn drawBorder(self: *Table, buffer: *Buffer, x: u16, y: u16, width: u16, height: u16) void {
         if (!self.show_borders or width < 2 or height < 2) return;
-        
+
         // Top and bottom borders
         var border_x = x;
         while (border_x < x + width) : (border_x += 1) {
             buffer.setCell(border_x, y, Cell.init('─', self.border_style));
             buffer.setCell(border_x, y + height - 1, Cell.init('─', self.border_style));
         }
-        
+
         // Left and right borders
         var border_y = y;
         while (border_y < y + height) : (border_y += 1) {
             buffer.setCell(x, border_y, Cell.init('│', self.border_style));
             buffer.setCell(x + width - 1, border_y, Cell.init('│', self.border_style));
         }
-        
+
         // Corners
         buffer.setCell(x, y, Cell.init('┌', self.border_style));
         buffer.setCell(x + width - 1, y, Cell.init('┐', self.border_style));
@@ -304,10 +307,10 @@ pub const Table = struct {
     fn drawCell(self: *Table, buffer: *Buffer, x: u16, y: u16, width: u16, text: []const u8, alignment: Column.Alignment, cell_style: Style) void {
         _ = self;
         if (width == 0) return;
-        
+
         // Clear cell background
         buffer.fill(Rect.init(x, y, width, 1), Cell.withStyle(cell_style));
-        
+
         // Calculate text position
         const text_len = @min(text.len, width);
         const text_x = switch (alignment) {
@@ -315,7 +318,7 @@ pub const Table = struct {
             .center => x + (width - @as(u16, @intCast(text_len))) / 2,
             .right => x + width - @as(u16, @intCast(text_len)),
         };
-        
+
         // Draw text
         if (text_len > 0) {
             buffer.writeText(text_x, y, text[0..text_len], cell_style);
@@ -327,34 +330,34 @@ pub const Table = struct {
         self.area = area;
 
         if (area.height == 0 or area.width == 0) return;
-        
+
         // Calculate column widths
         self.calculateColumnWidths();
-        
+
         // Draw outer border
         if (self.show_borders) {
             self.drawBorder(buffer, area.x, area.y, area.width, area.height);
         }
-        
+
         // Calculate content area
         var content_area = area;
         if (self.show_borders) {
             content_area = Rect.init(area.x + 1, area.y + 1, area.width - 2, area.height - 2);
         }
-        
+
         if (content_area.height == 0 or content_area.width == 0) return;
-        
+
         var current_y = content_area.y;
-        
+
         // Draw header
         if (self.show_header and self.columns.items.len > 0) {
             var current_x = content_area.x;
-            
+
             for (self.columns.items, 0..) |column, col_idx| {
                 const col_width = self.calculated_widths.items[col_idx];
-                
+
                 self.drawCell(buffer, current_x, current_y, col_width, column.title, column.alignment, self.header_style);
-                
+
                 current_x += col_width;
                 if (col_idx < self.columns.items.len - 1) {
                     current_x += self.column_spacing;
@@ -364,9 +367,9 @@ pub const Table = struct {
                     }
                 }
             }
-            
+
             current_y += 1;
-            
+
             // Draw header separator
             if (self.show_borders and current_y < content_area.y + content_area.height) {
                 var sep_x = content_area.x;
@@ -376,28 +379,30 @@ pub const Table = struct {
                 current_y += 1;
             }
         }
-        
+
         // Draw rows
-        const visible_rows = if (current_y < content_area.y + content_area.height) 
-            content_area.y + content_area.height - current_y else 0;
-        
+        const visible_rows = if (current_y < content_area.y + content_area.height)
+            content_area.y + content_area.height - current_y
+        else
+            0;
+
         var row_idx = self.scroll_offset_row;
         var displayed_rows: u16 = 0;
-        
+
         while (row_idx < self.rows.items.len and displayed_rows < visible_rows) {
             const row = self.rows.items[row_idx];
             const is_selected = self.selectable and self.selected_row == row_idx;
-            
+
             var current_x = content_area.x;
-            
+
             for (self.columns.items, 0..) |column, col_idx| {
                 const col_width = self.calculated_widths.items[col_idx];
                 const cell_text = if (col_idx < row.cells.len) row.cells[col_idx] else "";
-                
+
                 const cell_style = if (is_selected) self.selected_style else row.style;
-                
+
                 self.drawCell(buffer, current_x, current_y, col_width, cell_text, column.alignment, cell_style);
-                
+
                 current_x += col_width;
                 if (col_idx < self.columns.items.len - 1) {
                     current_x += self.column_spacing;
@@ -407,7 +412,7 @@ pub const Table = struct {
                     }
                 }
             }
-            
+
             row_idx += 1;
             displayed_rows += 1;
             current_y += 1;
@@ -416,7 +421,7 @@ pub const Table = struct {
 
     fn handleEvent(widget: *Widget, event: Event) bool {
         const self: *Table = @fieldParentPtr("widget", widget);
-        
+
         if (!self.selectable) return false;
 
         switch (event) {
@@ -460,9 +465,9 @@ pub const Table = struct {
 
     fn deinit(widget: *Widget) void {
         const self: *Table = @fieldParentPtr("widget", widget);
-        self.columns.deinit(self.allocator);
-        self.rows.deinit(self.allocator);
-        self.calculated_widths.deinit(self.allocator);
+        self.columns.deinit();
+        self.rows.deinit();
+        self.calculated_widths.deinit();
         self.allocator.destroy(self);
     }
 };
@@ -486,17 +491,17 @@ test "Table widget column and row management" {
 
     try table.addColumn(Column{ .title = "Name", .width = 20 });
     try table.addColumn(Column{ .title = "Age", .width = 10 });
-    
+
     try table.addRow(Row.init(&[_][]const u8{ "John", "25" }));
     try table.addRow(Row.init(&[_][]const u8{ "Jane", "30" }));
 
     try std.testing.expect(table.columns.items.len == 2);
     try std.testing.expect(table.rows.items.len == 2);
     try std.testing.expect(table.selected_row.? == 0);
-    
+
     table.selectNext();
     try std.testing.expect(table.selected_row.? == 1);
-    
+
     table.selectPrevious();
     try std.testing.expect(table.selected_row.? == 0);
 }

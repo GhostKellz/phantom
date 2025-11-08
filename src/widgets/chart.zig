@@ -3,6 +3,7 @@
 //! Uses Bresenham algorithm for line drawing
 
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const phantom = @import("../root.zig");
 const Rect = phantom.Rect;
 const Position = phantom.Position;
@@ -76,7 +77,7 @@ pub const Chart = struct {
     pub const Point = ChartPoint;
     pub const Dataset = ChartDataset;
     allocator: std.mem.Allocator,
-    datasets: std.ArrayList(ChartDataset),
+    datasets: ArrayList(ChartDataset),
     x_axis: Axis,
     y_axis: Axis,
     chart_type: ChartType,
@@ -91,7 +92,7 @@ pub const Chart = struct {
     pub fn init(allocator: std.mem.Allocator, config: ChartConfig) Error!Chart {
         return Chart{
             .allocator = allocator,
-            .datasets = .{},
+            .datasets = ArrayList(ChartDataset).init(allocator),
             .x_axis = Axis.init(config.x_axis_label),
             .y_axis = Axis.init(config.y_axis_label),
             .chart_type = config.chart_type,
@@ -108,13 +109,13 @@ pub const Chart = struct {
     pub const Builder = struct {
         allocator: std.mem.Allocator,
         config: ChartConfig,
-        datasets_list: std.ArrayList(ChartDataset),
+        datasets_list: ArrayList(ChartDataset),
 
         pub fn init(allocator: std.mem.Allocator) Builder {
             return .{
                 .allocator = allocator,
                 .config = ChartConfig.default(),
-                .datasets_list = .{},
+                .datasets_list = ArrayList(ChartDataset).init(allocator),
             };
         }
 
@@ -149,7 +150,7 @@ pub const Chart = struct {
         }
 
         pub fn addDataset(self: *Builder, label: []const u8, points: []ChartPoint, color: Color, marker: u21) Error!*Builder {
-            try self.datasets_list.append(self.allocator, ChartDataset{
+            try self.datasets_list.append(ChartDataset{
                 .label = label,
                 .points = points,
                 .color = color,
@@ -163,7 +164,7 @@ pub const Chart = struct {
 
             // Transfer datasets
             chart.datasets = self.datasets_list;
-            self.datasets_list = .{}; // Clear to avoid double-free
+            self.datasets_list = ArrayList(ChartDataset).init(self.allocator); // Reset builder list
 
             // Auto-scale axes if needed
             if (chart.x_axis.auto_scale or chart.y_axis.auto_scale) {
@@ -174,7 +175,7 @@ pub const Chart = struct {
         }
 
         pub fn deinit(self: *Builder) void {
-            self.datasets_list.deinit(self.allocator);
+            self.datasets_list.deinit();
         }
     };
 
@@ -184,12 +185,12 @@ pub const Chart = struct {
     }
 
     pub fn deinit(self: *Chart) void {
-        self.datasets.deinit(self.allocator);
+        self.datasets.deinit();
     }
 
     /// Add a dataset to the chart
     pub fn addDataset(self: *Chart, label: []const u8, points: []ChartPoint, color: Color, marker: u21) !void {
-        try self.datasets.append(self.allocator, ChartDataset{
+        try self.datasets.append(ChartDataset{
             .label = label,
             .points = points,
             .color = color,
@@ -407,13 +408,13 @@ pub const Chart = struct {
         const style = Style.default().withFg(dataset.color);
 
         // Convert data points to screen coordinates
-        var screen_points = std.ArrayList(struct { x: u16, y: u16 }){};
-        defer screen_points.deinit(self.allocator);
+        var screen_points = ArrayList(struct { x: u16, y: u16 }).init(self.allocator);
+        defer screen_points.deinit();
 
         for (dataset.points) |point| {
             const screen_x = self.mapToScreenX(point.x, area);
             const screen_y = self.mapToScreenY(point.y, area);
-            screen_points.append(self.allocator, .{ .x = screen_x, .y = screen_y }) catch continue;
+            screen_points.append(.{ .x = screen_x, .y = screen_y }) catch continue;
         }
 
         // Draw scatter points

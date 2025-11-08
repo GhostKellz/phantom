@@ -1,5 +1,6 @@
 //! Progress bar widget for showing progress/completion
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
@@ -190,29 +191,29 @@ pub const ProgressBar = struct {
             buffer.fill(text_rect, Cell.withStyle(self.text_style));
 
             // Build text string
-            var text_buffer = std.ArrayList(u8).initCapacity(self.allocator, 32) catch return;
-            defer text_buffer.deinit(self.allocator);
+            var text_buffer = ArrayList(u8).initCapacity(self.allocator, 32) catch return;
+            defer text_buffer.deinit();
 
             if (self.label) |label| {
-                text_buffer.appendSlice(self.allocator, label) catch {};
+                text_buffer.appendSlice(label) catch {};
                 if (self.show_percentage or self.show_value) {
-                    text_buffer.appendSlice(self.allocator, " ") catch {};
+                    text_buffer.appendSlice(" ") catch {};
                 }
             }
 
             if (self.show_percentage) {
                 const percentage_str = std.fmt.allocPrint(self.allocator, "{d:.1}%", .{percentage}) catch "";
                 defer self.allocator.free(percentage_str);
-                text_buffer.appendSlice(self.allocator, percentage_str) catch {};
+                text_buffer.appendSlice(percentage_str) catch {};
             }
 
             if (self.show_value) {
                 if (self.show_percentage) {
-                    text_buffer.appendSlice(self.allocator, " ") catch {};
+                    text_buffer.appendSlice(" ") catch {};
                 }
                 const value_str = std.fmt.allocPrint(self.allocator, "({d:.1}/{d:.1})", .{ self.value, self.max_value }) catch "";
                 defer self.allocator.free(value_str);
-                text_buffer.appendSlice(self.allocator, value_str) catch {};
+                text_buffer.appendSlice(value_str) catch {};
             }
 
             // Render text

@@ -48,8 +48,8 @@ pub const Presets = struct {
     }
 
     /// Create a time series line chart
-    pub fn timeSeriesChart(allocator: std.mem.Allocator, title: []const u8) Chart {
-        var chart = Chart.init(allocator, .{}) catch unreachable;
+    pub fn timeSeriesChart(allocator: std.mem.Allocator, title: []const u8) !Chart {
+        var chart = try Chart.init(allocator, .{});
         _ = chart.setTitle(title)
             .setChartType(.line)
             .setShowGrid(true)
@@ -58,8 +58,8 @@ pub const Presets = struct {
     }
 
     /// Create a scatter plot chart
-    pub fn scatterChart(allocator: std.mem.Allocator, title: []const u8) Chart {
-        var chart = Chart.init(allocator, .{}) catch unreachable;
+    pub fn scatterChart(allocator: std.mem.Allocator, title: []const u8) !Chart {
+        var chart = try Chart.init(allocator, .{});
         _ = chart.setTitle(title)
             .setChartType(.scatter)
             .setShowGrid(true)
@@ -68,8 +68,8 @@ pub const Presets = struct {
     }
 
     /// Create a resource usage bar chart (CPU, Memory, Disk, Network)
-    pub fn resourceBarChart(allocator: std.mem.Allocator) BarChart {
-        var chart = BarChart.init(allocator, .{}) catch unreachable;
+    pub fn resourceBarChart(allocator: std.mem.Allocator) !BarChart {
+        var chart = try BarChart.init(allocator, .{});
         _ = chart.setOrientation(.horizontal)
             .setShowValues(true)
             .setShowLabels(true)
@@ -78,8 +78,8 @@ pub const Presets = struct {
     }
 
     /// Create a comparison bar chart (vertical)
-    pub fn comparisonBarChart(allocator: std.mem.Allocator, title: []const u8) BarChart {
-        var chart = BarChart.init(allocator, .{}) catch unreachable;
+    pub fn comparisonBarChart(allocator: std.mem.Allocator, title: []const u8) !BarChart {
+        var chart = try BarChart.init(allocator, .{});
         _ = chart.setOrientation(.vertical)
             .setShowValues(true)
             .setShowLabels(true)

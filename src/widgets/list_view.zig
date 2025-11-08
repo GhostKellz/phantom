@@ -1,6 +1,7 @@
 //! ListView widget with virtualization for efficient large list rendering
 //! Perfect for LSP completion menus, file lists, diagnostic lists, etc.
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
@@ -74,7 +75,7 @@ pub const ListView = struct {
     allocator: std.mem.Allocator,
 
     /// All items (can be millions)
-    items: std.ArrayList(ListViewItem),
+    items: ArrayList(ListViewItem),
 
     /// Selected index
     selected_index: ?usize,
@@ -106,7 +107,7 @@ pub const ListView = struct {
 
     /// Filter/search
     filter: ?[]const u8,
-    filtered_indices: ?std.ArrayList(usize),
+    filtered_indices: ?ArrayList(usize),
 
     const vtable = Widget.WidgetVTable{
         .render = render,
@@ -121,7 +122,7 @@ pub const ListView = struct {
         list.* = ListView{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .items = .{},
+            .items = ArrayList(ListViewItem).init(allocator),
             .selected_index = null,
             .hovered_index = null,
             .scroll_offset = 0,
@@ -143,7 +144,7 @@ pub const ListView = struct {
     }
 
     pub fn addItem(self: *ListView, item: ListViewItem) !void {
-        try self.items.append(self.allocator, item);
+        try self.items.append(item);
 
         // Select first item if none selected
         if (self.selected_index == null and self.items.items.len > 0) {
@@ -169,7 +170,7 @@ pub const ListView = struct {
                 self.allocator.free(sec);
             }
         }
-        self.items.clearAndFree(self.allocator);
+        self.items.clearAndFree();
         self.selected_index = null;
         self.hovered_index = null;
         self.scroll_offset = 0;
@@ -180,7 +181,7 @@ pub const ListView = struct {
             self.filter = null;
         }
         if (self.filtered_indices) |*fi| {
-            fi.deinit(self.allocator);
+            fi.deinit();
             self.filtered_indices = null;
         }
 
@@ -285,7 +286,7 @@ pub const ListView = struct {
         if (filter.len == 0) {
             self.filter = null;
             if (self.filtered_indices) |*fi| {
-                fi.deinit(self.allocator);
+                fi.deinit();
                 self.filtered_indices = null;
             }
             return;
@@ -307,14 +308,14 @@ pub const ListView = struct {
 
         // Build filtered indices
         if (self.filtered_indices == null) {
-            self.filtered_indices = .{};
+            self.filtered_indices = ArrayList(usize).init(self.allocator);
         } else {
             self.filtered_indices.?.clearRetainingCapacity();
         }
 
         for (self.items.items, 0..) |item, i| {
             if (std.mem.indexOf(u8, item.text, filter) != null) {
-                try self.filtered_indices.?.append(self.allocator, i);
+                try self.filtered_indices.?.append(i);
             }
         }
 
@@ -542,10 +543,10 @@ pub const ListView = struct {
         self.clear();
 
         if (self.filtered_indices) |*fi| {
-            fi.deinit(self.allocator);
+            fi.deinit();
         }
 
-        self.items.deinit(self.allocator);
+        self.items.deinit();
         self.allocator.destroy(self);
     }
 };

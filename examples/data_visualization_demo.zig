@@ -136,7 +136,7 @@ fn renderTitle(buffer: *phantom.Buffer, area: phantom.Rect) void {
 }
 
 fn renderResourceBarChart(buffer: *phantom.Buffer, area: phantom.Rect) !void {
-    var chart = phantom.widgets.Presets.resourceBarChart(buffer.allocator);
+    var chart = try phantom.widgets.Presets.resourceBarChart(buffer.allocator);
     defer chart.deinit();
 
     const values = [_]f64{ global_state.cpu_usage, global_state.memory_usage, global_state.disk_usage, global_state.network_in * 10, global_state.network_out * 10 };
@@ -146,13 +146,13 @@ fn renderResourceBarChart(buffer: *phantom.Buffer, area: phantom.Rect) !void {
 }
 
 fn renderGauges(buffer: *phantom.Buffer, area: phantom.Rect) !void {
-    // Split into 3 rows for 3 gauges
-    const layout = phantom.ConstraintLayout.init(.vertical, &[_]phantom.Constraint{
-        .{ .percentage = 33 },
-        .{ .percentage = 33 },
-        .{ .percentage = 34 },
-    });
-    const gauge_areas = try layout.split(buffer.allocator, area);
+    // Split into 3 rows for 3 gauges using the new layout engine
+    const weights = [_]phantom.layout.engine.WeightSpec{
+        .{ .weight = 1.0 },
+        .{ .weight = 1.0 },
+        .{ .weight = 1.0 },
+    };
+    const gauge_areas = try phantom.layout.engine.splitColumn(buffer.allocator, area, &weights);
     defer buffer.allocator.free(gauge_areas);
 
     // CPU gauge
@@ -172,7 +172,7 @@ fn renderGauges(buffer: *phantom.Buffer, area: phantom.Rect) !void {
 }
 
 fn renderTimeSeriesChart(buffer: *phantom.Buffer, area: phantom.Rect) !void {
-    var chart = phantom.widgets.Presets.timeSeriesChart(buffer.allocator, "CPU History");
+    var chart = try phantom.widgets.Presets.timeSeriesChart(buffer.allocator, "CPU History");
     defer chart.deinit();
 
     // Convert history to points
@@ -214,8 +214,8 @@ fn renderCanvasDemo(buffer: *phantom.Buffer, area: phantom.Rect) !void {
 }
 
 fn renderStatusBar(buffer: *phantom.Buffer, area: phantom.Rect) !void {
-    var status_bar = phantom.widgets.Presets.statusBar(buffer.allocator);
-    defer status_bar.deinit();
+    var status_bar = try phantom.widgets.StatusBar.init(buffer.allocator, .{});
+    defer status_bar.widget.deinit();
 
     const net_in = try std.fmt.allocPrint(buffer.allocator, "IN {d:.2} MB/s", .{global_state.network_in});
     defer buffer.allocator.free(net_in);
@@ -223,12 +223,14 @@ fn renderStatusBar(buffer: *phantom.Buffer, area: phantom.Rect) !void {
     const net_out = try std.fmt.allocPrint(buffer.allocator, "OUT {d:.2} MB/s", .{global_state.network_out});
     defer buffer.allocator.free(net_out);
 
-    try status_bar.addMetric("CPU", global_state.cpu_usage / 100.0, phantom.Color.green);
-    try status_bar.addMetric("MEM", global_state.memory_usage / 100.0, phantom.Color.blue);
-    try status_bar.addMetric("NET", (global_state.network_in + global_state.network_out) / 10.0, phantom.Color.cyan);
-    try status_bar.setLeftText("📊 Live Metrics Dashboard");
-    try status_bar.setRightText(net_in);
-    try status_bar.setRightText(net_out);
+    const cpu_idx = try status_bar.addProgressSegment(.{ .label = "CPU", .width = 15 });
+    try status_bar.setProgress(cpu_idx, @as(f32, @floatCast(global_state.cpu_usage / 100.0)));
 
-    status_bar.render(buffer, area);
+    const mem_idx = try status_bar.addProgressSegment(.{ .label = "MEM", .width = 15 });
+    try status_bar.setProgress(mem_idx, @as(f32, @floatCast(global_state.memory_usage / 100.0)));
+
+    _ = try status_bar.addTextSegment(.{ .label = "", .value = net_in });
+    _ = try status_bar.addTextSegment(.{ .label = "", .value = net_out });
+
+    status_bar.widget.render(buffer, area);
 }

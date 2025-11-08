@@ -2,6 +2,7 @@
 //! Provides basic scrollback buffering and placeholder rendering while
 //! the full terminal pipeline is under construction.
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const style = @import("../style.zig");
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
@@ -109,8 +110,8 @@ pub const Terminal = struct {
     session_metrics: ?*term_session.Metrics = null,
     session_config: ?term_session.Config = null,
     parser: TerminalParser,
-    scrollback: std.ArrayList([]Cell),
-    line_buffer: std.ArrayList(Cell),
+    scrollback: ArrayList([]Cell),
+    line_buffer: ArrayList(Cell),
     current_style: Style,
     cursor_col: usize = 0,
     selection: ?Selection = null,
@@ -138,8 +139,8 @@ pub const Terminal = struct {
             .session_metrics = null,
             .session_config = config.session_config,
             .parser = TerminalParser.init(allocator),
-            .scrollback = std.ArrayList([]Cell).init(allocator),
-            .line_buffer = std.ArrayList(Cell).init(allocator),
+            .scrollback = ArrayList([]Cell).init(allocator),
+            .line_buffer = ArrayList(Cell).init(allocator),
             .current_style = config.text_style,
             .cursor_col = 0,
             .repaint_requested = true,
@@ -231,7 +232,7 @@ pub const Terminal = struct {
     pub fn selectionText(self: *Self, allocator: std.mem.Allocator) ![]u8 {
         const selection = self.selection orelse return Error.NoSelection;
 
-        var output = std.ArrayList(u8).init(allocator);
+        var output = ArrayList(u8).init(allocator);
         errdefer output.deinit();
 
         var line_index = selection.start.line;
@@ -267,7 +268,7 @@ pub const Terminal = struct {
 
     pub fn clearScrollback(self: *Self) void {
         self.freeScrollback();
-        self.scrollback = std.ArrayList([]Cell).init(self.allocator);
+        self.scrollback = ArrayList([]Cell).init(self.allocator);
         self.clearCurrentLine();
         self.selection = null;
         self.repaint_requested = true;
@@ -404,7 +405,7 @@ pub const Terminal = struct {
         return Error.SelectionOutOfRange;
     }
 
-    fn appendCellUtf8(list: *std.ArrayList(u8), cell: Cell) !void {
+    fn appendCellUtf8(list: *ArrayList(u8), cell: Cell) !void {
         var buf: [4]u8 = undefined;
         const len = std.unicode.utf8Encode(cell.char, &buf) catch return Error.UnsupportedCodepoint;
         try list.appendSlice(buf[0..len]);
@@ -719,7 +720,7 @@ test "Terminal widget buffers plain text" {
 
     const scroll = widget.getScrollback();
     try testing.expectEqual(@as(usize, 2), scroll.len);
-    var line_buf = std.ArrayList(u8).init(testing.allocator);
+    var line_buf = ArrayList(u8).init(testing.allocator);
     defer line_buf.deinit();
 
     line_buf.clearRetainingCapacity();

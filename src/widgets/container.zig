@@ -3,6 +3,7 @@
 //! The Container widget provides a generic way to group and layout child widgets.
 //! It supports different layout modes and automatic child positioning.
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Event = @import("../event.zig").Event;
@@ -34,7 +35,7 @@ pub const ContainerChild = struct {
 pub const Container = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
-    children: std.ArrayList(ContainerChild),
+    children: ArrayList(ContainerChild),
     layout_direction: LayoutDirection,
     /// Gap between children (in automatic layout)
     gap: u16 = 0,
@@ -53,7 +54,7 @@ pub const Container = struct {
         container.* = Container{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .children = .{},
+            .children = ArrayList(ContainerChild).init(allocator),
             .layout_direction = direction,
         };
         return container;
@@ -61,14 +62,14 @@ pub const Container = struct {
 
     /// Add a child widget (automatic layout)
     pub fn addChild(self: *Container, child: *Widget) !void {
-        try self.children.append(self.allocator, ContainerChild{
+        try self.children.append(ContainerChild{
             .widget = child,
         });
     }
 
     /// Add a child widget with flex factor
     pub fn addChildWithFlex(self: *Container, child: *Widget, flex: u16) !void {
-        try self.children.append(self.allocator, ContainerChild{
+        try self.children.append(ContainerChild{
             .widget = child,
             .flex = flex,
         });
@@ -76,7 +77,7 @@ pub const Container = struct {
 
     /// Add a child widget at manual position (manual layout mode only)
     pub fn addChildAt(self: *Container, child: *Widget, area: Rect) !void {
-        try self.children.append(self.allocator, ContainerChild{
+        try self.children.append(ContainerChild{
             .widget = child,
             .area = area,
         });
@@ -239,7 +240,7 @@ pub const Container = struct {
 
     fn deinit(widget: *Widget) void {
         const self: *Container = @fieldParentPtr("widget", widget);
-        self.children.deinit(self.allocator);
+        self.children.deinit();
         self.allocator.destroy(self);
     }
 };

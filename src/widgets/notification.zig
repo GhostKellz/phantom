@@ -1,5 +1,6 @@
 //! Notification widget for toast notifications and alerts
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
@@ -202,14 +203,14 @@ pub const Notification = struct {
 /// Notification system manager
 pub const NotificationSystem = struct {
     allocator: std.mem.Allocator,
-    notifications: std.ArrayList(Notification),
+    notifications: ArrayList(Notification),
     next_id: u32 = 1,
     max_notifications: u8 = 5,
 
     pub fn init(allocator: std.mem.Allocator) NotificationSystem {
         return NotificationSystem{
             .allocator = allocator,
-            .notifications = std.ArrayList(Notification).init(allocator),
+            .notifications = ArrayList(Notification).init(allocator),
         };
     }
 

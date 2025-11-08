@@ -147,13 +147,13 @@ pub const InputParser = struct {
         byte: u8,
     ) !bool {
         self.state = .idle;
-        const maybe_key = switch (byte) {
-            'P' => Key.f1,
-            'Q' => Key.f2,
-            'R' => Key.f3,
-            'S' => Key.f4,
-            'H' => Key.home,
-            'F' => Key.end,
+        const maybe_key: ?Key = switch (byte) {
+            'P' => .f1,
+            'Q' => .f2,
+            'R' => .f3,
+            'S' => .f4,
+            'H' => .home,
+            'F' => .end,
             else => null,
         };
         if (maybe_key) |key| {
@@ -245,13 +245,13 @@ pub const InputParser = struct {
     fn decodeCsi(params: []const u8, final_char: u8) ?Key {
         if (final_char == '~') {
             const value = parseNumericParam(params);
-            return switch (value) {
+            return if (value) |v| switch (v) {
                 2 => Key.insert,
                 3 => Key.delete,
                 5 => Key.page_up,
                 6 => Key.page_down,
                 else => null,
-            };
+            } else null;
         }
 
         if (params.len == 0) {

@@ -1,6 +1,7 @@
 //! Event system for Phantom TUI - keyboard, mouse, and system events
 const std = @import("std");
 const builtin = @import("builtin");
+const ArrayList = std.array_list.Managed;
 const posix = std.posix;
 const types = @import("event/types.zig");
 
@@ -42,7 +43,7 @@ pub const EventLoop = struct {
     };
 
     allocator: std.mem.Allocator,
-    handlers: std.ArrayList(EventHandler),
+    handlers: ArrayList(EventHandler),
     config: Config,
     tick_interval_ms: u64 = 16,
     tick_interval_ns: u64 = 16 * std.time.ns_per_ms,
@@ -66,7 +67,7 @@ pub const EventLoop = struct {
 
         var loop = EventLoop{
             .allocator = allocator,
-            .handlers = std.ArrayList(EventHandler){},
+            .handlers = ArrayList(EventHandler).init(allocator),
             .config = config,
             .tick_interval_ms = config.tick_interval_ms,
             .tick_interval_ns = config.tick_interval_ms * std.time.ns_per_ms,
@@ -101,11 +102,11 @@ pub const EventLoop = struct {
             .simple => |*backend| backend.deinit(),
             .zigzag => |backend| backend.deinit(),
         }
-        self.handlers.deinit(self.allocator);
+        self.handlers.deinit();
     }
 
     pub fn addHandler(self: *EventLoop, handler: EventHandler) !void {
-        try self.handlers.append(self.allocator, handler);
+        try self.handlers.append(handler);
     }
 
     pub fn removeHandler(self: *EventLoop, handler: EventHandler) void {
@@ -234,7 +235,7 @@ pub const EventLoop = struct {
                 if (frame_elapsed_ns < self.frame_budget_ns) {
                     const frame_remaining_ns = self.frame_budget_ns - frame_elapsed_ns;
                     sleep_ns = if (sleep_ns) |existing|
-                        std.math.min(existing, frame_remaining_ns)
+                        @min(existing, frame_remaining_ns)
                     else
                         frame_remaining_ns;
                 }
@@ -244,7 +245,7 @@ pub const EventLoop = struct {
                 if (ns > 0) {
                     const sleep_sec = ns / std.time.ns_per_s;
                     const sleep_sub_ns = @as(u32, @intCast(ns % std.time.ns_per_s));
-                    std.posix.nanosleep(sleep_sec, sleep_sub_ns) catch {};
+                    std.posix.nanosleep(sleep_sec, sleep_sub_ns);
                 }
             }
         }
@@ -469,9 +470,7 @@ const SimpleBackend = struct {
 
         while (true) {
             const bytes_read = posix.read(self.stdin_fd, &self.read_buffer) catch |err| switch (err) {
-                error.Interrupted => continue,
                 error.WouldBlock => break,
-                error.OperationAborted => break,
                 else => return err,
             };
 
@@ -491,8 +490,8 @@ const SimpleBackend = struct {
         const flags = try posix.fcntl(self.stdin_fd, posix.F.GETFL, 0);
         self.stdin_flags_original = @intCast(flags);
 
-        const non_block: usize = @intCast(@intFromEnum(posix.O.NONBLOCK));
-        try posix.fcntl(self.stdin_fd, posix.F.SETFL, flags | non_block);
+        const non_block: usize = 1 << @bitOffsetOf(posix.O, "NONBLOCK");
+        _ = try posix.fcntl(self.stdin_fd, posix.F.SETFL, flags | non_block);
     }
 
     fn restoreStdinFlags(self: *SimpleBackend) void {

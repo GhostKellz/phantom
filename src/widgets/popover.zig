@@ -1,5 +1,6 @@
 //! Popover widget for contextual help or menus.
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const SizeConstraints = @import("../widget.zig").SizeConstraints;
 const Buffer = @import("../terminal.zig").Buffer;
@@ -29,7 +30,7 @@ pub const Popover = struct {
     allocator: std.mem.Allocator,
     config: Config,
     title: ?[]u8 = null,
-    body_lines: std.ArrayList([]u8),
+    body_lines: ArrayList([]u8),
     visible: bool = false,
 
     const vtable = Widget.WidgetVTable{
@@ -45,7 +46,7 @@ pub const Popover = struct {
             .widget = .{ .vtable = &vtable },
             .allocator = allocator,
             .config = config,
-            .body_lines = std.ArrayList([]u8).init(allocator),
+            .body_lines = ArrayList([]u8).init(allocator),
         };
         return self;
     }

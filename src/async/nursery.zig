@@ -1,5 +1,6 @@
 //! Nursery helpers for structured asynchronous task management
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const runtime_mod = @import("runtime.zig");
 
 const AsyncRuntime = runtime_mod.AsyncRuntime;
@@ -8,7 +9,7 @@ const TaskHandle = runtime_mod.TaskHandle;
 pub const Nursery = struct {
     allocator: std.mem.Allocator,
     runtime: *AsyncRuntime,
-    tasks: std.ArrayList(TaskSlot),
+    tasks: ArrayList(TaskSlot),
 
     const TaskSlot = struct {
         ptr: *anyopaque,
@@ -21,7 +22,7 @@ pub const Nursery = struct {
         return Nursery{
             .allocator = allocator,
             .runtime = runtime,
-            .tasks = std.ArrayList(TaskSlot).init(allocator),
+            .tasks = ArrayList(TaskSlot).init(allocator),
         };
     }
 

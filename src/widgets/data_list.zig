@@ -65,8 +65,8 @@ pub fn DataListView(comptime Item: type) type {
                 comptime {
                     const info = @typeInfo(Item);
                     switch (info) {
-                        .Pointer => |ptr| {
-                            if (ptr.size != .Slice) {
+                        .pointer => |ptr| {
+                            if (ptr.size != .slice) {
                                 @compileError("text adapter requires slice items");
                             }
                             if (ptr.child != u8) {
@@ -271,7 +271,7 @@ pub fn DataListView(comptime Item: type) type {
 
         fn appendItem(self: *Self, item: Item, index: usize) AdapterError!void {
             const new_item = try self.adapter.buildItem(self.allocator, item, index);
-            try self.list_view.items.append(self.allocator, new_item);
+            try self.list_view.items.append(new_item);
             if (self.list_view.selected_index == null and self.list_view.items.items.len > 0) {
                 self.list_view.selected_index = 0;
             }

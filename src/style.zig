@@ -1,5 +1,6 @@
 //! Style system for Phantom TUI - colors, attributes, and styling
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 
 /// RGB color representation
 pub const Color = union(enum) {
@@ -67,12 +68,12 @@ pub const Color = union(enum) {
             .rgb => |rgb| if (background) blk: {
                 // True color background support
                 var buffer: [24]u8 = undefined;
-                const escape_seq = std.fmt.bufPrint(&buffer, "\x1b[48;2;{};{};{}m", .{rgb.r, rgb.g, rgb.b}) catch "";
+                const escape_seq = std.fmt.bufPrint(&buffer, "\x1b[48;2;{};{};{}m", .{ rgb.r, rgb.g, rgb.b }) catch "";
                 break :blk escape_seq;
             } else blk: {
                 // True color foreground support
                 var buffer: [24]u8 = undefined;
-                const escape_seq = std.fmt.bufPrint(&buffer, "\x1b[38;2;{};{};{}m", .{rgb.r, rgb.g, rgb.b}) catch "";
+                const escape_seq = std.fmt.bufPrint(&buffer, "\x1b[38;2;{};{};{}m", .{ rgb.r, rgb.g, rgb.b }) catch "";
                 break :blk escape_seq;
             },
         };
@@ -106,18 +107,18 @@ pub const Attributes = packed struct {
     }
 
     pub fn ansiCodes(self: Attributes, allocator: std.mem.Allocator) ![]const u8 {
-        var codes = std.ArrayList(u8){};
-        defer codes.deinit(allocator);
+        var codes = ArrayList(u8).init(allocator);
+        defer codes.deinit();
 
-        if (self.bold) try codes.appendSlice(allocator, "\x1b[1m");
-        if (self.italic) try codes.appendSlice(allocator, "\x1b[3m");
-        if (self.underline) try codes.appendSlice(allocator, "\x1b[4m");
-        if (self.strikethrough) try codes.appendSlice(allocator, "\x1b[9m");
-        if (self.dim) try codes.appendSlice(allocator, "\x1b[2m");
-        if (self.reverse) try codes.appendSlice(allocator, "\x1b[7m");
-        if (self.blink) try codes.appendSlice(allocator, "\x1b[5m");
+        if (self.bold) try codes.appendSlice("\x1b[1m");
+        if (self.italic) try codes.appendSlice("\x1b[3m");
+        if (self.underline) try codes.appendSlice("\x1b[4m");
+        if (self.strikethrough) try codes.appendSlice("\x1b[9m");
+        if (self.dim) try codes.appendSlice("\x1b[2m");
+        if (self.reverse) try codes.appendSlice("\x1b[7m");
+        if (self.blink) try codes.appendSlice("\x1b[5m");
 
-        return try codes.toOwnedSlice(allocator);
+        return try codes.toOwnedSlice();
     }
 };
 
@@ -170,34 +171,34 @@ pub const Style = struct {
     /// Check if two styles are equal
     pub fn eq(self: Style, other: Style) bool {
         return std.meta.eql(self.fg, other.fg) and
-               std.meta.eql(self.bg, other.bg) and
-               std.meta.eql(self.attributes, other.attributes);
+            std.meta.eql(self.bg, other.bg) and
+            std.meta.eql(self.attributes, other.attributes);
     }
 
     /// Generate ANSI escape codes for this style
     pub fn ansiCodes(self: Style, allocator: std.mem.Allocator) ![]const u8 {
-        var codes = try std.ArrayList(u8).initCapacity(allocator, 32);
-        defer codes.deinit(allocator);
+        var codes = try ArrayList(u8).initCapacity(allocator, 32);
+        defer codes.deinit();
 
         // Reset first
-        try codes.appendSlice(allocator, "\x1b[0m");
+        try codes.appendSlice("\x1b[0m");
 
         // Foreground color
         if (self.fg) |fg| {
-            try codes.appendSlice(allocator, fg.ansiCode(false));
+            try codes.appendSlice(fg.ansiCode(false));
         }
 
         // Background color
         if (self.bg) |bg| {
-            try codes.appendSlice(allocator, bg.ansiCode(true));
+            try codes.appendSlice(bg.ansiCode(true));
         }
 
         // Attributes
         const attr_codes = try self.attributes.ansiCodes(allocator);
         defer allocator.free(attr_codes);
-        try codes.appendSlice(allocator, attr_codes);
+        try codes.appendSlice(attr_codes);
 
-        return try codes.toOwnedSlice(allocator);
+        return try codes.toOwnedSlice();
     }
 };
 

@@ -1,4 +1,5 @@
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const types = @import("types.zig");
 
 const windows = std.os.windows;
@@ -82,7 +83,7 @@ pub const Session = struct {
         var mode: windows.DWORD = windows.PIPE_NOWAIT;
         _ = kernel32.SetNamedPipeHandleState(output_read, &mode, null, null);
 
-        var cmd_builder = std.ArrayList(u8).init(allocator);
+        var cmd_builder = ArrayList(u8).init(allocator);
         defer cmd_builder.deinit();
 
         for (config.command, 0..) |arg, i| {

@@ -2,6 +2,7 @@
 //! Supports built-in themes and user themes from ~/.config/phantom/themes/
 
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const theme_mod = @import("Theme.zig");
 const Theme = theme_mod.Theme;
 const Variant = theme_mod.Variant;
@@ -99,7 +100,7 @@ pub const ThemeManager = struct {
 
     /// List all available theme names
     pub fn listThemes(self: *ThemeManager, allocator: std.mem.Allocator) ![][]const u8 {
-        var names = std.ArrayList([]const u8).init(allocator);
+        var names = ArrayList([]const u8).init(allocator);
         defer names.deinit();
 
         var iter = self.themes.keyIterator();
@@ -209,7 +210,8 @@ pub const ThemeManager = struct {
             return;
         }
 
-        if (self.themes.iterator().next()) |entry| {
+        var themes_iter = self.themes.iterator();
+        if (themes_iter.next()) |entry| {
             self.active_theme_name = entry.key_ptr.*;
             self.preferred_variant = entry.value_ptr.*.variant;
             return;
@@ -226,7 +228,8 @@ pub const ThemeManager = struct {
             }
         }
 
-        if (self.themes.iterator().next()) |entry| {
+        var themes_iter2 = self.themes.iterator();
+        if (themes_iter2.next()) |entry| {
             self.active_theme_name = entry.key_ptr.*;
             self.preferred_variant = entry.value_ptr.*.variant;
             return;
@@ -245,7 +248,7 @@ pub const ThemeManager = struct {
     }
 
     fn removeThemesByOrigin(self: *ThemeManager, origin: Origin) !bool {
-        var to_remove = std.ArrayList([]const u8).init(self.allocator);
+        var to_remove = ArrayList([]const u8).init(self.allocator);
         defer to_remove.deinit();
 
         var iter = self.themes.iterator();

@@ -382,6 +382,48 @@ pub fn build(b: *std.Build) void {
         ghostty_demo_step.dependOn(&run_ghostty_demo.step);
     }
 
+    // AI Chat CLI Demo - requires basic widgets
+    if (features.basic_widgets) {
+        const ai_chat_demo = b.addExecutable(.{
+            .name = "ai_chat_cli",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/ai_chat_cli.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        ai_chat_demo.linkLibC();
+        b.installArtifact(ai_chat_demo);
+
+        const run_ai_chat_demo = b.addRunArtifact(ai_chat_demo);
+        const ai_chat_demo_step = b.step("demo-ai-chat", "Run the AI Chat CLI demo");
+        ai_chat_demo_step.dependOn(&run_ai_chat_demo.step);
+    }
+
+    // Performance Benchmark Suite
+    {
+        const bench = b.addExecutable(.{
+            .name = "benchmark_suite",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/benchmark_suite.zig"),
+                .target = target,
+                .optimize = optimize,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        bench.linkLibC();
+        b.installArtifact(bench);
+
+        const run_bench = b.addRunArtifact(bench);
+        const bench_step = b.step("benchmark", "Run performance benchmarks");
+        bench_step.dependOn(&run_bench.step);
+    }
+
     // ZION CLI Demo - requires basic widgets
     if (features.basic_widgets) {
         const zion_demo = b.addExecutable(.{

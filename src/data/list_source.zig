@@ -1,5 +1,6 @@
 //! Generic list data source abstraction with async-friendly hooks
 const std = @import("std");
+const ArrayListUnmanaged = std.ArrayListUnmanaged;
 
 /// Range request for list data virtualization.
 pub const Range = struct {
@@ -149,8 +150,8 @@ pub fn InMemoryListSource(comptime Item: type) type {
 
         allocator: std.mem.Allocator,
         state: State = .idle,
-        items: std.ArrayListUnmanaged(Item) = .{},
-        observers: std.ArrayListUnmanaged(ObserverType) = .{},
+        items: ArrayListUnmanaged(Item) = .{},
+        observers: ArrayListUnmanaged(ObserverType) = .{},
 
         pub fn init(allocator: std.mem.Allocator) Self {
             return .{ .allocator = allocator };
@@ -267,7 +268,10 @@ pub fn InMemoryListSource(comptime Item: type) type {
                 self.replayObserver(stored);
                 return;
             }
-            self.observers.append(self.allocator, observer_ptr.*) catch unreachable;
+            self.observers.append(self.allocator, observer_ptr.*) catch |err| {
+                std.log.err("Failed to register observer: {}", .{err});
+                return; // Fail silently - observer won't receive updates
+            };
             const stored = &self.observers.items[self.observers.items.len - 1];
             self.replayObserver(stored);
         }
@@ -324,8 +328,8 @@ test "ListDataSource vtable contract" {
 
         state: State = .idle,
         allocator: std.mem.Allocator,
-        items: std.ArrayListUnmanaged(Item) = .{},
-        observers: std.ArrayListUnmanaged(ObserverType) = .{},
+        items: ArrayListUnmanaged(Item) = .{},
+        observers: ArrayListUnmanaged(ObserverType) = .{},
 
         fn init(allocator: std.mem.Allocator) Self {
             return Self{
@@ -372,7 +376,10 @@ test "ListDataSource vtable contract" {
 
         fn subscribe(context: *anyopaque, observer_ptr: *const ObserverType) void {
             const self = @as(*Self, @ptrCast(@alignCast(context)));
-            self.observers.append(self.allocator, observer_ptr.*) catch unreachable;
+            self.observers.append(self.allocator, observer_ptr.*) catch |err| {
+                std.log.err("Failed to register observer: {}", .{err});
+                return;
+            };
         }
 
         fn unsubscribe(context: *anyopaque, observer_ptr: *const ObserverType) void {
@@ -448,7 +455,7 @@ test "InMemoryListSource emits event payloads" {
     const EventLog = struct {
         const Self = @This();
         allocator: std.mem.Allocator,
-        entries: std.ArrayListUnmanaged(EventType) = .{},
+        entries: ArrayListUnmanaged(EventType) = .{},
 
         fn append(self: *Self, event: EventType) void {
             self.entries.append(self.allocator, event) catch unreachable;

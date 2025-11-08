@@ -1,5 +1,6 @@
 //! Emoji support utilities for Phantom TUI
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 
 /// Common emoji sets for TUI applications
 pub const Emoji = struct {
@@ -243,7 +244,7 @@ pub fn truncateText(allocator: std.mem.Allocator, text: []const u8, max_width: u
     }
 
     // Simple truncation - could be improved with proper Unicode handling
-    var result = std.ArrayList(u8).init(allocator);
+    var result = ArrayList(u8).init(allocator);
     var width: usize = 0;
     var i: usize = 0;
 
@@ -265,16 +266,15 @@ pub fn truncateText(allocator: std.mem.Allocator, text: []const u8, max_width: u
 
         if (width + char_width > max_width) break;
 
-        try result.appendSlice(allocator, text[i .. i + char_len]);
+        try result.appendSlice(text[i .. i + char_len]);
         width += char_width;
         i += char_len;
     }
 
     if (i < text.len) {
-        try result.appendSlice(allocator, "…");
+        try result.appendSlice("…");
     }
-
-    return result.toOwnedSlice(allocator);
+    return result.toOwnedSlice();
 }
 
 test "emoji display width calculation" {

@@ -1,5 +1,6 @@
 //! NetworkTopology widget for visualizing VPN connections and mesh networks
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
@@ -7,6 +8,7 @@ const Event = @import("../event.zig").Event;
 const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
 const emoji = @import("../emoji.zig");
+const time_utils = @import("../time/utils.zig");
 
 const Rect = geometry.Rect;
 const Style = style.Style;
@@ -17,7 +19,7 @@ pub const ConnectionStatus = enum {
     connecting,
     disconnected,
     err,
-    
+
     pub fn getEmoji(self: ConnectionStatus) []const u8 {
         return switch (self) {
             .connected => "🟢",
@@ -26,7 +28,7 @@ pub const ConnectionStatus = enum {
             .err => "🔴",
         };
     }
-    
+
     pub fn getStyle(self: ConnectionStatus) Style {
         return switch (self) {
             .connected => Style.withFg(style.Color.bright_green),
@@ -48,16 +50,16 @@ pub const NetworkNode = struct {
     is_relay: bool = false,
     is_exit_node: bool = false,
     position: Position = Position{},
-    
+
     pub const Position = struct {
         x: u16 = 0,
         y: u16 = 0,
     };
-    
+
     pub fn getDisplayName(self: *const NetworkNode) []const u8 {
         return if (self.name.len > 0) self.name else self.id;
     }
-    
+
     pub fn getIcon(self: *const NetworkNode) []const u8 {
         if (self.is_exit_node) return "🌐";
         if (self.is_relay) return "🔄";
@@ -74,7 +76,7 @@ pub const Connection = struct {
     throughput_mbps: f64 = 0.0,
     is_direct: bool = true, // false for relayed connections
     last_activity: u64 = 0,
-    
+
     pub fn getLineStyle(self: *const Connection) []const u8 {
         return switch (self.status) {
             .connected => if (self.is_direct) "━" else "┄",
@@ -87,46 +89,46 @@ pub const Connection = struct {
 
 /// Layout style for network topology
 pub const TopologyLayout = enum {
-    auto,      // Automatic spring-based layout
-    circular,  // Nodes arranged in a circle
-    grid,      // Grid-based layout
-    star,      // Star topology with central hub
-    mesh,      // Full mesh layout
+    auto, // Automatic spring-based layout
+    circular, // Nodes arranged in a circle
+    grid, // Grid-based layout
+    star, // Star topology with central hub
+    mesh, // Full mesh layout
 };
 
 /// NetworkTopology widget for mesh network visualization
 pub const NetworkTopology = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
-    
+
     // Network data
-    nodes: std.ArrayList(NetworkNode),
-    connections: std.ArrayList(Connection),
+    nodes: ArrayList(NetworkNode),
+    connections: ArrayList(Connection),
     node_map: std.HashMap([]const u8, usize, std.hash_map.StringContext, std.hash_map.default_max_load_percentage), // id -> index
-    
+
     // Layout
     layout: TopologyLayout = .auto,
     center_x: u16 = 0,
     center_y: u16 = 0,
     scale: f64 = 1.0,
-    
+
     // Display options
     show_latency: bool = true,
     show_throughput: bool = true,
     show_node_details: bool = true,
     animate_connections: bool = true,
     compact_mode: bool = false,
-    
+
     // Styling
     header_style: Style,
     node_style: Style,
     connection_style: Style,
     info_style: Style,
-    
+
     // Interactive state
     selected_node: ?usize = null,
     hover_node: ?usize = null,
-    
+
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
 
@@ -142,15 +144,15 @@ pub const NetworkTopology = struct {
         topology.* = NetworkTopology{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .nodes = std.ArrayList(NetworkNode).init(allocator),
-            .connections = std.ArrayList(Connection).init(allocator),
+            .nodes = try ArrayList(NetworkNode).init(allocator),
+            .connections = try ArrayList(Connection).init(allocator),
             .node_map = std.HashMap([]const u8, usize, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
             .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
             .node_style = Style.withFg(style.Color.bright_white),
             .connection_style = Style.withFg(style.Color.bright_blue),
             .info_style = Style.withFg(style.Color.white),
         };
-        
+
         return topology;
     }
 
@@ -168,11 +170,11 @@ pub const NetworkTopology = struct {
             .is_exit_node = node.is_exit_node,
             .position = node.position,
         };
-        
+
         const index = self.nodes.items.len;
         try self.nodes.append(owned_node);
         try self.node_map.put(owned_node.id, index);
-        
+
         // Auto-position if not specified
         if (owned_node.position.x == 0 and owned_node.position.y == 0) {
             self.calculateNodePosition(index);
@@ -185,7 +187,7 @@ pub const NetworkTopology = struct {
             if (index < self.nodes.items.len) {
                 self.nodes.items[index].status = status;
                 self.nodes.items[index].latency_ms = latency_ms;
-                self.nodes.items[index].last_seen = std.time.timestamp();
+                self.nodes.items[index].last_seen = time_utils.unixTimestampSeconds();
             }
         }
     }
@@ -197,18 +199,18 @@ pub const NetworkTopology = struct {
             if (std.mem.eql(u8, conn.from_id, from_id) and std.mem.eql(u8, conn.to_id, to_id)) {
                 conn.status = status;
                 conn.latency_ms = latency_ms;
-                conn.last_activity = std.time.timestamp();
+                conn.last_activity = time_utils.unixTimestampSeconds();
                 return;
             }
         }
-        
+
         // Create new connection
         const connection = Connection{
             .from_id = try self.allocator.dupe(u8, from_id),
             .to_id = try self.allocator.dupe(u8, to_id),
             .status = status,
             .latency_ms = latency_ms,
-            .last_activity = std.time.timestamp(),
+            .last_activity = time_utils.unixTimestampSeconds(),
         };
         try self.connections.append(connection);
     }
@@ -231,10 +233,10 @@ pub const NetworkTopology = struct {
 
     fn calculateNodePosition(self: *NetworkTopology, node_index: usize) void {
         if (node_index >= self.nodes.items.len) return;
-        
+
         const area_width = @as(f64, @floatFromInt(self.area.width));
         const area_height = @as(f64, @floatFromInt(self.area.height));
-        
+
         switch (self.layout) {
             .circular => {
                 const angle = (@as(f64, @floatFromInt(node_index)) / @as(f64, @floatFromInt(self.nodes.items.len))) * 2.0 * std.math.pi;
@@ -288,13 +290,13 @@ pub const NetworkTopology = struct {
         if (area.height == 0 or area.width == 0) return;
 
         var y: u16 = area.y;
-        
+
         // Header
         if (y < area.y + area.height) {
             buffer.fill(Rect.init(area.x, y, area.width, 1), Cell.withStyle(self.header_style));
             const header = if (self.compact_mode) "🌐 Network" else "🌐 NETWORK TOPOLOGY";
             buffer.writeText(area.x, y, header, self.header_style);
-            
+
             // Show stats in header
             const stats_text = std.fmt.allocPrint(self.allocator, "  ({d} nodes, {d} connections)", .{ self.nodes.items.len, self.connections.items.len }) catch return;
             defer self.allocator.free(stats_text);
@@ -306,10 +308,10 @@ pub const NetworkTopology = struct {
 
         // Render connections first (so they appear behind nodes)
         self.renderConnections(buffer, area);
-        
+
         // Render nodes
         self.renderNodes(buffer, area);
-        
+
         // Render node details panel if a node is selected
         if (self.selected_node) |selected_index| {
             self.renderNodeDetails(buffer, area, selected_index);
@@ -320,12 +322,12 @@ pub const NetworkTopology = struct {
         for (self.connections.items) |*conn| {
             const from_index = self.node_map.get(conn.from_id) orelse continue;
             const to_index = self.node_map.get(conn.to_id) orelse continue;
-            
+
             if (from_index >= self.nodes.items.len or to_index >= self.nodes.items.len) continue;
-            
+
             const from_node = &self.nodes.items[from_index];
             const to_node = &self.nodes.items[to_index];
-            
+
             // Draw line between nodes
             self.drawConnection(buffer, area, from_node.position, to_node.position, conn);
         }
@@ -333,24 +335,24 @@ pub const NetworkTopology = struct {
 
     fn drawConnection(self: *NetworkTopology, buffer: *Buffer, area: Rect, from: NetworkNode.Position, to: NetworkNode.Position, conn: *const Connection) void {
         _ = area; // TODO: Check bounds
-        
+
         const line_char = conn.getLineStyle();
         const line_style = conn.status.getStyle();
-        
+
         // Simple line drawing (could be enhanced with Bresenham algorithm)
         const dx = @as(i32, @intCast(to.x)) - @as(i32, @intCast(from.x));
         const dy = @as(i32, @intCast(to.y)) - @as(i32, @intCast(from.y));
         const steps = @max(@abs(dx), @abs(dy));
-        
+
         if (steps == 0) return;
-        
+
         const x_inc = @as(f64, @floatFromInt(dx)) / @as(f64, @floatFromInt(steps));
         const y_inc = @as(f64, @floatFromInt(dy)) / @as(f64, @floatFromInt(steps));
-        
+
         for (0..@as(usize, @intCast(steps))) |i| {
             const x = @as(u16, @intFromFloat(@as(f64, @floatFromInt(from.x)) + x_inc * @as(f64, @floatFromInt(i))));
             const y = @as(u16, @intFromFloat(@as(f64, @floatFromInt(from.y)) + y_inc * @as(f64, @floatFromInt(i))));
-            
+
             // Skip if position is occupied by a node
             var skip = false;
             for (self.nodes.items) |*node| {
@@ -359,20 +361,20 @@ pub const NetworkTopology = struct {
                     break;
                 }
             }
-            
+
             if (!skip and i > 0 and i < steps - 1) { // Don't draw over the nodes themselves
                 buffer.setCell(x, y, Cell.init(@as(u21, @intCast(line_char[0])), line_style));
             }
         }
-        
+
         // Show latency near the middle of the connection if enabled
         if (self.show_latency and conn.latency_ms > 0) {
             const mid_x = @as(u16, @intFromFloat((@as(f64, @floatFromInt(from.x)) + @as(f64, @floatFromInt(to.x))) / 2.0));
             const mid_y = @as(u16, @intFromFloat((@as(f64, @floatFromInt(from.y)) + @as(f64, @floatFromInt(to.y))) / 2.0));
-            
+
             const latency_text = std.fmt.allocPrint(self.allocator, "{d:.0}ms", .{conn.latency_ms}) catch return;
             defer self.allocator.free(latency_text);
-            
+
             buffer.writeText(mid_x, mid_y, latency_text, Style.withFg(style.Color.bright_yellow));
         }
     }
@@ -381,26 +383,25 @@ pub const NetworkTopology = struct {
         for (self.nodes.items, 0..) |*node, i| {
             // Check if node is within the display area
             if (node.position.x < area.x or node.position.x >= area.x + area.width or
-                node.position.y < area.y or node.position.y >= area.y + area.height) {
+                node.position.y < area.y or node.position.y >= area.y + area.height)
+            {
                 continue;
             }
-            
+
             // Determine node style
-            const node_style = if (self.selected_node == i) Style.withFg(style.Color.bright_cyan).withBold()
-            else if (self.hover_node == i) Style.withFg(style.Color.bright_white).withBold()
-            else node.status.getStyle();
-            
+            const node_style = if (self.selected_node == i) Style.withFg(style.Color.bright_cyan).withBold() else if (self.hover_node == i) Style.withFg(style.Color.bright_white).withBold() else node.status.getStyle();
+
             // Draw node icon
             const icon = node.getIcon();
             buffer.writeText(node.position.x, node.position.y, icon, node_style);
-            
+
             // Draw node name/status if not in compact mode
             if (!self.compact_mode and node.position.y + 1 < area.y + area.height) {
                 const status_emoji = node.status.getEmoji();
                 const node_text = if (node.name.len > 0) node.name else node.id;
                 const display_text = std.fmt.allocPrint(self.allocator, "{s}{s}", .{ status_emoji, node_text }) catch return;
                 defer self.allocator.free(display_text);
-                
+
                 const max_len = @min(display_text.len, 12); // Limit to prevent overlap
                 buffer.writeText(node.position.x, node.position.y + 1, display_text[0..max_len], self.info_style);
             }
@@ -409,24 +410,24 @@ pub const NetworkTopology = struct {
 
     fn renderNodeDetails(self: *NetworkTopology, buffer: *Buffer, area: Rect, node_index: usize) void {
         if (node_index >= self.nodes.items.len) return;
-        
+
         const node = &self.nodes.items[node_index];
         const panel_width: u16 = 30;
         const panel_x = if (area.width > panel_width) area.x + area.width - panel_width else area.x;
         var panel_y = area.y + 2;
-        
+
         // Node details panel
         const details = [_][]const u8{
             "┌─ NODE DETAILS ─────────────┐",
         };
-        
+
         for (details) |line| {
             if (panel_y < area.y + area.height) {
                 buffer.writeText(panel_x, panel_y, line, self.header_style);
                 panel_y += 1;
             }
         }
-        
+
         // Node information
         const info_lines = [_][]const u8{
             std.fmt.allocPrint(self.allocator, "│ Name: {s}", .{node.getDisplayName()}) catch return,
@@ -435,20 +436,20 @@ pub const NetworkTopology = struct {
             std.fmt.allocPrint(self.allocator, "│ Latency: {d:.1}ms", .{node.latency_ms}) catch return,
         };
         defer for (info_lines) |line| self.allocator.free(line);
-        
+
         for (info_lines) |line| {
             if (panel_y < area.y + area.height) {
                 buffer.writeText(panel_x, panel_y, line, self.info_style);
                 panel_y += 1;
             }
         }
-        
+
         buffer.writeText(panel_x, panel_y, "└────────────────────────────┘", self.header_style);
     }
 
     fn handleEvent(widget: *Widget, event: Event) bool {
         const self: *NetworkTopology = @fieldParentPtr("widget", widget);
-        
+
         switch (event) {
             .mouse => |mouse_event| {
                 // Find node under cursor
@@ -492,7 +493,7 @@ pub const NetworkTopology = struct {
             },
             else => {},
         }
-        
+
         return false;
     }
 
@@ -506,7 +507,7 @@ pub const NetworkTopology = struct {
 
     fn deinit(widget: *Widget) void {
         const self: *NetworkTopology = @fieldParentPtr("widget", widget);
-        
+
         // Free node data
         for (self.nodes.items) |*node| {
             self.allocator.free(node.id);
@@ -514,14 +515,14 @@ pub const NetworkTopology = struct {
             self.allocator.free(node.ip_address);
         }
         self.nodes.deinit();
-        
+
         // Free connection data
         for (self.connections.items) |*conn| {
             self.allocator.free(conn.from_id);
             self.allocator.free(conn.to_id);
         }
         self.connections.deinit();
-        
+
         self.node_map.deinit();
         self.allocator.destroy(self);
     }
@@ -541,7 +542,7 @@ test "NetworkTopology widget creation" {
         .status = .connected,
         .latency_ms = 15.5,
     });
-    
+
     try topology.addNode(NetworkNode{
         .id = "relay1",
         .name = "Relay Server",
@@ -550,10 +551,10 @@ test "NetworkTopology widget creation" {
         .is_relay = true,
         .latency_ms = 45.2,
     });
-    
+
     // Add connection
     try topology.updateConnection("node1", "relay1", .connected, 30.0);
-    
+
     try std.testing.expect(topology.nodes.items.len == 2);
     try std.testing.expect(topology.connections.items.len == 1);
 }

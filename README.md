@@ -36,10 +36,10 @@ Terminal user interface framework for Zig, inspired by Ratatui.
 
 ## Installation
 
-Requires Zig 0.16+
+**Requires Zig 0.16.0-dev** (tested with 0.16.0-dev.1225+bf9082518 or later)
 
 ```bash
-zig fetch --save https://github.com/ghostkellz/phantom/archive/refs/tags/v0.7.0.tar.gz
+zig fetch --save https://github.com/ghostkellz/phantom/archive/refs/tags/v0.8.0.tar.gz
 ```
 
 In `build.zig`:

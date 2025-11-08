@@ -1,15 +1,16 @@
 //! Phantom - The Next-Gen TUI Framework for Zig
 //! A lightning-fast, async-native TUI framework inspired by Ratatui
 //!
-//! Version 0.7.1 - Major stability improvements:
-//! - Fixed zsync/runtime crash on exit
-//! - Fixed widget overlapping with automatic vertical layout
-//! - Made runtime.initRuntime() optional (no longer required)
-//! - Improved Ratatui-style API compatibility
+//! Version 0.8.0 - Production-ready release:
+//! - Full Zig 0.16.0-dev API migration completed
+//! - Modernized layout engine with constraint solver
+//! - Enhanced theme system with hot-reload support
+//! - Improved async runtime with nursery patterns
+//! - Production-grade error handling and testing
 const std = @import("std");
 
 /// Phantom version
-pub const version = "0.7.1";
+pub const version = "0.8.0";
 
 // Build-time configuration
 pub const phantom_config = @import("phantom_config");

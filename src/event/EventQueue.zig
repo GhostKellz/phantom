@@ -3,6 +3,7 @@
 
 const std = @import("std");
 const vxfw = @import("../vxfw.zig");
+const time_utils = @import("../time/utils.zig");
 const event_types = @import("types.zig");
 
 const Allocator = std.mem.Allocator;
@@ -106,10 +107,11 @@ pub const EventQueue = struct {
             }
         }
 
+        const now_ms = time_utils.monotonicTimestampMs();
         const queued_event = QueuedEvent{
             .event = event,
             .priority = priority,
-            .timestamp = std.time.milliTimestamp(),
+            .timestamp = std.math.cast(i64, now_ms) orelse std.math.maxInt(i64),
         };
 
         try self.pushIntoSubqueue(queued_event);
@@ -137,17 +139,17 @@ pub const EventQueue = struct {
         defer self.mutex.unlock();
 
         const deadline = if (timeout_ms) |ms|
-            std.time.milliTimestamp() + ms
+            time_utils.monotonicTimestampMs() + @as(u64, ms)
         else
             null;
 
         while (self.total_events == 0 and !self.is_shutdown) {
             if (deadline) |d| {
-                const now = std.time.milliTimestamp();
+                const now = time_utils.monotonicTimestampMs();
                 if (now >= d) break;
 
-                const remaining_ms = @as(u32, @intCast(d - now));
-                self.condition.timedWait(&self.mutex, remaining_ms * 1000000) catch break;
+                const remaining_ms = d - now;
+                self.condition.timedWait(&self.mutex, remaining_ms * std.time.ns_per_ms) catch break;
             } else {
                 self.condition.wait(&self.mutex);
             }
@@ -172,7 +174,7 @@ pub const EventQueue = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
 
-        const commands = try self.commands.toOwnedSlice();
+    const commands = try self.commands.toOwnedSlice();
         self.commands = std.array_list.AlignedManaged(vxfw.Command, null).init(self.allocator);
         return commands;
     }
@@ -424,12 +426,12 @@ pub const EventProcessor = struct {
 
     /// Process events in batches
     pub fn processBatch(self: *EventProcessor, handler: *const fn ([]QueuedEvent) anyerror!void) !void {
-        const start_time = std.time.milliTimestamp();
+    const start_time = time_utils.monotonicTimestampMs();
         var events = std.array_list.AlignedManaged(QueuedEvent, null).init(self.allocator);
         defer events.deinit();
 
         while (events.items.len < self.batch_size) {
-            const elapsed = std.time.milliTimestamp() - start_time;
+            const elapsed = time_utils.monotonicTimestampMs() - start_time;
             if (elapsed >= self.processing_time_ms) break;
 
             if (self.queue.popEvent()) |event| {

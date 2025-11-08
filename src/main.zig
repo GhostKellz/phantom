@@ -1,4 +1,5 @@
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const phantom = @import("phantom");
 
 pub fn main() !void {
@@ -45,9 +46,9 @@ pub fn main() !void {
 
 test "simple test" {
     const allocator = std.testing.allocator;
-    var list = std.ArrayList(i32){};
-    defer list.deinit(allocator);
-    try list.append(allocator, 42);
+    var list = ArrayList(i32).init(allocator);
+    defer list.deinit();
+    try list.append(42);
     try std.testing.expectEqual(@as(i32, 42), list.pop());
 }
 

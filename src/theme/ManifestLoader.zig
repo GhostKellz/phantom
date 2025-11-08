@@ -1,5 +1,6 @@
 //! Runtime theme manifest loader with hot-swap support
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const theme_manager = @import("ThemeManager.zig");
 const ThemeManager = theme_manager.ThemeManager;
 const Origin = @import("Theme.zig").Origin;
@@ -11,7 +12,7 @@ const log = std.log.scoped(.theme_manifest);
 pub const ManifestLoader = struct {
     allocator: std.mem.Allocator,
     manager: *ThemeManager,
-    entries: std.ArrayList(Entry),
+    entries: ArrayList(Entry),
 
     pub const Entry = struct {
         name: []const u8,
@@ -32,7 +33,7 @@ pub const ManifestLoader = struct {
         return ManifestLoader{
             .allocator = allocator,
             .manager = manager,
-            .entries = std.ArrayList(Entry).init(allocator),
+            .entries = ArrayList(Entry).init(allocator),
         };
     }
 
@@ -59,9 +60,10 @@ pub const ManifestLoader = struct {
             .last_stat = null,
         });
         errdefer {
-            const removed = self.entries.pop();
-            self.allocator.free(removed.name);
-            self.allocator.free(removed.path);
+            if (self.entries.pop()) |removed| {
+                self.allocator.free(removed.name);
+                self.allocator.free(removed.path);
+            }
         }
 
         const entry = &self.entries.items[self.entries.items.len - 1];
@@ -114,7 +116,7 @@ pub const ManifestLoader = struct {
 };
 
 fn statsEqual(a: std.fs.File.Stat, b: std.fs.File.Stat) bool {
-    return a.size == b.size and a.mtime.sec == b.mtime.sec and a.mtime.nsec == b.mtime.nsec;
+    return a.size == b.size and a.mtime.nanoseconds == b.mtime.nanoseconds;
 }
 
 // Tests

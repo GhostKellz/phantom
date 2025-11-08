@@ -112,7 +112,7 @@ const ThemeGalleryUI = struct {
         const names = try self.manager.listThemes(self.allocator);
         defer self.allocator.free(names);
 
-        std.sort.sort([]const u8, names, {}, struct {
+        std.mem.sort([]const u8, names, {}, struct {
             fn lessThan(_: void, a: []const u8, b: []const u8) bool {
                 return std.mem.lessThan(u8, a, b);
             }

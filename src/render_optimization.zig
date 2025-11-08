@@ -1,8 +1,10 @@
 //! Rendering optimization utilities for Phantom TUI
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const builtin = @import("builtin");
 const geometry = @import("geometry.zig");
 const style = @import("style.zig");
+const time_utils = @import("time/utils.zig");
 const Buffer = @import("terminal.zig").Buffer;
 const Cell = @import("terminal.zig").Cell;
 
@@ -45,13 +47,13 @@ pub const DirtyRect = struct {
 /// Dirty region manager for tracking areas that need rerendering
 pub const DirtyRegionManager = struct {
     allocator: std.mem.Allocator,
-    dirty_rects: std.ArrayList(DirtyRect),
+    dirty_rects: ArrayList(DirtyRect),
     screen_size: geometry.Size,
 
     pub fn init(allocator: std.mem.Allocator, screen_size: geometry.Size) DirtyRegionManager {
         return DirtyRegionManager{
             .allocator = allocator,
-            .dirty_rects = std.ArrayList(DirtyRect).init(allocator),
+            .dirty_rects = ArrayList(DirtyRect).init(allocator),
             .screen_size = screen_size,
         };
     }
@@ -72,7 +74,7 @@ pub const DirtyRegionManager = struct {
         }
 
         // No overlap, add as new dirty rect
-        try self.dirty_rects.append(self.allocator, DirtyRect.init(rect));
+        try self.dirty_rects.append(DirtyRect.init(rect));
         self.dirty_rects.items[self.dirty_rects.items.len - 1].markDirty();
     }
 
@@ -187,7 +189,7 @@ pub const RenderCache = struct {
         key: u64,
         buffer: []Cell,
         size: geometry.Size,
-        timestamp: i64,
+        timestamp: u64,
 
         pub fn deinit(self: *CacheEntry, allocator: std.mem.Allocator) void {
             allocator.free(self.buffer);
@@ -232,7 +234,7 @@ pub const RenderCache = struct {
             .key = key,
             .buffer = buffer_copy,
             .size = size,
-            .timestamp = std.time.nanoTimestamp(),
+            .timestamp = time_utils.monotonicTimestampNs(),
         };
 
         // Remove existing entry if it exists
@@ -259,7 +261,7 @@ pub const RenderCache = struct {
 
     fn evictOldest(self: *RenderCache) void {
         var oldest_key: ?u64 = null;
-        var oldest_timestamp: i64 = std.math.maxInt(i64);
+        var oldest_timestamp: u64 = std.math.maxInt(u64);
 
         var iterator = self.cache.iterator();
         while (iterator.next()) |entry| {
@@ -283,13 +285,13 @@ pub const RenderCache = struct {
 pub const FrameTimer = struct {
     target_fps: u32,
     frame_duration_ns: u64,
-    last_frame_time: i64,
+    last_frame_time: u64,
     frame_count: u64,
-    start_time: i64,
+    start_time: u64,
 
     pub fn init(target_fps: u32) FrameTimer {
-        const frame_duration_ns = 1_000_000_000 / @as(u64, target_fps);
-        const current_time = std.time.nanoTimestamp();
+        const frame_duration_ns = std.time.ns_per_s / @as(u64, target_fps);
+        const current_time = time_utils.monotonicTimestampNs();
 
         return FrameTimer{
             .target_fps = target_fps,
@@ -301,20 +303,20 @@ pub const FrameTimer = struct {
     }
 
     pub fn shouldRender(self: *FrameTimer) bool {
-        const current_time = std.time.nanoTimestamp();
-        const elapsed = @as(u64, @intCast(current_time - self.last_frame_time));
+        const current_time = time_utils.monotonicTimestampNs();
+        const elapsed = current_time - self.last_frame_time;
 
         return elapsed >= self.frame_duration_ns;
     }
 
     pub fn frameComplete(self: *FrameTimer) void {
-        self.last_frame_time = std.time.nanoTimestamp();
+        self.last_frame_time = time_utils.monotonicTimestampNs();
         self.frame_count += 1;
     }
 
     pub fn waitForNextFrame(self: *FrameTimer) void {
-        const current_time = std.time.nanoTimestamp();
-        const elapsed = @as(u64, @intCast(current_time - self.last_frame_time));
+        const current_time = time_utils.monotonicTimestampNs();
+        const elapsed = current_time - self.last_frame_time;
 
         if (elapsed < self.frame_duration_ns) {
             var remaining = self.frame_duration_ns - elapsed;
@@ -348,8 +350,8 @@ pub const FrameTimer = struct {
     }
 
     pub fn getAverageFPS(self: *const FrameTimer) f64 {
-        const current_time = std.time.nanoTimestamp();
-        const total_time = @as(f64, @floatFromInt(current_time - self.start_time)) / 1_000_000_000.0;
+        const current_time = time_utils.monotonicTimestampNs();
+        const total_time = @as(f64, @floatFromInt(current_time - self.start_time)) / @as(f64, std.time.ns_per_s);
 
         if (total_time > 0.0) {
             return @as(f64, @floatFromInt(self.frame_count)) / total_time;
@@ -363,7 +365,7 @@ pub const FrameTimer = struct {
     }
 
     pub fn reset(self: *FrameTimer) void {
-        const current_time = std.time.nanoTimestamp();
+        const current_time = time_utils.monotonicTimestampNs();
         self.last_frame_time = current_time;
         self.start_time = current_time;
         self.frame_count = 0;
@@ -472,13 +474,13 @@ pub const OptimizedRenderer = struct {
     }
 
     pub fn endFrame(self: *OptimizedRenderer) void {
-        const render_start = std.time.nanoTimestamp();
+        const render_start = time_utils.monotonicTimestampNs();
 
         // Swap buffers
         self.double_buffer.swap();
 
         // Record frame statistics
-        const render_time = @as(u64, @intCast(std.time.nanoTimestamp() - render_start));
+        const render_time = time_utils.monotonicTimestampNs() - render_start;
         self.stats.recordFrame(render_time, @as(u32, @intCast(self.dirty_manager.dirty_rects.items.len)));
 
         // Clear dirty regions

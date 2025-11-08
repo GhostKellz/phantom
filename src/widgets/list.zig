@@ -1,5 +1,6 @@
 //! List widget for displaying selectable items
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
@@ -29,7 +30,7 @@ pub const ListItem = struct {
 pub const List = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
-    items: std.ArrayList(ListItem),
+    items: ArrayList(ListItem),
     selected_index: ?usize,
     scroll_offset: usize,
     item_style: Style,
@@ -47,7 +48,7 @@ pub const List = struct {
         list.* = List{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .items = std.ArrayList(ListItem){},
+            .items = ArrayList(ListItem).init(allocator),
             .selected_index = null,
             .scroll_offset = 0,
             .item_style = Style.default(),
@@ -57,7 +58,7 @@ pub const List = struct {
     }
 
     pub fn addItem(self: *List, item: ListItem) !void {
-        try self.items.append(self.allocator, item);
+        try self.items.append(item);
 
         // Select first item if none selected
         if (self.selected_index == null and self.items.items.len > 0) {
@@ -81,7 +82,7 @@ pub const List = struct {
         for (self.items.items) |item| {
             self.allocator.free(item.text);
         }
-        self.items.clearAndFree(self.allocator);
+        self.items.clearRetainingCapacity();
         self.selected_index = null;
         self.scroll_offset = 0;
     }
@@ -211,7 +212,7 @@ pub const List = struct {
             self.allocator.free(item.text);
         }
 
-        self.items.deinit(self.allocator);
+        self.items.deinit();
         self.allocator.destroy(self);
     }
 };

@@ -3,11 +3,12 @@
 //! Optional backend - can be enabled with -Devent_loop=zigzag
 
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const builtin = @import("builtin");
 const posix = std.posix;
 const zigzag = @import("zigzag");
 
-const ZigZagCoalescingConfig = std.meta.Child(std.meta.FieldType(zigzag.Options, "coalescing"));
+const ZigZagCoalescingConfig = std.meta.Child(@FieldType(zigzag.Options, "coalescing"));
 const types = @import("types.zig");
 const vxfw = @import("../vxfw.zig");
 const EventQueue = @import("EventQueue.zig").EventQueue;
@@ -19,7 +20,7 @@ const InputParser = @import("InputParser.zig").InputParser;
 const Event = types.Event;
 
 fn toZigZagCoalescing(config: CoalescingConfig) ZigZagCoalescingConfig {
-    const debounce_ms = std.math.max(u32, config.resize_debounce_ms, config.mouse_move_debounce_ms);
+    const debounce_ms = @max(config.resize_debounce_ms, config.mouse_move_debounce_ms);
     const bounded_debounce = if (debounce_ms == 0) @as(u32, 1) else debounce_ms;
     const batch_size: usize = if (config.coalesce_mouse_move) 64 else 16;
 
@@ -79,7 +80,7 @@ pub const ZigZagBackend = struct {
 
         const initial_budget_ms: u32 = config.frame_budget_ms orelse 16;
         const initial_rate: u32 = if (config.frame_budget_ms) |ms|
-            if (ms == 0) 0 else std.math.max(@as(u32, @intCast(@divTrunc(1000, ms))), 1)
+            if (ms == 0) 0 else @max(@as(u32, @intCast(@divTrunc(1000, ms))), 1)
         else
             60;
 
@@ -142,7 +143,7 @@ pub const ZigZagBackend = struct {
         var had_activity = count > 0;
 
         // Flush any pending coalesced events
-        var pending_events = std.ArrayList(Event).init(self.allocator);
+        var pending_events = ArrayList(Event).init(self.allocator);
         defer pending_events.deinit();
         try self.coalescer.flushPending(&pending_events);
 
@@ -285,7 +286,7 @@ pub const ZigZagBackend = struct {
         return try self.event_queue.popCommands();
     }
 
-    pub fn queueStats(self: *ZigZagBackend) EventQueue.QueueStats {
+    pub fn queueStats(self: *ZigZagBackend) @import("EventQueue.zig").QueueStats {
         return self.event_queue.getStats();
     }
 
@@ -295,8 +296,8 @@ pub const ZigZagBackend = struct {
         const flags = try posix.fcntl(self.stdin_fd, posix.F.GETFL, 0);
         self.stdin_flags_original = @intCast(flags);
 
-        const non_block: usize = @intCast(@intFromEnum(posix.O.NONBLOCK));
-        try posix.fcntl(self.stdin_fd, posix.F.SETFL, flags | non_block);
+        const non_block: usize = 1 << @bitOffsetOf(posix.O, "NONBLOCK");
+        _ = try posix.fcntl(self.stdin_fd, posix.F.SETFL, flags | non_block);
     }
 
     fn restoreStdinFlags(self: *ZigZagBackend) void {

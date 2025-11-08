@@ -1,5 +1,6 @@
 //! CommandBuilder widget for interactive CLI command construction
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Cell = @import("../terminal.zig").Cell;
@@ -13,11 +14,11 @@ const Style = style.Style;
 
 /// Command argument types
 pub const ArgumentType = enum {
-    flag,           // --flag or -f
-    option,         // --option=value
-    positional,     // value
-    subcommand,     // subcommand
-    
+    flag, // --flag or -f
+    option, // --option=value
+    positional, // value
+    subcommand, // subcommand
+
     pub fn getIcon(self: ArgumentType) []const u8 {
         return switch (self) {
             .flag => "🏳️",
@@ -34,7 +35,7 @@ pub const Suggestion = struct {
     description: []const u8,
     arg_type: ArgumentType,
     required: bool = false,
-    
+
     pub fn getDisplayText(self: *const Suggestion, allocator: std.mem.Allocator) ![]const u8 {
         const req_marker = if (self.required) "*" else "";
         return std.fmt.allocPrint(allocator, "{s}{s}{s} - {s}", .{ self.arg_type.getIcon(), req_marker, self.text, self.description });
@@ -46,7 +47,7 @@ pub const CommandPart = struct {
     text: []const u8,
     arg_type: ArgumentType,
     value: ?[]const u8 = null, // For options that take values
-    
+
     pub fn getFullText(self: *const CommandPart, allocator: std.mem.Allocator) ![]const u8 {
         return if (self.value) |val|
             std.fmt.allocPrint(allocator, "{s}={s}", .{ self.text, val })
@@ -59,28 +60,28 @@ pub const CommandPart = struct {
 pub const CommandBuilder = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
-    
+
     // Command state
-    base_command: []const u8,       // e.g., "git", "flash"
-    command_parts: std.ArrayList(CommandPart),
-    current_input: std.ArrayList(u8),
-    
+    base_command: []const u8, // e.g., "git", "flash"
+    command_parts: ArrayList(CommandPart),
+    current_input: ArrayList(u8),
+
     // Suggestions and completion
-    available_suggestions: std.ArrayList(Suggestion),
-    filtered_suggestions: std.ArrayList(usize), // indices into available_suggestions
+    available_suggestions: ArrayList(Suggestion),
+    filtered_suggestions: ArrayList(usize), // indices into available_suggestions
     selected_suggestion: usize = 0,
     show_suggestions: bool = false,
-    
+
     // Preview and validation
-    preview_command: std.ArrayList(u8),
+    preview_command: ArrayList(u8),
     command_valid: bool = true,
     validation_message: ?[]const u8 = null,
-    
+
     // Display state
     input_focused: bool = true,
     cursor_position: usize = 0,
     scroll_offset: usize = 0,
-    
+
     // Styling
     header_style: Style,
     input_style: Style,
@@ -89,7 +90,7 @@ pub const CommandBuilder = struct {
     preview_style: Style,
     error_style: Style,
     success_style: Style,
-    
+
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
     input_area: Rect = Rect.init(0, 0, 0, 0),
@@ -109,11 +110,11 @@ pub const CommandBuilder = struct {
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
             .base_command = try allocator.dupe(u8, base_command),
-            .command_parts = std.ArrayList(CommandPart).init(allocator),
-            .current_input = std.ArrayList(u8).init(allocator),
-            .available_suggestions = std.ArrayList(Suggestion).init(allocator),
-            .filtered_suggestions = std.ArrayList(usize).init(allocator),
-            .preview_command = std.ArrayList(u8).init(allocator),
+            .command_parts = ArrayList(CommandPart).init(allocator),
+            .current_input = ArrayList(u8).init(allocator),
+            .available_suggestions = ArrayList(Suggestion).init(allocator),
+            .filtered_suggestions = ArrayList(usize).init(allocator),
+            .preview_command = ArrayList(u8).init(allocator),
             .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
             .input_style = Style.withFg(style.Color.bright_white),
             .suggestion_style = Style.withFg(style.Color.white),
@@ -122,10 +123,10 @@ pub const CommandBuilder = struct {
             .error_style = Style.withFg(style.Color.bright_red),
             .success_style = Style.withFg(style.Color.bright_green),
         };
-        
+
         // Initialize with base command
         try builder.updatePreview();
-        
+
         return builder;
     }
 
@@ -203,16 +204,16 @@ pub const CommandBuilder = struct {
     /// Validate the current command
     pub fn validate(self: *CommandBuilder) bool {
         // Basic validation - check for required arguments
-        var required_flags = std.ArrayList([]const u8).init(self.allocator);
+        var required_flags = ArrayList([]const u8).init(self.allocator);
         defer required_flags.deinit();
-        
+
         // Collect required suggestions
         for (self.available_suggestions.items) |*suggestion| {
             if (suggestion.required) {
                 required_flags.append(suggestion.text) catch continue;
             }
         }
-        
+
         // Check if all required arguments are present
         for (required_flags.items) |required| {
             var found = false;
@@ -228,7 +229,7 @@ pub const CommandBuilder = struct {
                 return false;
             }
         }
-        
+
         self.command_valid = true;
         self.validation_message = null;
         return true;
@@ -236,10 +237,10 @@ pub const CommandBuilder = struct {
 
     fn updatePreview(self: *CommandBuilder) !void {
         self.preview_command.clearRetainingCapacity();
-        
+
         // Start with base command
         try self.preview_command.appendSlice(self.base_command);
-        
+
         // Add all command parts
         for (self.command_parts.items) |*part| {
             try self.preview_command.append(' ');
@@ -247,20 +248,20 @@ pub const CommandBuilder = struct {
             defer self.allocator.free(part_text);
             try self.preview_command.appendSlice(part_text);
         }
-        
+
         // Add current input if any
         if (self.current_input.items.len > 0) {
             try self.preview_command.append(' ');
             try self.preview_command.appendSlice(self.current_input.items);
         }
-        
+
         // Validate the command
         _ = self.validate();
     }
 
     fn filterSuggestions(self: *CommandBuilder) void {
         self.filtered_suggestions.clearRetainingCapacity();
-        
+
         const input = self.current_input.items;
         if (input.len == 0) {
             // Show all suggestions
@@ -275,12 +276,12 @@ pub const CommandBuilder = struct {
                 }
             }
         }
-        
+
         // Reset selection if out of bounds
         if (self.selected_suggestion >= self.filtered_suggestions.items.len) {
             self.selected_suggestion = 0;
         }
-        
+
         self.show_suggestions = self.filtered_suggestions.items.len > 0;
     }
 
@@ -288,18 +289,18 @@ pub const CommandBuilder = struct {
         if (self.filtered_suggestions.items.len == 0 or self.selected_suggestion >= self.filtered_suggestions.items.len) {
             return;
         }
-        
+
         const suggestion_index = self.filtered_suggestions.items[self.selected_suggestion];
         const suggestion = &self.available_suggestions.items[suggestion_index];
-        
+
         // Add the suggestion as a command part
         try self.addArgument(suggestion.text, suggestion.arg_type, null);
-        
+
         // Clear current input
         self.current_input.clearRetainingCapacity();
         self.cursor_position = 0;
         self.show_suggestions = false;
-        
+
         // Update filters for next input
         self.filterSuggestions();
     }
@@ -311,7 +312,7 @@ pub const CommandBuilder = struct {
         if (area.height == 0 or area.width == 0) return;
 
         var y: u16 = area.y;
-        
+
         // Header
         if (y < area.y + area.height) {
             buffer.fill(Rect.init(area.x, y, area.width, 1), Cell.withStyle(self.header_style));
@@ -325,15 +326,15 @@ pub const CommandBuilder = struct {
             const parts_text = std.fmt.allocPrint(self.allocator, "Built: {s}", .{self.base_command}) catch return;
             defer self.allocator.free(parts_text);
             buffer.writeText(area.x, y, parts_text, self.input_style);
-            
+
             var x_offset = @as(u16, @intCast(parts_text.len));
             for (self.command_parts.items) |*part| {
                 const part_text = part.getFullText(self.allocator) catch continue;
                 defer self.allocator.free(part_text);
-                
+
                 const display_text = std.fmt.allocPrint(self.allocator, " {s}", .{part_text}) catch continue;
                 defer self.allocator.free(display_text);
-                
+
                 if (area.x + x_offset + display_text.len < area.x + area.width) {
                     buffer.writeText(area.x + x_offset, y, display_text, part.arg_type.getIcon()[0] == '🏳' and true);
                     x_offset += @as(u16, @intCast(display_text.len));
@@ -377,19 +378,19 @@ pub const CommandBuilder = struct {
 
     fn renderInputLine(self: *CommandBuilder, buffer: *Buffer, area: Rect) void {
         buffer.fill(area, Cell.withStyle(self.input_style));
-        
+
         const prompt = "❯ ";
         buffer.writeText(area.x, area.y, prompt, self.input_style);
-        
+
         const input_x = area.x + @as(u16, @intCast(prompt.len));
         const available_width = if (area.width > prompt.len) area.width - @as(u16, @intCast(prompt.len)) else 0;
-        
+
         if (available_width > 0) {
             const input_text = self.current_input.items;
             const display_len = @min(input_text.len, available_width);
-            
+
             buffer.writeText(input_x, area.y, input_text[0..display_len], self.input_style);
-            
+
             // Draw cursor
             if (self.input_focused and self.cursor_position < available_width) {
                 const cursor_x = input_x + @as(u16, @intCast(self.cursor_position));
@@ -401,29 +402,29 @@ pub const CommandBuilder = struct {
 
     fn renderSuggestions(self: *CommandBuilder, buffer: *Buffer, area: Rect) void {
         if (area.height == 0) return;
-        
+
         // Header
         buffer.writeText(area.x, area.y, "💡 Suggestions:", self.header_style);
-        
+
         const suggestions_start_y = area.y + 1;
         const available_height = if (area.height > 1) area.height - 1 else 0;
-        
+
         for (self.filtered_suggestions.items, 0..) |suggestion_index, i| {
             if (i >= available_height) break;
-            
+
             const y = suggestions_start_y + @as(u16, @intCast(i));
             const suggestion = &self.available_suggestions.items[suggestion_index];
-            
+
             const is_selected = i == self.selected_suggestion;
             const suggestion_style = if (is_selected) self.selected_suggestion_style else self.suggestion_style;
-            
+
             const display_text = suggestion.getDisplayText(self.allocator) catch continue;
             defer self.allocator.free(display_text);
-            
+
             const prefix = if (is_selected) "→ " else "  ";
             const full_text = std.fmt.allocPrint(self.allocator, "{s}{s}", .{ prefix, display_text }) catch continue;
             defer self.allocator.free(full_text);
-            
+
             const text_len = @min(full_text.len, area.width);
             buffer.writeText(area.x, y, full_text[0..text_len], suggestion_style);
         }
@@ -431,22 +432,22 @@ pub const CommandBuilder = struct {
 
     fn renderPreview(self: *CommandBuilder, buffer: *Buffer, area: Rect) void {
         if (area.height == 0) return;
-        
+
         // Preview header
         const preview_header = "📋 Preview:";
         buffer.writeText(area.x, area.y, preview_header, self.header_style);
-        
+
         if (area.height > 1) {
             const preview_style = if (self.command_valid) self.success_style else self.error_style;
             const preview_prefix = if (self.command_valid) "✅ " else "❌ ";
-            
+
             const preview_text = std.fmt.allocPrint(self.allocator, "{s}{s}", .{ preview_prefix, self.preview_command.items }) catch return;
             defer self.allocator.free(preview_text);
-            
+
             const text_len = @min(preview_text.len, area.width);
             buffer.writeText(area.x, area.y + 1, preview_text[0..text_len], preview_style);
         }
-        
+
         // Help text
         if (area.height > 3) {
             const help_text = "Tab: autocomplete | Enter: execute | Esc: clear | Backspace: remove";
@@ -457,11 +458,11 @@ pub const CommandBuilder = struct {
 
     fn handleEvent(widget: *Widget, event: Event) bool {
         const self: *CommandBuilder = @fieldParentPtr("widget", widget);
-        
+
         switch (event) {
             .key => |key_event| {
                 if (!key_event.pressed) return false;
-                
+
                 switch (key_event.key) {
                     .char => |char| {
                         // Add character to input
@@ -550,7 +551,7 @@ pub const CommandBuilder = struct {
             },
             else => {},
         }
-        
+
         return false;
     }
 
@@ -561,30 +562,30 @@ pub const CommandBuilder = struct {
 
     fn deinit(widget: *Widget) void {
         const self: *CommandBuilder = @fieldParentPtr("widget", widget);
-        
+
         // Free command parts
         for (self.command_parts.items) |*part| {
             self.allocator.free(part.text);
             if (part.value) |val| self.allocator.free(val);
         }
         self.command_parts.deinit();
-        
+
         // Free suggestions
         for (self.available_suggestions.items) |*suggestion| {
             self.allocator.free(suggestion.text);
             self.allocator.free(suggestion.description);
         }
         self.available_suggestions.deinit();
-        
+
         self.filtered_suggestions.deinit();
         self.current_input.deinit();
         self.preview_command.deinit();
         self.allocator.free(self.base_command);
-        
+
         if (self.validation_message) |msg| {
             self.allocator.free(msg);
         }
-        
+
         self.allocator.destroy(self);
     }
 };
@@ -601,7 +602,7 @@ test "CommandBuilder widget creation" {
         .description = "Record changes to the repository",
         .arg_type = .subcommand,
     });
-    
+
     try builder.addSuggestion(Suggestion{
         .text = "--message",
         .description = "Commit message",

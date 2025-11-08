@@ -1,4 +1,5 @@
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const builtin = @import("builtin");
 const async_mod = @import("../../async/mod.zig");
 const pty = @import("../pty.zig");
@@ -407,7 +408,7 @@ test "Session pumps PTY output to channel" {
 
     const channel = session.channel();
 
-    var buffer = std.ArrayList(u8).init(allocator);
+    var buffer = ArrayList(u8).init(allocator);
     defer buffer.deinit();
 
     var exit_status: ?types.ExitStatus = null;
@@ -469,7 +470,7 @@ test "Manager orchestrates PTY sessions" {
     const handle = try manager.spawn(config);
     try testing.expectEqual(@as(usize, 1), manager.sessionCount());
 
-    var buffer = std.ArrayList(u8).init(allocator);
+    var buffer = ArrayList(u8).init(allocator);
     defer buffer.deinit();
 
     var exit_status: ?types.ExitStatus = null;

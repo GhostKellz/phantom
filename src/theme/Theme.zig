@@ -224,10 +224,7 @@ pub const Theme = struct {
 
     /// Load theme from JSON file
     pub fn loadFromFile(allocator: std.mem.Allocator, path: []const u8) !Theme {
-        const file = try std.fs.cwd().openFile(path, .{});
-        defer file.close();
-
-        const content = try file.readToEndAlloc(allocator, 10 * 1024 * 1024); // 10MB max
+        const content = try std.fs.cwd().readFileAlloc(path, allocator, @enumFromInt(10 * 1024 * 1024)); // 10MB max
         defer allocator.free(content);
 
         return try parseJson(allocator, content);
@@ -527,12 +524,12 @@ fn parseTypography(theme: *Theme, obj: std.json.ObjectMap) !void {
         if (preset_obj.get("weight")) |weight_val| {
             switch (weight_val) {
                 .integer => |int_val| {
-                    const clamped = std.math.clamp(i64, int_val, 0, std.math.maxInt(u16));
+                    const clamped = std.math.clamp(int_val, 0, @as(i64, std.math.maxInt(u16)));
                     preset.weight = @intCast(clamped);
                 },
                 .float => |float_val| {
                     const converted: i64 = @intFromFloat(float_val);
-                    const clamped = std.math.clamp(i64, converted, 0, std.math.maxInt(u16));
+                    const clamped = std.math.clamp(converted, 0, @as(i64, std.math.maxInt(u16)));
                     preset.weight = @intCast(clamped);
                 },
                 else => return error.InvalidTypographyPreset,
@@ -545,7 +542,7 @@ fn parseTypography(theme: *Theme, obj: std.json.ObjectMap) !void {
                 .float => |float_val| @intFromFloat(float_val),
                 else => return error.InvalidTypographyPreset,
             };
-            const clamped = std.math.clamp(i64, amount, -128, 127);
+            const clamped = std.math.clamp(amount, -128, 127);
             preset.tracking = @intCast(clamped);
         }
 

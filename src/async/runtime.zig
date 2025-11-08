@@ -5,6 +5,7 @@
 const std = @import("std");
 const zsync = @import("zsync");
 const phantom = @import("../root.zig");
+const time_utils = @import("../time/utils.zig");
 
 pub const LifecycleHooks = struct {
     context: ?*anyopaque = null,
@@ -88,7 +89,7 @@ pub const AsyncRuntime = struct {
         if (self.running) return error.AlreadyRunning;
         self.runtime.setGlobal();
         self.running = true;
-        self.start_timestamp_ns = std.time.nanoTimestamp();
+        self.start_timestamp_ns = @intCast(time_utils.monotonicTimestampNs());
 
         if (self.config.debug_logging) {
             std.log.info(
@@ -123,7 +124,7 @@ pub const AsyncRuntime = struct {
 
     pub fn uptimeMs(self: *const AsyncRuntime) ?i64 {
         if (self.start_timestamp_ns) |started| {
-            const elapsed_ns = std.time.nanoTimestamp() - started;
+            const elapsed_ns = time_utils.monotonicTimestampNs() - @as(u64, @intCast(started));
             return @intCast(elapsed_ns / std.time.ns_per_ms);
         }
         return null;

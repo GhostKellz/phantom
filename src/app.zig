@@ -11,6 +11,7 @@ const geometry = @import("geometry.zig");
 const style = @import("style.zig");
 const widget_mod = @import("widget.zig");
 const animation = @import("animation.zig");
+const ArrayList = std.array_list.Managed;
 
 const AutoHashMap = std.AutoHashMap;
 
@@ -51,7 +52,7 @@ pub const App = struct {
     needs_redraw: bool = true,
 
     // Widget storage
-    widgets: std.ArrayList(*Widget),
+    widgets: ArrayList(*Widget),
     transition_manager: animation.TransitionManager,
     widget_transitions: AutoHashMap(*Widget, WidgetTransitionState),
 
@@ -66,7 +67,7 @@ pub const App = struct {
             .terminal = terminal,
             .event_loop = event_loop,
             .config = config,
-            .widgets = std.ArrayList(*Widget).init(allocator),
+            .widgets = ArrayList(*Widget).init(allocator),
             .transition_manager = animation.TransitionManager.init(allocator),
             .widget_transitions = AutoHashMap(*Widget, WidgetTransitionState).init(allocator),
         };
@@ -74,16 +75,16 @@ pub const App = struct {
 
     pub fn deinit(self: *App) void {
         self.transition_manager.deinit();
-    self.widget_transitions.deinit();
-    self.widgets.deinit();
+        self.widget_transitions.deinit();
+        self.widgets.deinit();
         self.event_loop.deinit();
         self.terminal.deinit();
     }
 
     /// Add a widget to the application
     pub fn addWidget(self: *App, widget: *Widget) !void {
-    try self.widgets.append(widget);
-    try self.widget_transitions.put(widget, WidgetTransitionState{});
+        try self.widgets.append(widget);
+        try self.widget_transitions.put(widget, WidgetTransitionState{});
         self.needs_redraw = true;
     }
 
@@ -220,7 +221,7 @@ pub const App = struct {
     }
 
     fn resolveWidgetRect(self: *App, widget: *Widget, target: Rect) !Rect {
-    var entry = try self.widget_transitions.getOrPut(widget);
+        var entry = try self.widget_transitions.getOrPut(widget);
         if (!entry.found_existing) {
             entry.value_ptr.* = WidgetTransitionState{};
         }

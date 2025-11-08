@@ -26,6 +26,21 @@ pub const ManifestError = error{
     InvalidComponentEntry,
     MissingRequiredToken,
     UnknownTypographyReference,
+    // JSON parsing errors
+    OutOfMemory,
+    SyntaxError,
+    UnexpectedEndOfInput,
+    UnexpectedToken,
+    InvalidNumber,
+    InvalidCharacter,
+    InvalidEnumTag,
+    DuplicateField,
+    UnknownField,
+    MissingField,
+    LengthMismatch,
+    BufferUnderrun,
+    Overflow,
+    ValueTooLong,
 };
 
 pub const Manifest = struct {
@@ -99,10 +114,7 @@ pub const Manifest = struct {
     }
 
     pub fn loadFromFile(allocator: std.mem.Allocator, path: []const u8) !Manifest {
-        const file = try std.fs.cwd().openFile(path, .{});
-        defer file.close();
-
-        const contents = try file.readToEndAlloc(allocator, 10 * 1024 * 1024);
+        const contents = try std.fs.cwd().readFileAlloc(path, allocator, @enumFromInt(10 * 1024 * 1024));
         defer allocator.free(contents);
 
         return try Manifest.parse(allocator, contents);
@@ -356,18 +368,22 @@ pub const ComponentStyle = struct {
     owns_typography: bool = false,
 
     pub fn setTypography(self: *ComponentStyle, allocator: std.mem.Allocator, name: []const u8) !void {
-        if (self.owns_typography and self.typography) |existing| {
-            allocator.free(@constCast(existing));
-            self.typography = null;
-            self.owns_typography = false;
+        if (self.owns_typography) {
+            if (self.typography) |existing| {
+                allocator.free(@constCast(existing));
+                self.typography = null;
+                self.owns_typography = false;
+            }
         }
         self.typography = try allocator.dupe(u8, name);
         self.owns_typography = true;
     }
 
     pub fn deinit(self: *ComponentStyle, allocator: std.mem.Allocator) void {
-        if (self.owns_typography and self.typography) |name| {
-            allocator.free(@constCast(name));
+        if (self.owns_typography) {
+            if (self.typography) |name| {
+                allocator.free(@constCast(name));
+            }
         }
     }
 };
@@ -409,12 +425,12 @@ fn parseTypographySection(manifest: *Manifest, obj: std.json.ObjectMap) Manifest
         if (preset_obj.get("weight")) |weight_val| {
             switch (weight_val) {
                 .integer => |int_val| {
-                    const clamped = std.math.clamp(i64, int_val, 0, std.math.maxInt(u16));
+                    const clamped = std.math.clamp(int_val, 0, @as(i64, std.math.maxInt(u16)));
                     token.weight = @intCast(clamped);
                 },
                 .float => |float_val| {
                     const converted: i64 = @intFromFloat(float_val);
-                    const clamped = std.math.clamp(i64, converted, 0, std.math.maxInt(u16));
+                    const clamped = std.math.clamp(converted, 0, @as(i64, std.math.maxInt(u16)));
                     token.weight = @intCast(clamped);
                 },
                 else => return ManifestError.InvalidTypographyEntry,
@@ -427,7 +443,7 @@ fn parseTypographySection(manifest: *Manifest, obj: std.json.ObjectMap) Manifest
                 .float => |float_val| @intFromFloat(float_val),
                 else => return ManifestError.InvalidTypographyEntry,
             };
-            const clamped = std.math.clamp(i64, amount, -128, 127);
+            const clamped = std.math.clamp(amount, -128, 127);
             token.tracking = @intCast(clamped);
         }
 

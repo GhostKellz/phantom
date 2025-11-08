@@ -1,5 +1,6 @@
 //! Application status bar widget with customizable segments.
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const SizeConstraints = @import("../widget.zig").SizeConstraints;
 const Buffer = @import("../terminal.zig").Buffer;
@@ -74,7 +75,7 @@ pub const StatusBar = struct {
 
     widget: Widget,
     allocator: std.mem.Allocator,
-    segments: std.ArrayList(Segment),
+    segments: ArrayList(Segment),
     gap: u8,
     background_style: Style,
 
@@ -121,7 +122,7 @@ pub const StatusBar = struct {
         self.* = .{
             .widget = .{ .vtable = &vtable },
             .allocator = allocator,
-            .segments = std.ArrayList(Segment).init(allocator),
+            .segments = ArrayList(Segment).init(allocator),
             .gap = config.gap,
             .background_style = config.background_style,
         };
@@ -289,7 +290,7 @@ pub const StatusBar = struct {
         }
     }
 
-    fn render(widget: *Widget, buffer: *Buffer, area: Rect) void {
+    pub fn render(widget: *Widget, buffer: *Buffer, area: Rect) void {
         const self: *StatusBar = @fieldParentPtr("widget", widget);
         if (area.width == 0 or area.height == 0) return;
 
@@ -371,8 +372,8 @@ pub const StatusBar = struct {
         if (pos < end_x) {
             var pct_buf: [8]u8 = undefined;
             const pct_float = segment.percent * @as(f32, 100.0);
-            const pct_clamped = math.clamp(f32, pct_float, 0.0, 100.0);
-            const pct_value = @as(u8, @intFromFloat(math.round(f32, pct_clamped)));
+            const pct_clamped = math.clamp(pct_float, 0.0, 100.0);
+            const pct_value = @as(u8, @intFromFloat(@round(pct_clamped)));
             const pct_text = std.fmt.bufPrint(&pct_buf, " {d}%", .{pct_value}) catch " 0%";
             pos += self.writeLimited(buffer, pos, area.y, end_x, pct_text, segment.text_style);
         }
@@ -398,9 +399,9 @@ pub const StatusBar = struct {
         }
 
         var filled_count: u16 = if (bar_width == 0) 0 else blk: {
-            const normalized = math.clamp(f32, segment.percent, 0.0, 1.0);
-            const fill_amount = normalized * @as(f32, bar_width);
-            const rounded = math.round(f32, fill_amount);
+            const normalized = math.clamp(segment.percent, 0.0, 1.0);
+            const fill_amount = normalized * @as(f32, @floatFromInt(bar_width));
+            const rounded = @round(fill_amount);
             break :blk @as(u16, @intFromFloat(rounded));
         };
         if (filled_count > bar_width) filled_count = bar_width;
@@ -443,7 +444,7 @@ pub const StatusBar = struct {
         return SizeConstraints.minimum(0, 1);
     }
 
-    fn deinit(widget: *Widget) void {
+    pub fn deinit(widget: *Widget) void {
         const self: *StatusBar = @fieldParentPtr("widget", widget);
         self.clear();
         self.segments.deinit();

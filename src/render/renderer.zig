@@ -2,8 +2,10 @@
 //! Hardened rendering pipeline with CPU backend, dirty-region merging, and stats.
 
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
+const time_utils = @import("../time/utils.zig");
 const CellBuffer = @import("../rendering/CellBuffer.zig").CellBuffer;
 const GraphemeCache = @import("../unicode/GraphemeCache.zig").GraphemeCache;
 
@@ -29,7 +31,7 @@ pub const Target = union(enum) {
     /// Render to a specific file handle.
     file: std.fs.File,
     /// Render into an in-memory buffer (useful for testing).
-    buffer: *std.ArrayList(u8),
+    buffer: *ArrayList(u8),
 };
 
 /// Renderer configuration.
@@ -85,7 +87,7 @@ pub const Renderer = struct {
     config: Config,
     grapheme_cache: GraphemeCache,
     cell_buffer: CellBuffer,
-    merge_scratch: std.ArrayList(Rect),
+    merge_scratch: ArrayList(Rect),
     stats: Stats = .{},
     backend: BackendKind = .cpu,
     first_frame: bool = true,
@@ -96,12 +98,14 @@ pub const Renderer = struct {
             return error.InvalidSize;
         }
 
+        const merge_scratch = try ArrayList(Rect).init(allocator);
+
         var renderer = Renderer{
             .allocator = allocator,
             .config = config,
             .grapheme_cache = GraphemeCache.init(allocator),
             .cell_buffer = undefined,
-            .merge_scratch = std.ArrayList(Rect).init(allocator),
+            .merge_scratch = merge_scratch,
         };
 
         renderer.cell_buffer = try CellBuffer.init(
@@ -203,7 +207,7 @@ pub const Renderer = struct {
             return;
         }
 
-        const frame_start = std.time.nanoTimestamp();
+        const frame_start = time_utils.monotonicTimestampNs();
 
         switch (self.config.target) {
             .stdout => {
@@ -220,8 +224,8 @@ pub const Renderer = struct {
             },
         }
 
-        const frame_end = std.time.nanoTimestamp();
-        const duration = @as(u64, @intCast(frame_end - frame_start));
+        const frame_end = time_utils.monotonicTimestampNs();
+        const duration = frame_end - frame_start;
 
         self.stats.frames += 1;
         self.stats.cpu_frames += 1;
@@ -353,7 +357,7 @@ fn rangesOverlapOrTouch(a_start: u32, a_end: u32, b_start: u32, b_end: u32) bool
 
 test "renderer emits escape sequences for text" {
     const allocator = std.testing.allocator;
-    var output = std.ArrayList(u8).init(allocator);
+    var output = try ArrayList(u8).init(allocator);
     defer output.deinit();
 
     var renderer = try Renderer.init(allocator, .{
@@ -373,7 +377,7 @@ test "renderer emits escape sequences for text" {
 
 test "renderer merges adjacent dirty regions" {
     const allocator = std.testing.allocator;
-    var output = std.ArrayList(u8).init(allocator);
+    var output = try ArrayList(u8).init(allocator);
     defer output.deinit();
 
     var renderer = try Renderer.init(allocator, .{
@@ -395,7 +399,7 @@ test "renderer merges adjacent dirty regions" {
 
 test "renderer resize triggers full redraw" {
     const allocator = std.testing.allocator;
-    var output = std.ArrayList(u8).init(allocator);
+    var output = try ArrayList(u8).init(allocator);
     defer output.deinit();
 
     var renderer = try Renderer.init(allocator, .{

@@ -4,6 +4,7 @@
 //! The Stack widget renders children in order, with later children appearing on top.
 //! This enables floating windows, context menus, and overlay UI elements.
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 const Widget = @import("../widget.zig").Widget;
 const Buffer = @import("../terminal.zig").Buffer;
 const Event = @import("../event.zig").Event;
@@ -23,7 +24,7 @@ pub const StackChild = struct {
 pub const Stack = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
-    children: std.ArrayList(StackChild),
+    children: ArrayList(StackChild),
 
     const vtable = Widget.WidgetVTable{
         .render = render,
@@ -37,14 +38,14 @@ pub const Stack = struct {
         stack.* = Stack{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .children = .{},
+            .children = ArrayList(StackChild).init(allocator),
         };
         return stack;
     }
 
     /// Add a child widget at the given position
     pub fn addChild(self: *Stack, child: *Widget, area: Rect) !void {
-        try self.children.append(self.allocator, StackChild{
+        try self.children.append(StackChild{
             .widget = child,
             .area = area,
         });
@@ -52,7 +53,7 @@ pub const Stack = struct {
 
     /// Add a modal child (blocks events to layers below)
     pub fn addModalChild(self: *Stack, child: *Widget, area: Rect) !void {
-        try self.children.append(self.allocator, StackChild{
+        try self.children.append(StackChild{
             .widget = child,
             .area = area,
             .modal = true,
@@ -86,7 +87,7 @@ pub const Stack = struct {
         for (self.children.items, 0..) |stack_child, i| {
             if (stack_child.widget == child) {
                 const item = self.children.swapRemove(i);
-                self.children.append(self.allocator, item) catch return;
+                self.children.append(item) catch return;
                 return;
             }
         }
@@ -97,7 +98,7 @@ pub const Stack = struct {
         for (self.children.items, 0..) |stack_child, i| {
             if (stack_child.widget == child) {
                 const item = self.children.swapRemove(i);
-                self.children.insert(self.allocator, 0, item) catch return;
+                self.children.insert(0, item) catch return;
                 return;
             }
         }
@@ -168,7 +169,7 @@ pub const Stack = struct {
 
     fn deinit(widget: *Widget) void {
         const self: *Stack = @fieldParentPtr("widget", widget);
-        self.children.deinit(self.allocator);
+        self.children.deinit();
         self.allocator.destroy(self);
     }
 };

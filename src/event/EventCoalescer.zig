@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const Event = @import("../event.zig").Event;
+const ArrayList = std.array_list.Managed;
 const EventQueue = @import("EventQueue.zig").EventQueue;
 const geometry = @import("../geometry.zig");
 const Position = geometry.Position;
@@ -80,7 +81,7 @@ pub const EventCoalescer = struct {
     }
 
     /// Flush any pending coalesced events that have passed their debounce time
-    pub fn flushPending(self: *EventCoalescer, events: *std.ArrayList(Event)) !void {
+    pub fn flushPending(self: *EventCoalescer, events: *ArrayList(Event)) !void {
         const now = self.timer.read() / std.time.ns_per_ms;
 
         // Flush resize event if debounce time elapsed
@@ -125,7 +126,8 @@ pub const EventCoalescer = struct {
     fn handleMouseMoveEvent(self: *EventCoalescer, event: Event, pos: Position, now: u64) CoalesceResult {
         // If this is a different position, update the stored event
         if (self.last_mouse_move_pos == null or
-            !self.last_mouse_move_pos.?.equals(pos)) {
+            !std.meta.eql(self.last_mouse_move_pos.?, pos))
+        {
             self.last_mouse_move_event = event;
             self.last_mouse_move_pos = pos;
             self.last_mouse_move_time = now;
@@ -174,7 +176,7 @@ test "EventCoalescer resize coalescing" {
     try testing.expect(stats.pending_resize);
 
     // Flush pending events
-    var events = std.ArrayList(Event).init(testing.allocator);
+    var events = ArrayList(Event).init(testing.allocator);
     defer events.deinit();
 
     // Wait for debounce time
@@ -205,17 +207,17 @@ test "EventCoalescer mouse move coalescing" {
         .button = .left,
         .position = pos1,
         .pressed = false,
-    }};
+    } };
     const mouse2 = Event{ .mouse = MouseEvent{
         .button = .left,
         .position = pos2,
         .pressed = false,
-    }};
+    } };
     const mouse3 = Event{ .mouse = MouseEvent{
         .button = .left,
         .position = pos3,
         .pressed = false,
-    }};
+    } };
 
     _ = coalescer.processEvent(mouse1);
     _ = coalescer.processEvent(mouse2);
@@ -225,7 +227,7 @@ test "EventCoalescer mouse move coalescing" {
     try testing.expect(stats.pending_mouse_move);
 
     // Flush after debounce time
-    var events = std.ArrayList(Event).init(testing.allocator);
+    var events = ArrayList(Event).init(testing.allocator);
     defer events.deinit();
 
     std.posix.nanosleep(0, 20 * std.time.ns_per_ms);

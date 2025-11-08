@@ -50,7 +50,7 @@ fn onTick() !void {
     }
 
     if (dashboard_state.tick % 6 == 3 and dashboard_state.emitted < Tasks.len) {
-        try global_source.appendSlice(&Tasks[dashboard_state.emitted .. dashboard_state.emitted + 1]);
+        try global_source.appendSlice(Tasks[dashboard_state.emitted .. dashboard_state.emitted + 1]);
         dashboard_state.emitted += 1;
         if (dashboard_state.emitted == Tasks.len) {
             global_source.setState(.exhausted);

@@ -4,6 +4,7 @@
 const std = @import("std");
 const geometry = @import("geometry.zig");
 const style = @import("style.zig");
+const time_utils = @import("time/utils.zig");
 
 const Allocator = std.mem.Allocator;
 const Size = geometry.Size;
@@ -113,9 +114,9 @@ pub const Tick = struct {
 
     /// Create a tick command that fires after the specified milliseconds
     pub fn in(ms: u32, widget: Widget) Command {
-        // Use nanoTimestamp since we don't have a timer instance here
-        const now_ns = std.time.nanoTimestamp();
-        const now_ms = @as(i64, @intCast(@as(u64, @intCast(now_ns)) / std.time.ns_per_ms));
+        // Use monotonic timestamp since we don't have a timer instance here
+        const now_ns = time_utils.monotonicTimestampNs();
+        const now_ms = @as(i64, @intCast(now_ns / std.time.ns_per_ms));
         return .{ .tick = .{
             .deadline_ms = now_ms + ms,
             .widget = widget,
@@ -207,7 +208,18 @@ pub const Key = struct {
         page_down,
 
         // Function keys
-        f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12,
+        f1,
+        f2,
+        f3,
+        f4,
+        f5,
+        f6,
+        f7,
+        f8,
+        f9,
+        f10,
+        f11,
+        f12,
 
         // Character keys (use codepoint for unicode)
         character,
@@ -332,20 +344,20 @@ test "Event types" {
     const key_event = Event{ .key_press = .{
         .key = .escape,
         .mods = .{ .ctrl = true },
-    }};
+    } };
 
     // Test mouse event creation
     const mouse_event = Event{ .mouse = .{
         .button = .left,
         .action = .press,
         .position = .{ .x = 10, .y = 5 },
-    }};
+    } };
 
     // Test user event
     const user_event = Event{ .user = .{
         .name = "test_event",
         .data = null,
-    }};
+    } };
 
     _ = key_event;
     _ = mouse_event;

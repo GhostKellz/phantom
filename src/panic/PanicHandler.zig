@@ -3,6 +3,7 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const time_utils = @import("../time/utils.zig");
 const GlobalTTY = @import("../tty/GlobalTTY.zig");
 
 /// Panic handler configuration
@@ -140,7 +141,7 @@ fn savePanicLog(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, r
     const writer = file.writer();
 
     // Write timestamp
-    const timestamp = std.time.timestamp();
+    const timestamp = time_utils.unixTimestampSeconds();
     try writer.print("\n[PANIC] {d} - ", .{timestamp});
 
     // Write panic message

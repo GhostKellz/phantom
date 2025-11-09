@@ -7,8 +7,6 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    phantom.runtime.initRuntime(allocator);
-    defer phantom.runtime.deinitRuntime();
 
     var app = try phantom.App.init(allocator, phantom.AppConfig{
         .title = "👻 Phantom TUI - Advanced Demo",

@@ -102,25 +102,19 @@ pub fn main() !void {
     var list_widget = try DataListView.init(allocator, handle, list_adapter, list_config, .{
         .virtualization = .{ .window_size = 40, .preload = 10 },
     });
-    defer list_widget.widget.deinit();
 
     var indicator = try DataStateIndicator.init(allocator, handle, .{});
-    defer indicator.widget.deinit();
 
     var badge = try DataBadge.init(allocator, handle, .{});
-    defer badge.widget.deinit();
 
     var overlay = try DataEventOverlay.init(allocator, handle, .{ .max_entries = 12 });
-    defer overlay.widget.deinit();
 
     var header = try Container.init(allocator, .horizontal);
-    defer header.widget.deinit();
     header.setGap(2);
     try header.addChild(&indicator.widget);
     try header.addChild(&badge.widget);
 
     var layout = try Container.init(allocator, .vertical);
-    defer layout.widget.deinit();
     layout.setGap(1);
     layout.setPadding(1);
     try layout.addChildWithFlex(&header.widget, 1);
@@ -139,10 +133,6 @@ pub fn main() !void {
 
     try app.addWidget(&layout.widget);
     try app.event_loop.addHandler(handleEvent);
-
-    std.debug.print("Data Dashboard Demo\n", .{});
-    std.debug.print("===================\n\n", .{});
-    std.debug.print("Press 'q' to exit.\n", .{});
 
     try app.run();
 }

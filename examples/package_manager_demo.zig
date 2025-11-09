@@ -71,8 +71,6 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    try phantom.runtime.initRuntime(allocator);
-    defer phantom.runtime.deinitRuntime();
 
     var app = try phantom.App.init(allocator, phantom.AppConfig{
         .title = "🪐 ZION Package Manager Demo",

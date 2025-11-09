@@ -215,7 +215,6 @@ fn renderCanvasDemo(buffer: *phantom.Buffer, area: phantom.Rect) !void {
 
 fn renderStatusBar(buffer: *phantom.Buffer, area: phantom.Rect) !void {
     var status_bar = try phantom.widgets.StatusBar.init(buffer.allocator, .{});
-    defer status_bar.widget.deinit();
 
     const net_in = try std.fmt.allocPrint(buffer.allocator, "IN {d:.2} MB/s", .{global_state.network_in});
     defer buffer.allocator.free(net_in);

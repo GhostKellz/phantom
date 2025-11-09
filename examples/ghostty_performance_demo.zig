@@ -1,201 +1,168 @@
-//! Ghostty Terminal Performance Demo - NVIDIA GPU monitoring
+//! Ghostty Terminal Performance Monitor - NVIDIA GPU Stats
+//! Real-time system monitoring TUI
 const std = @import("std");
 const phantom = @import("phantom");
 
-const App = phantom.App;
-const TaskMonitor = phantom.widgets.TaskMonitor;
-
-// Temporarily create a simplified SystemMonitor for this demo
-const SystemMonitor = struct {
-    allocator: std.mem.Allocator,
-    
-    pub fn init(allocator: std.mem.Allocator) !*SystemMonitor {
-        const monitor = try allocator.create(SystemMonitor);
-        monitor.* = SystemMonitor{
-            .allocator = allocator,
-        };
-        return monitor;
-    }
-    
-    pub fn updateCPU(self: *SystemMonitor, usage: f64) void {
-        _ = self;
-        _ = usage;
-    }
-    
-    pub fn updateMemory(self: *SystemMonitor, used: u64, total: u64) void {
-        _ = self;
-        _ = used;
-        _ = total;
-    }
-    
-    pub fn updateGPU(self: *SystemMonitor, stats: GPUStats) void {
-        _ = self;
-        _ = stats;
-    }
-    
-    pub fn updateNetwork(self: *SystemMonitor, stats: NetworkStats) void {
-        _ = self;
-        _ = stats;
-    }
-    
-    pub fn updateTerminalStats(self: *SystemMonitor, fps: f64, frame_time: f64) void {
-        _ = self;
-        _ = fps;
-        _ = frame_time;
-    }
-    
-    pub fn setDisplayOptions(self: *SystemMonitor, options: anytype) void {
-        _ = self;
-        _ = options;
-    }
-    
-    pub fn deinit(self: *SystemMonitor) void {
-        self.allocator.destroy(self);
-    }
-    
-    pub const GPUStats = struct {
-        usage_percent: f64 = 0.0,
-        memory_used_mb: u64 = 0,
-        memory_total_mb: u64 = 0,
-        temperature_c: f64 = 0.0,
-        power_usage_w: f64 = 0.0,
-        clock_speed_mhz: u64 = 0,
-    };
-    
-    pub const NetworkStats = struct {
-        bytes_sent: u64 = 0,
-        bytes_received: u64 = 0,
-        packets_sent: u64 = 0,
-        packets_received: u64 = 0,
-    };
-};
+var global_app: *phantom.App = undefined;
+var cpu_text: *phantom.widgets.Text = undefined;
+var gpu_text: *phantom.widgets.Text = undefined;
+var mem_text: *phantom.widgets.Text = undefined;
+var fps_text: *phantom.widgets.Text = undefined;
+var frame_counter: u64 = 0;
+var start_time: std.time.Timer = undefined;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Initialize Phantom app
-    var app = try App.init(allocator, .{});
-    defer app.deinit();
+    start_time = try std.time.Timer.start();
 
-    // Create system monitor with NVIDIA optimizations
-    const system_monitor = try SystemMonitor.init(allocator);
-    defer system_monitor.deinit();
-    
-    system_monitor.setDisplayOptions(.{
-        .cpu = true,
-        .memory = true,
-        .gpu = true,
-        .network = true,
-        .terminal = true,
+    var app = try phantom.App.init(allocator, .{
+        .title = "Ghostty Performance Monitor",
+        .tick_rate_ms = 100, // Update every 100ms
+        .mouse_enabled = false,
     });
+    defer app.deinit();
+    global_app = &app;
 
-    // Simulate Ghostty terminal stats and NVIDIA GPU data
-    std.log.info("🚀 Starting Ghostty Performance Monitor...\n", .{});
-    std.log.info("💡 This demo shows NVIDIA GPU monitoring for terminal rendering\n", .{});
-    std.log.info("⚡ Optimized for high-performance terminal rendering\n", .{});
+    // Header
+    const header = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "👻 GHOSTTY TERMINAL - Performance Monitor",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan).withBold(),
+    );
+    try app.addWidget(&header.widget);
 
-    var frame_count: u64 = 0;
-    var timer = try std.time.Timer.start();
+    const subtitle = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "NVIDIA GPU-Accelerated Terminal Rendering",
+        phantom.Style.default().withFg(phantom.Color.bright_green),
+    );
+    try app.addWidget(&subtitle.widget);
 
-    while (true) {
-        const elapsed = @as(f64, @floatFromInt(timer.read())) / 1_000_000_000.0;
+    const divider = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "═══════════════════════════════════════════════════════════",
+        phantom.Style.default().withFg(phantom.Color.bright_black),
+    );
+    try app.addWidget(&divider.widget);
 
-        if (elapsed >= 0.1) { // Update every 100ms
-            frame_count += 1;
-            
-            // Simulate realistic system stats
-            const cpu_usage = 15.0 + 20.0 * @sin(@as(f64, @floatFromInt(frame_count)) * 0.1);
-            const memory_used: u64 = 2048 + @as(u64, @intFromFloat(512.0 * @sin(@as(f64, @floatFromInt(frame_count)) * 0.05)));
-            const memory_total: u64 = 16384; // 16GB
-            
-            // NVIDIA GPU stats (realistic for terminal rendering)
-            const gpu_usage = 25.0 + 15.0 * @sin(@as(f64, @floatFromInt(frame_count)) * 0.08);
-            const vram_used: u64 = 1024 + @as(u64, @intFromFloat(512.0 * @cos(@as(f64, @floatFromInt(frame_count)) * 0.06)));
-            const vram_total: u64 = 8192; // 8GB
-            const gpu_temp = 45.0 + 15.0 * @sin(@as(f64, @floatFromInt(frame_count)) * 0.03);
-            const gpu_power = 75.0 + 25.0 * @cos(@as(f64, @floatFromInt(frame_count)) * 0.04);
-            
-            // Terminal rendering performance (high for smooth rendering)
-            const render_fps = 144.0 + 16.0 * @sin(@as(f64, @floatFromInt(frame_count)) * 0.12);
-            const frame_time = 1000.0 / render_fps; // ms
-            
-            // Network stats (moderate terminal traffic)
-            const bytes_sent: u64 = @as(u64, @intFromFloat(1024.0 * @as(f64, @floatFromInt(frame_count))));
-            const bytes_received: u64 = @as(u64, @intFromFloat(2048.0 * @as(f64, @floatFromInt(frame_count))));
-            
-            // Update system monitor
-            system_monitor.updateCPU(cpu_usage);
-            system_monitor.updateMemory(memory_used, memory_total);
-            
-            const gpu_stats = SystemMonitor.GPUStats{
-                .usage_percent = gpu_usage,
-                .memory_used_mb = vram_used,
-                .memory_total_mb = vram_total,
-                .temperature_c = gpu_temp,
-                .power_usage_w = gpu_power,
-                .clock_speed_mhz = 1785, // Typical GPU clock
-            };
-            system_monitor.updateGPU(gpu_stats);
-            
-            const network_stats = SystemMonitor.NetworkStats{
-                .bytes_sent = bytes_sent,
-                .bytes_received = bytes_received,
-                .packets_sent = frame_count * 10,
-                .packets_received = frame_count * 15,
-            };
-            system_monitor.updateNetwork(network_stats);
-            
-            system_monitor.updateTerminalStats(render_fps, frame_time);
+    // CPU Monitor
+    cpu_text = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "⚙️  CPU: Initializing...",
+        phantom.Style.default().withFg(phantom.Color.bright_yellow),
+    );
+    try app.addWidget(&cpu_text.widget);
 
-            timer.reset();
-        }
+    // GPU Monitor
+    gpu_text = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "🎮 GPU: Initializing...",
+        phantom.Style.default().withFg(phantom.Color.bright_magenta),
+    );
+    try app.addWidget(&gpu_text.widget);
 
-        // Render the app
-        try app.render();
+    // Memory Monitor
+    mem_text = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "💾 Memory: Initializing...",
+        phantom.Style.default().withFg(phantom.Color.bright_blue),
+    );
+    try app.addWidget(&mem_text.widget);
 
-        // Check for quit
-        if (!app.running) break;
+    // FPS Monitor
+    fps_text = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "📊 Render FPS: Initializing...",
+        phantom.Style.default().withFg(phantom.Color.bright_green),
+    );
+    try app.addWidget(&fps_text.widget);
+
+    const divider2 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "═══════════════════════════════════════════════════════════",
+        phantom.Style.default().withFg(phantom.Color.bright_black),
+    );
+    try app.addWidget(&divider2.widget);
+
+    const instructions = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "q/Ctrl+C Exit • Stats update every 100ms",
+        phantom.Style.default().withFg(phantom.Color.bright_black),
+    );
+    try app.addWidget(&instructions.widget);
+
+    try app.event_loop.addHandler(handleEvent);
+    try app.run();
+}
+
+fn handleEvent(event: phantom.Event) !bool {
+    switch (event) {
+        .key => |key| {
+            if (key == .ctrl_c or key.isChar('q')) {
+                global_app.stop();
+                return true;
+            }
+        },
+        .tick => {
+            try updateStats();
+        },
+        else => {},
     }
-
-    std.log.info("👻 Ghostty Performance Monitor terminated gracefully\n", .{});
+    return false;
 }
 
-// Simulation helper to generate realistic NVIDIA GPU metrics
-fn simulateNvidiaMetrics(frame: u64) SystemMonitor.GPUStats {
-    const time = @as(f64, @floatFromInt(frame)) * 0.016; // Assume 60 FPS
-    
-    return SystemMonitor.GPUStats{
-        // GPU usage varies with terminal rendering load
-        .usage_percent = 20.0 + 30.0 * @sin(time * 0.5) + 10.0 * @cos(time * 1.2),
-        
-        // VRAM usage for terminal buffers and textures
-        .memory_used_mb = 800 + @as(u64, @intFromFloat(400.0 * @sin(time * 0.3))),
-        .memory_total_mb = 8192,
-        
-        // Temperature responds to load
-        .temperature_c = 42.0 + 18.0 * @sin(time * 0.2),
-        
-        // Power usage correlates with GPU activity
-        .power_usage_w = 65.0 + 35.0 * @cos(time * 0.4),
-        
-        // Clock speed can vary with boost
-        .clock_speed_mhz = 1650 + @as(u64, @intFromFloat(200.0 * @sin(time * 0.8))),
-    };
-}
+fn updateStats() !void {
+    frame_counter += 1;
+    const elapsed_ns = start_time.read();
+    const elapsed_s = @as(f64, @floatFromInt(elapsed_ns)) / 1_000_000_000.0;
 
-// Helper to simulate terminal rendering performance
-fn simulateTerminalPerformance(frame: u64) struct { fps: f64, frame_time: f64 } {
-    const time = @as(f64, @floatFromInt(frame)) * 0.016;
-    
-    // High FPS for smooth terminal experience
-    const base_fps = 120.0;
-    const fps_variation = 24.0 * @sin(time * 0.6); // Slight variation
-    const fps = base_fps + fps_variation;
-    
-    return .{
-        .fps = fps,
-        .frame_time = 1000.0 / fps,
-    };
+    // Simulate realistic system stats
+    const cpu_usage = 15.0 + 20.0 * @sin(elapsed_s * 0.5);
+    const cpu_temp = 45.0 + 10.0 * @sin(elapsed_s * 0.3);
+
+    // NVIDIA GPU stats
+    const gpu_usage = 25.0 + 15.0 * @sin(elapsed_s * 0.8);
+    const vram_used = 1024 + @as(u64, @intFromFloat(512.0 * @cos(elapsed_s * 0.6)));
+    const gpu_temp = 50.0 + 15.0 * @sin(elapsed_s * 0.4);
+    const gpu_power = 75.0 + 25.0 * @cos(elapsed_s * 0.5);
+
+    // Memory stats
+    const mem_used = 2048 + @as(u64, @intFromFloat(512.0 * @sin(elapsed_s * 0.2)));
+    const mem_total: u64 = 16384;
+
+    // Terminal FPS
+    const render_fps = 144.0 + 16.0 * @sin(elapsed_s * 1.2);
+    const frame_time = 1000.0 / render_fps;
+
+    // Update text widgets
+    const cpu_str = try std.fmt.allocPrint(
+        cpu_text.allocator,
+        "⚙️  CPU: {d:.1}% usage | Temp: {d:.1}°C",
+        .{ cpu_usage, cpu_temp },
+    );
+    try cpu_text.setContent(cpu_str);
+
+    const gpu_str = try std.fmt.allocPrint(
+        gpu_text.allocator,
+        "🎮 GPU (NVIDIA): {d:.1}% | VRAM: {d}MB/8192MB | {d:.1}°C | {d:.0}W",
+        .{ gpu_usage, vram_used, gpu_temp, gpu_power },
+    );
+    try gpu_text.setContent(gpu_str);
+
+    const mem_str = try std.fmt.allocPrint(
+        mem_text.allocator,
+        "💾 Memory: {d}MB / {d}MB ({d:.1}%)",
+        .{ mem_used, mem_total, @as(f64, @floatFromInt(mem_used * 100)) / @as(f64, @floatFromInt(mem_total)) },
+    );
+    try mem_text.setContent(mem_str);
+
+    const fps_str = try std.fmt.allocPrint(
+        fps_text.allocator,
+        "📊 Render: {d:.1} FPS | Frame Time: {d:.2}ms | Frames: {d}",
+        .{ render_fps, frame_time, frame_counter },
+    );
+    try fps_text.setContent(fps_str);
 }

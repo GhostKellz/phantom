@@ -27,7 +27,6 @@ pub fn main() !void {
 
     // Create StreamingText widget
     const widget = try StreamingText.init(allocator);
-    defer widget.deinit();
 
     widget.setTypingSpeed(100); // 100 characters per second
     widget.setShowCursor(true);

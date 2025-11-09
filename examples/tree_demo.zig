@@ -74,18 +74,6 @@ pub fn main() !void {
 
     try app.addWidget(&tree.widget);
 
-    std.debug.print("Tree Widget Demo\n", .{});
-    std.debug.print("=================\n", .{});
-    std.debug.print("\n", .{});
-    std.debug.print("Navigation:\n", .{});
-    std.debug.print("  ↑/k     - Move up\n", .{});
-    std.debug.print("  ↓/j     - Move down\n", .{});
-    std.debug.print("  →/l     - Expand node\n", .{});
-    std.debug.print("  ←/h     - Collapse node\n", .{});
-    std.debug.print("  Enter   - Toggle expand/collapse\n", .{});
-    std.debug.print("  Esc     - Quit\n", .{});
-    std.debug.print("\n", .{});
-    std.debug.print("Press any key to start...", .{});
     _ = try std.io.getStdIn().reader().readByte();
 
     try app.run();

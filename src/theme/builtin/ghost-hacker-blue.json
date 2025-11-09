@@ -1,11 +1,11 @@
 {
   "name": "Ghost Hacker Blue",
-  "description": "Customized Tokyo Night with vivid teals, aquas, and mint greens",
+  "description": "Deep blue hacker aesthetic matching Grim IDE - Tokyo Night inspired with vivid teals, aquas, and mint greens",
   "variant": "dark",
   "defs": {
-    "bg": "#222436",
-    "bgDark": "#2d3f76",
-    "bgHighlight": "#444a73",
+    "bg": "#1a1b26",
+    "bgDark": "#16161e",
+    "bgHighlight": "#292e42",
     "fg": "#c8d3f5",
     "fgDark": "#c0caf5",
     "comment": "#636da6",

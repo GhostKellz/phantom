@@ -74,6 +74,11 @@ pub const App = struct {
     }
 
     pub fn deinit(self: *App) void {
+        // Clean up all widgets first
+        for (self.widgets.items) |widget| {
+            widget.deinit();
+        }
+
         self.transition_manager.deinit();
         self.widget_transitions.deinit();
         self.widgets.deinit();

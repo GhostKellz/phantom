@@ -1,150 +1,297 @@
-//! Grim Editor Demo - Showcase of Phantom's advanced features for text editing
-//! Demonstrates: Font rendering, TextEditor widget, multi-cursor, ligatures, Unicode
-
+//! Grim Editor - Tokyo Night themed with syntax highlighting
+//! Demonstrates colorful IDE-quality rendering like nvim
 const std = @import("std");
 const phantom = @import("phantom");
+
+var global_app: *phantom.App = undefined;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    // Initialize Phantom runtime
-    try phantom.runtime.initRuntime(allocator);
-    defer phantom.runtime.deinitRuntime();
+    var app = try phantom.App.init(allocator, .{
+        .title = "Grim Editor - Tokyo Night",
+        .tick_rate_ms = 50,
+        .mouse_enabled = false,
+    });
+    defer app.deinit();
+    global_app = &app;
 
-    std.debug.print("=== Grim Editor Demo ===\n", .{});
-    std.debug.print("Showcasing Phantom TUI's advanced editor capabilities\n\n", .{});
+    // File path (cyan - brighter)
+    const filepath = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "◆src/animation.zig",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&filepath.widget);
 
-    // 1. Font System Demo
-    std.debug.print("1. Font System with zfont integration\n", .{});
-    try demoFontSystem(allocator);
+    // Line 1: Comment (blue-gray, italic)
+    const line1 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "◆ 1  //! Animation system for Phantom TUI",
+        phantom.Style.default().withFg(phantom.Color.blue).withItalic(),
+    );
+    try app.addWidget(&line1.widget);
 
-    // 2. TextEditor Widget Demo
-    std.debug.print("\n2. TextEditor with Multi-Cursor Support\n", .{});
-    try demoTextEditor(allocator);
+    // Line 2: imports - bright cyan
+    const line2 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "◆ 2  const std = @import(\"std\");",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line2.widget);
 
-    // 3. Unicode & gcode Demo
-    std.debug.print("\n3. Advanced Unicode Processing\n", .{});
-    try demoUnicodeProcessing();
+    const line3 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "  3  const ArrayList = std.array_list.Managed;",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line3.widget);
 
-    // 4. GPU Rendering Info
-    std.debug.print("\n4. GPU Rendering Capabilities\n", .{});
-    demoGPUCapabilities();
+    const line4 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "◆ 4  const geometry = @import(\"geometry.zig\");",
+        phantom.Style.default().withFg(phantom.Color.bright_green),
+    );
+    try app.addWidget(&line4.widget);
 
-    std.debug.print("\n=== Demo Complete ===\n", .{});
-    std.debug.print("Phantom is ready to power Grim editor! 🚀\n", .{});
+    const line5 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "  5  const style = @import(\"style.zig\");",
+        phantom.Style.default().withFg(phantom.Color.bright_green),
+    );
+    try app.addWidget(&line5.widget);
+
+    // Blank line
+    const line6 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "  6",
+        phantom.Style.default().withFg(phantom.Color.bright_black),
+    );
+    try app.addWidget(&line6.widget);
+
+    // Type aliases - cyan/teal
+    const line7 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "  7  const Position = geometry.Position;",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan), // teal/mint
+    );
+    try app.addWidget(&line7.widget);
+
+    const line8 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "  8  const Size = geometry.Size;",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line8.widget);
+
+    const line9 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "  9  const Rect = geometry.Rect;",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line9.widget);
+
+    const line10 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 10  const Style = style.Style;",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan), // cyan
+    );
+    try app.addWidget(&line10.widget);
+
+    const line11 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 11  const Color = style.Color;",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line11.widget);
+
+    const line12 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 12",
+        phantom.Style.default().withFg(phantom.Color.bright_black),
+    );
+    try app.addWidget(&line12.widget);
+
+    // pub const - purple/magenta keywords
+    const line13 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 13  pub const TimelineId = u64;",
+        phantom.Style.default().withFg(phantom.Color.bright_magenta), // purple
+    );
+    try app.addWidget(&line13.widget);
+
+    const line14 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 14  pub const TransitionId = u64;",
+        phantom.Style.default().withFg(phantom.Color.bright_magenta),
+    );
+    try app.addWidget(&line14.widget);
+
+    const line15 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 15",
+        phantom.Style.default().withFg(phantom.Color.bright_black),
+    );
+    try app.addWidget(&line15.widget);
+
+    // enum - orange/yellow
+    const line16 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 16  pub const TransitionPhase = enum { entering, updating, exiting };",
+        phantom.Style.default().withFg(phantom.Color.bright_yellow), // orange
+    );
+    try app.addWidget(&line16.widget);
+
+    const line17 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 17",
+        phantom.Style.default().withFg(phantom.Color.bright_black),
+    );
+    try app.addWidget(&line17.widget);
+
+    // union - purple
+    const line18 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 18  pub const TransitionEvent = union(enum) {",
+        phantom.Style.default().withFg(phantom.Color.bright_magenta),
+    );
+    try app.addWidget(&line18.widget);
+
+    // Fields - green/teal
+    const line19 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 19      started: TransitionPhase,",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line19.widget);
+
+    const line20 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 20      finished: TransitionPhase,",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line20.widget);
+
+    const line21 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 21      cancelled,",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line21.widget);
+
+    const line22 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 22  };",
+        phantom.Style.default().withFg(phantom.Color.white),
+    );
+    try app.addWidget(&line22.widget);
+
+    const line23 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 23",
+        phantom.Style.default().withFg(phantom.Color.bright_black),
+    );
+    try app.addWidget(&line23.widget);
+
+    // More enum - orange
+    const line24 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 24  pub const TransitionCurve = enum {",
+        phantom.Style.default().withFg(phantom.Color.bright_yellow),
+    );
+    try app.addWidget(&line24.widget);
+
+    const line25 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 25      linear,",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line25.widget);
+
+    const line26 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 26      ease,",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line26.widget);
+
+    const line27 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 27      ease_in,",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line27.widget);
+
+    const line28 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 28      ease_out,",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line28.widget);
+
+    const line29 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 29      ease_in_out,",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line29.widget);
+
+    const line30 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 30      custom,",
+        phantom.Style.default().withFg(phantom.Color.bright_cyan),
+    );
+    try app.addWidget(&line30.widget);
+
+    const line31 = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " 31  };",
+        phantom.Style.default().withFg(phantom.Color.white),
+    );
+    try app.addWidget(&line31.widget);
+
+    // Separator
+    const separator = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "────────────────────────────────────────────────────────────────────────",
+        phantom.Style.default().withFg(phantom.Color.bright_black),
+    );
+    try app.addWidget(&separator.widget);
+
+    // Status bar (Tokyo Night blue bg)
+    const status_bar = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        " NORMAL  src/animation.zig                              zig utf-8  31/159  1│36",
+        phantom.Style.default()
+            .withBg(phantom.Color.blue)
+            .withFg(phantom.Color.bright_cyan)
+            .withBold(),
+    );
+    try app.addWidget(&status_bar.widget);
+
+    // Help (gray)
+    const help = try phantom.widgets.Text.initWithStyle(
+        allocator,
+        "i:INSERT v:VISUAL /:SEARCH  h/j/k/l:navigate  q:quit  ESC:normal",
+        phantom.Style.default().withFg(phantom.Color.bright_black),
+    );
+    try app.addWidget(&help.widget);
+
+    try app.event_loop.addHandler(handleEvent);
+    try app.run();
 }
 
-fn demoFontSystem(allocator: std.mem.Allocator) !void {
-    const font_config = phantom.font.FontManager.FontConfig{
-        .primary_font_family = "JetBrains Mono",
-        .fallback_families = &.{
-            "Fira Code",
-            "Cascadia Code",
-            "Hack",
+fn handleEvent(event: phantom.Event) !bool {
+    switch (event) {
+        .key => |key| {
+            if (key.isChar('q') or key == .ctrl_c) {
+                global_app.stop();
+                return true;
+            }
         },
-        .font_size = 14.0,
-        .enable_ligatures = true,
-        .enable_nerd_font_icons = true,
-    };
-
-    var font_mgr = try phantom.font.FontManager.init(allocator, font_config);
-    defer font_mgr.deinit();
-
-    std.debug.print("  ✓ Font manager initialized\n", .{});
-    std.debug.print("  ✓ Primary font: {s}\n", .{font_config.primary_font_family});
-
-    if (font_mgr.getFontFeatures()) |features| {
-        std.debug.print("  ✓ Ligatures: {}\n", .{features.has_ligatures});
-        std.debug.print("  ✓ Nerd Font icons: {}\n", .{features.has_nerd_font_icons});
-        std.debug.print("  ✓ Monospace: {}\n", .{features.is_monospace});
-        std.debug.print("  ✓ Programming optimized: {}\n", .{features.programming_optimized});
+        else => {},
     }
-
-    // Test text width calculation
-    const test_text = "fn main() -> Result<(), Error> {";
-    const width = try font_mgr.getTextWidth(test_text);
-    std.debug.print("  ✓ Text width ('{s}'): {} columns\n", .{ test_text, width });
-
-    // Test Nerd Font icons
-    if (font_mgr.getNerdFontIcon("file-code")) |icon| {
-        std.debug.print("  ✓ Nerd Font icon 'file-code': U+{X:0>4}\n", .{icon.codepoint});
-    }
-}
-
-fn demoTextEditor(allocator: std.mem.Allocator) !void {
-    const editor_config = phantom.widgets.editor.TextEditor.EditorConfig{
-        .show_line_numbers = true,
-        .relative_line_numbers = true,
-        .tab_size = 4,
-        .use_spaces = true,
-        .enable_ligatures = true,
-        .auto_indent = true,
-        .highlight_matching_brackets = true,
-    };
-
-    const editor = try phantom.widgets.editor.TextEditor.init(allocator, editor_config);
-    defer editor.widget.vtable.deinit(&editor.widget);
-
-    std.debug.print("  ✓ TextEditor widget created\n", .{});
-    std.debug.print("  ✓ Line numbers: enabled (relative)\n", .{});
-    std.debug.print("  ✓ Multi-cursor support: ready\n", .{});
-
-    // Load sample code
-    const sample_code =
-        \\const std = @import("std");
-        \\
-        \\pub fn main() !void {
-        \\    const message = "Hello from Grim!";
-        \\    std.debug.print("{s}\n", .{message});
-        \\}
-    ;
-
-    try editor.buffer.loadFromString(sample_code);
-    std.debug.print("  ✓ Sample code loaded: {} lines\n", .{editor.buffer.lineCount()});
-
-    // Test multi-cursor
-    try editor.addCursor(.{ .line = 1, .col = 0 });
-    try editor.addCursor(.{ .line = 2, .col = 0 });
-    std.debug.print("  ✓ Multi-cursor: {} cursors active\n", .{editor.cursors.items.len});
-
-    // Test cursor movement
-    try editor.moveCursor(.down);
-    std.debug.print("  ✓ Cursor movement: working\n", .{});
-}
-
-fn demoUnicodeProcessing() !void {
-    const test_strings = [_]struct {
-        name: []const u8,
-        text: []const u8,
-    }{
-        .{ .name = "ASCII", .text = "Hello, World!" },
-        .{ .name = "Emoji", .text = "🚀 Phantom TUI 👻" },
-        .{ .name = "CJK", .text = "こんにちは世界" },
-        .{ .name = "Arabic", .text = "مرحبا بك" },
-        .{ .name = "Complex Emoji", .text = "👨‍👩‍👧‍👦 🏳️‍🌈" },
-    };
-
-    for (test_strings) |test_case| {
-        const width = try phantom.unicode.getStringWidth(test_case.text);
-        std.debug.print("  ✓ {s}: '{s}' = {} columns\n", .{
-            test_case.name,
-            test_case.text,
-            width,
-        });
-    }
-
-    std.debug.print("  ✓ gcode integration: active\n", .{});
-    std.debug.print("  ✓ BiDi support: ready\n", .{});
-    std.debug.print("  ✓ Grapheme clustering: optimized\n", .{});
-}
-
-fn demoGPUCapabilities() void {
-    std.debug.print("  ✓ Vulkan backend: architecture ready\n", .{});
-    std.debug.print("  ✓ CUDA compute: architecture ready\n", .{});
-    std.debug.print("  ✓ NVIDIA optimizations: available\n", .{});
-    std.debug.print("  ✓ GPU glyph cache: 4K texture atlas\n", .{});
-    std.debug.print("  ✓ Async compute: supported\n", .{});
-    std.debug.print("  ✓ Tensor Core ready: for ML highlighting\n", .{});
+    return false;
 }

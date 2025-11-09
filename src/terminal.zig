@@ -119,6 +119,7 @@ pub const Terminal = struct {
     back_buffer: Buffer,
     allocator: std.mem.Allocator,
     raw_mode: bool = false,
+    original_termios: ?std.posix.termios = null,
 
     pub fn init(allocator: std.mem.Allocator) !Terminal {
         const size = try getTerminalSize();
@@ -142,18 +143,50 @@ pub const Terminal = struct {
     pub fn enableRawMode(self: *Terminal) !void {
         if (self.raw_mode) return;
 
+        // Save original terminal attributes
+        const stdin_fd = std.posix.STDIN_FILENO;
+        var termios = try std.posix.tcgetattr(stdin_fd);
+        self.original_termios = termios;
+
+        // Configure raw mode
+        termios.lflag.ECHO = false;
+        termios.lflag.ICANON = false;
+        termios.lflag.ISIG = false;
+        termios.lflag.IEXTEN = false;
+
+        termios.iflag.IXON = false;
+        termios.iflag.ICRNL = false;
+        termios.iflag.BRKINT = false;
+        termios.iflag.INPCK = false;
+        termios.iflag.ISTRIP = false;
+
+        termios.oflag.OPOST = false;
+        termios.cflag.CSIZE = .CS8;
+
+        termios.cc[@intFromEnum(std.posix.V.MIN)] = 0;
+        termios.cc[@intFromEnum(std.posix.V.TIME)] = 1;
+
+        try std.posix.tcsetattr(stdin_fd, .NOW, termios);
+
         // Hide cursor and enable alternative screen
         try self.writeAnsi("\x1b[?25l\x1b[?1049h");
 
-        // Enable raw mode (simplified - in real implementation we'd use termios)
         self.raw_mode = true;
     }
 
     pub fn disableRawMode(self: *Terminal) !void {
         if (!self.raw_mode) return;
 
+        // Clear alternate screen before exiting
+        try self.writeAnsi("\x1b[2J\x1b[H");
+
         // Show cursor and disable alternative screen
         try self.writeAnsi("\x1b[?25h\x1b[?1049l");
+
+        // Restore original terminal attributes
+        if (self.original_termios) |termios| {
+            try std.posix.tcsetattr(std.posix.STDIN_FILENO, .NOW, termios);
+        }
 
         self.raw_mode = false;
     }

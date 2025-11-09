@@ -45,9 +45,10 @@ const ChatState = struct {
 
         // Add welcome message
         state.sequence_counter += 1;
+        const welcome_msg = try allocator.dupe(u8, "AI Assistant v0.8.0 - Press Ctrl+C to exit, Enter to send");
         try state.messages.append(allocator, .{
             .role = .system,
-            .content = "AI Assistant v0.8.0 - Press Ctrl+C to exit, Enter to send",
+            .content = welcome_msg,
             .sequence = state.sequence_counter,
         });
 
@@ -95,6 +96,7 @@ const ChatState = struct {
             "Echo: {s}\n\nThis is a demo response. In production, this would call an AI API like Claude or Gemini.",
             .{input}
         );
+        defer self.allocator.free(response);
         try self.addMessage(.assistant, response);
 
         self.input_buffer.clearRetainingCapacity();
@@ -136,6 +138,12 @@ pub fn main() !void {
 
     global_state = try ChatState.init(allocator);
     defer global_state.deinit();
+
+    // Load ghost-hacker-blue theme
+    var theme_manager = try phantom.theme.ThemeManager.init(allocator);
+    defer theme_manager.deinit();
+
+    try theme_manager.setTheme("ghost-hacker-blue");
 
     var app = try phantom.App.init(allocator, .{
         .title = "AI Chat CLI",
@@ -184,13 +192,16 @@ fn handleEvent(event: phantom.Event) !bool {
                 if (global_state.cursor_pos < global_state.input_buffer.items.len) {
                     global_state.cursor_pos += 1;
                 }
-            } else if (key.isChar(0)) {
-                // Ignore
-            } else if (key == .char) {
-                const char = key.char;
-                if (char >= 32 and char < 127) {
-                    try global_state.input_buffer.insert(global_state.allocator, global_state.cursor_pos, @intCast(char));
-                    global_state.cursor_pos += 1;
+            } else {
+                // Handle character input
+                switch (key) {
+                    .char => |c| {
+                        if (c >= 32 and c < 127) {
+                            try global_state.input_buffer.insert(global_state.allocator, global_state.cursor_pos, @intCast(c));
+                            global_state.cursor_pos += 1;
+                        }
+                    },
+                    else => {},
                 }
             }
         },
@@ -207,6 +218,9 @@ fn renderUI() !void {
     const area = phantom.Rect.init(0, 0, global_app.terminal.size.width, global_app.terminal.size.height);
 
     try global_app.terminal.clear();
+
+    // Fill background with dark color to prevent terminal bleed-through
+    buffer.fill(area, phantom.Cell.withStyle(phantom.Style.default().withBg(phantom.Color.black)));
 
     // Create layout: messages area + input area
     const layout = phantom.ConstraintLayout.init(.vertical, &[_]phantom.Constraint{

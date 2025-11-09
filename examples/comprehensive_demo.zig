@@ -85,8 +85,6 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     // Initialize runtime
-    phantom.runtime.initRuntime(allocator);
-    defer phantom.runtime.deinitRuntime();
 
     // Create application
     var app = try phantom.App.init(allocator, phantom.AppConfig{

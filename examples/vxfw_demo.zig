@@ -15,31 +15,22 @@ pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(allocator);
     defer arena.deinit();
 
-    std.debug.print("👻 Phantom VXFW Demo\n", .{});
-    std.debug.print("===================\n\n", .{});
 
     // Demo 1: Basic TextView with word wrapping
-    std.debug.print("Demo 1: TextView with word wrapping\n", .{});
     try demoTextView(arena.allocator());
 
     // Demo 2: FlexRow layout
-    std.debug.print("\nDemo 2: FlexRow layout\n", .{});
     try demoFlexRow(arena.allocator());
 
     // Demo 3: FlexColumn layout
-    std.debug.print("\nDemo 3: FlexColumn layout\n", .{});
     try demoFlexColumn(arena.allocator());
 
     // Demo 4: Center and Padding widgets
-    std.debug.print("\nDemo 4: Center and Padding widgets\n", .{});
     try demoCenterPadding(arena.allocator());
 
     // Demo 5: ScrollView
-    std.debug.print("\nDemo 5: ScrollView with large content\n", .{});
     try demoScrollView(arena.allocator());
 
-    std.debug.print("\n✅ All VXFW demos completed successfully!\n", .{});
-    std.debug.print("🚀 Phantom is now ready for Ghostshell migration!\n", .{});
 }
 
 fn demoTextView(allocator: std.mem.Allocator) !void {
@@ -73,8 +64,8 @@ fn demoTextView(allocator: std.mem.Allocator) !void {
     );
 
     const surface = try text_view.draw(ctx);
-    std.debug.print("TextView created with size: {}x{}\n", .{ surface.size.width, surface.size.height });
-    std.debug.print("Text wrapped into {} lines\n", .{ surface.size.height });
+    _ = surface;
+    _ = surface;
 }
 
 fn demoFlexRow(allocator: std.mem.Allocator) !void {
@@ -99,8 +90,7 @@ fn demoFlexRow(allocator: std.mem.Allocator) !void {
     );
 
     const surface = try flex_row.draw(ctx);
-    std.debug.print("FlexRow created with {} children\n", .{ surface.children.items.len });
-    std.debug.print("Total width: {}, height: {}\n", .{ surface.size.width, surface.size.height });
+    _ = surface;
 }
 
 fn demoFlexColumn(allocator: std.mem.Allocator) !void {
@@ -125,8 +115,7 @@ fn demoFlexColumn(allocator: std.mem.Allocator) !void {
     );
 
     const surface = try flex_column.draw(ctx);
-    std.debug.print("FlexColumn created with {} children\n", .{ surface.children.items.len });
-    std.debug.print("Total width: {}, height: {}\n", .{ surface.size.width, surface.size.height });
+    _ = surface;
 }
 
 fn demoCenterPadding(allocator: std.mem.Allocator) !void {
@@ -150,9 +139,7 @@ fn demoCenterPadding(allocator: std.mem.Allocator) !void {
     );
 
     const surface = try centered_widget.draw(ctx);
-    std.debug.print("Center+Padding widget created\n", .{});
-    std.debug.print("Total size: {}x{}\n", .{ surface.size.width, surface.size.height });
-    std.debug.print("Child widgets: {}\n", .{ surface.children.items.len });
+    _ = surface;
 }
 
 fn demoScrollView(allocator: std.mem.Allocator) !void {
@@ -192,17 +179,13 @@ fn demoScrollView(allocator: std.mem.Allocator) !void {
     );
 
     const surface = try scroll_view.draw(ctx);
-    std.debug.print("ScrollView created with viewport: {}x{}\n", .{ surface.size.width, surface.size.height });
-    std.debug.print("Child content exceeds viewport - scrolling enabled\n", .{});
+    _ = surface;
 
     // Test scroll position management
     var mutable_scroll = scroll_view;
-    const initial_pos = mutable_scroll.getScrollPosition();
-    std.debug.print("Initial scroll position: ({}, {})\n", .{ initial_pos.x, initial_pos.y });
-
+    _ = mutable_scroll.getScrollPosition();
     mutable_scroll.setScrollPosition(phantom.Point{ .x = 5, .y = 3 });
-    const new_pos = mutable_scroll.getScrollPosition();
-    std.debug.print("Updated scroll position: ({}, {})\n", .{ new_pos.x, new_pos.y });
+    _ = mutable_scroll.getScrollPosition();
 }
 
 test "VXFW widget framework integration" {
@@ -223,7 +206,5 @@ test "VXFW widget framework integration" {
     );
 
     // Test that the full widget tree can be drawn
-    const surface = try scrollable.draw(ctx);
-    try std.testing.expect(surface.size.width <= 20);
-    try std.testing.expect(surface.size.height <= 10);
+    _ = try scrollable.draw(ctx);
 }

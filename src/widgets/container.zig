@@ -240,6 +240,12 @@ pub const Container = struct {
 
     fn deinit(widget: *Widget) void {
         const self: *Container = @fieldParentPtr("widget", widget);
+
+        // Clean up all children widgets
+        for (self.children.items) |child| {
+            child.widget.deinit();
+        }
+
         self.children.deinit();
         self.allocator.destroy(self);
     }

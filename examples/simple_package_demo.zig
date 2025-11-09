@@ -8,8 +8,6 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     // Initialize runtime
-    try phantom.runtime.initRuntime(allocator);
-    defer phantom.runtime.deinitRuntime();
 
     // Create application
     var app = try phantom.App.init(allocator, phantom.AppConfig{
@@ -59,20 +57,8 @@ pub fn main() !void {
     try app.addWidget(&instructions.widget);
 
     // Print startup
-    std.debug.print("\n" ++ "=" ** 60 ++ "\n", .{});
-    std.debug.print("👻 PHANTOM TUI v0.2.1 - TASKMONITOR DEMO\n", .{});
-    std.debug.print("=" ** 60 ++ "\n", .{});
-    std.debug.print("🚀 Ratatui-level TUI experience achieved!\n", .{});
-    std.debug.print("📦 Perfect for ZION package manager\n", .{});
-    std.debug.print("⚰️  Perfect for Reaper AUR manager\n", .{});
-    std.debug.print("🎨 Enhanced emoji support\n", .{});
-    std.debug.print("=" ** 60 ++ "\n\n", .{});
 
     // Run the application
     try app.run();
 
-    std.debug.print("\n" ++ "=" ** 60 ++ "\n", .{});
-    std.debug.print("👻 Thanks for trying Phantom v0.2.1!\n", .{});
-    std.debug.print("🚀 TaskMonitor ready for production!\n", .{});
-    std.debug.print("=" ** 60 ++ "\n", .{});
 }

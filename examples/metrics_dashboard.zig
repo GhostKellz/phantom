@@ -1,9 +1,10 @@
-//! Phantom v0.7.0 Data Visualization Demo
-//! Showcases all new Ratatui-parity features:
+//! Phantom Metrics Dashboard Demo
+//! Real-time system metrics visualization with Ratatui-parity widgets:
 //! - BarChart, Chart, Gauge, Sparkline, Calendar, Canvas
 //! - Constraint-based layouts
 //! - Builder patterns and presets
-//! - Perfect reference for Zeke TUI development!
+//! - Live data updates and animations
+//! Perfect reference for building data dashboards in Zeke, Grim, and other TUI apps!
 
 const std = @import("std");
 const phantom = @import("phantom");
@@ -59,7 +60,7 @@ pub fn main() !void {
 
     // Initialize Phantom app
     var app = try phantom.App.init(allocator, .{
-        .title = "Phantom v0.7.0 - Data Visualization Demo",
+        .title = "Phantom Metrics Dashboard - Real-time Data Visualization",
         .tick_rate_ms = 100, // 10 FPS for smooth updates
         .mouse_enabled = true,
         .add_default_handler = false, // We'll handle events manually
@@ -102,6 +103,9 @@ fn renderFrame() !void {
     // Clear buffer
     try global_app.terminal.clear();
 
+    // Fill background to prevent terminal bleed-through
+    buffer.fill(area, phantom.Cell.withStyle(phantom.Style.default().withBg(phantom.Color.black)));
+
     // Use monitoring dashboard layout
     const layout_areas = try phantom.widgets.DashboardLayouts.monitoring(buffer.allocator, area);
     defer buffer.allocator.free(layout_areas);
@@ -129,7 +133,7 @@ fn renderFrame() !void {
 }
 
 fn renderTitle(buffer: *phantom.Buffer, area: phantom.Rect) void {
-    const title = "🎨 Phantom v0.7.0 - Ratatui Parity Demo | Press 'q' to quit";
+    const title = "🎨 Phantom Metrics Dashboard - Live System Monitor | Press 'q' to quit";
     const title_style = phantom.Style.default().withFg(phantom.Color.cyan).withBold();
     const x = area.x + @divTrunc(area.width, 2) - @divTrunc(@as(u16, @intCast(title.len)), 2);
     buffer.writeText(x, area.y, title, title_style);

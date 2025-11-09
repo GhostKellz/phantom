@@ -95,14 +95,8 @@ const ThemeGalleryUI = struct {
     }
 
     pub fn deinit(self: *ThemeGalleryUI) void {
-        self.title.widget.deinit();
-        self.subtitle.widget.deinit();
-        self.instructions.widget.deinit();
-        self.theme_list.widget.deinit();
-        self.preview_header.widget.deinit();
-        self.preview_surface.widget.deinit();
-        self.preview_notice.widget.deinit();
-        self.status.widget.deinit();
+        // Don't call widget.deinit() - App owns and will cleanup the widgets
+        // Just free the UI struct itself
         self.allocator.destroy(self);
     }
 
@@ -231,9 +225,12 @@ const ThemeGalleryUI = struct {
 
     fn tick(self: *ThemeGalleryUI) void {
         self.tick_counter += 1;
-        if (self.tick_counter % 30 == 0) { // roughly every half second at 60 FPS
-            self.refreshFromDisk();
-        }
+        // Disabled auto-refresh to prevent double-free during rapid theme reloading
+        // User can manually refresh with 'R' key
+        _ = self.tick_counter;
+        // if (self.tick_counter % 30 == 0) { // roughly every half second at 60 FPS
+        //     self.refreshFromDisk();
+        // }
     }
 
     fn handleKey(self: *ThemeGalleryUI, key: phantom.Key) !bool {
@@ -338,15 +335,11 @@ pub fn main() !void {
     global_ui = ui;
     defer {
         global_ui = null;
-        ui.deinit();
+        ui.deinit(); // Free the UI struct itself (not the widgets - App owns those)
     }
 
     try app.event_loop.addHandler(galleryEventHandler);
 
-    std.debug.print("\nPhantom Theme Gallery\n", .{});
-    std.debug.print("======================\n", .{});
-    std.debug.print("Available themes are loaded from JSON manifests.\n", .{});
-    std.debug.print("Edit the files under examples/themes and press R to hot-reload.\n\n", .{});
 
     try app.run();
 }

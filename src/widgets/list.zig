@@ -82,7 +82,7 @@ pub const List = struct {
         for (self.items.items) |item| {
             self.allocator.free(item.text);
         }
-        self.items.clearRetainingCapacity();
+        self.items.clearRetainingCapacity(); // Keep capacity, items are now empty
         self.selected_index = null;
         self.scroll_offset = 0;
     }

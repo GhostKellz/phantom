@@ -1,8 +1,9 @@
-//! Phantom v0.7.1 Test Demo
-//! This demonstrates the major fixes in v0.7.1:
-//! - No more zsync crashes on exit
+//! Phantom Stability Test Demo
+//! Demonstrates core stability features:
+//! - No zsync crashes on exit
 //! - Proper vertical layout without widget overlap
-//! - runtime.initRuntime() is now optional
+//! - Optional runtime initialization
+//! - Clean shutdown and resource cleanup
 
 const std = @import("std");
 const phantom = @import("phantom");
@@ -12,16 +13,6 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    std.debug.print("\n", .{});
-    std.debug.print("============================================================\n", .{});
-    std.debug.print("👻 PHANTOM v{s} - STABILITY TEST\n", .{phantom.version});
-    std.debug.print("============================================================\n", .{});
-    std.debug.print("✅ No more zsync crashes on exit\n", .{});
-    std.debug.print("✅ Fixed widget overlapping with auto vertical layout\n", .{});
-    std.debug.print("✅ runtime.initRuntime() is now optional\n", .{});
-    std.debug.print("============================================================\n", .{});
-    std.debug.print("🎮 Press Ctrl+C or ESC to exit\n", .{});
-    std.debug.print("============================================================\n\n", .{});
 
     // NOTE: We're NOT calling phantom.runtime.initRuntime() - it's optional now!
 
@@ -71,8 +62,4 @@ pub fn main() !void {
     // Run the app - should exit cleanly without crashes!
     try app.run();
 
-    std.debug.print("\n", .{});
-    std.debug.print("============================================================\n", .{});
-    std.debug.print("✅ Clean exit - no crashes!\n", .{});
-    std.debug.print("============================================================\n", .{});
 }

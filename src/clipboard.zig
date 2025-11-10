@@ -162,7 +162,12 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (xclip_child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const bytes_read = stdout.readAll(&buffer) catch {
+                    // Zig 0.16.0-dev: readAll removed, use reader pattern
+                    var io_threaded = std.Io.Threaded.init_single_threaded;
+                    const io = io_threaded.io();
+                    var reader_buf: [256]u8 = undefined;
+                    var reader = stdout.reader(io, &reader_buf);
+                    const bytes_read = reader.interface.readSliceShort(&buffer) catch {
                         return ClipboardError.SystemError;
                     };
                     const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
@@ -182,7 +187,12 @@ pub const Clipboard = struct {
             if (term == .Exited and term.Exited == 0) {
                 if (xsel_child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const bytes_read = stdout.readAll(&buffer) catch {
+                    // Zig 0.16.0-dev: readAll removed, use reader pattern
+                    var io_threaded = std.Io.Threaded.init_single_threaded;
+                    const io = io_threaded.io();
+                    var reader_buf: [256]u8 = undefined;
+                    var reader = stdout.reader(io, &reader_buf);
+                    const bytes_read = reader.interface.readSliceShort(&buffer) catch {
                         return ClipboardError.SystemError;
                     };
                     const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
@@ -250,14 +260,19 @@ pub const Clipboard = struct {
         var child = std.process.Child.init(&[_][]const u8{"pbpaste"}, self.allocator);
         child.stdout_behavior = .Pipe;
         child.stderr_behavior = .Pipe;
-        
+
         const result = child.spawnAndWait();
-        
+
         if (result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const bytes_read = stdout.readAll(&buffer) catch {
+                    // Zig 0.16.0-dev: readAll removed, use reader pattern
+                    var io_threaded = std.Io.Threaded.init_single_threaded;
+                    const io = io_threaded.io();
+                    var reader_buf: [256]u8 = undefined;
+                    var reader = stdout.reader(io, &reader_buf);
+                    const bytes_read = reader.interface.readSliceShort(&buffer) catch {
                         return ClipboardError.SystemError;
                     };
                     const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
@@ -307,14 +322,19 @@ pub const Clipboard = struct {
         var child = std.process.Child.init(&[_][]const u8{ "powershell", "-Command", "Get-Clipboard" }, self.allocator);
         child.stdout_behavior = .Pipe;
         child.stderr_behavior = .Pipe;
-        
+
         const result = child.spawnAndWait();
-        
+
         if (result) |term| {
             if (term == .Exited and term.Exited == 0) {
                 if (child.stdout) |stdout| {
                     var buffer: [8192]u8 = undefined;
-                    const bytes_read = stdout.readAll(&buffer) catch {
+                    // Zig 0.16.0-dev: readAll removed, use reader pattern
+                    var io_threaded = std.Io.Threaded.init_single_threaded;
+                    const io = io_threaded.io();
+                    var reader_buf: [256]u8 = undefined;
+                    var reader = stdout.reader(io, &reader_buf);
+                    const bytes_read = reader.interface.readSliceShort(&buffer) catch {
                         return ClipboardError.SystemError;
                     };
                     const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);

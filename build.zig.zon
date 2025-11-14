@@ -55,7 +55,7 @@
         },
         .grove = .{
             .url = "https://github.com/ghostkellz/grove/archive/main.tar.gz",
-            .hash = "grove-0.2.0-rGFsN0Tq6QTEsvGnA667q1GaWiXEJRPS6xkhjWgU22-L",
+            .hash = "grove-0.2.1-rGFsN2g-5ARHyAoh7CnzLilcF-E_2qZfqCxl_loQvVrY",
         },
     },
     .paths = .{

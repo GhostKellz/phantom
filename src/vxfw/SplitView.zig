@@ -284,7 +284,7 @@ pub fn handleEvent(self: *SplitView, ctx: vxfw.EventContext) Allocator.Error!vxf
     if (!self.is_dragging) {
         // Calculate which pane should receive the event based on mouse position or focus
         switch (ctx.event) {
-            .mouse => |_| {
+            .mouse => {
                 if (ctx.isMouseEvent()) |_| {
                     const local_pos = ctx.getLocalMousePosition() orelse return commands;
 

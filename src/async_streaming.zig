@@ -140,7 +140,8 @@ pub const AsyncStreamProducer = struct {
             try self.consumer.send(chunk);
 
             // Simulate network delay or typing speed
-            std.posix.nanosleep(0, self.delay_ms * std.time.ns_per_ms);
+            const ts = std.c.timespec{ .sec = 0, .nsec = @intCast(self.delay_ms * std.time.ns_per_ms) };
+            _ = std.c.nanosleep(&ts, null);
 
             i = end;
         }
@@ -148,7 +149,7 @@ pub const AsyncStreamProducer = struct {
 
     /// Stream lines from a file (useful for log tailing)
     pub fn streamFile(self: *AsyncStreamProducer, file_path: []const u8) !void {
-        const file = try std.fs.cwd().openFile(file_path, .{});
+        const file = try std.Io.Dir.cwd().openFile(file_path, .{});
         defer file.close();
 
         var buf_reader = std.io.bufferedReader(file.reader());
@@ -166,7 +167,8 @@ pub const AsyncStreamProducer = struct {
             try self.consumer.send(line_with_newline);
 
             // Delay between lines
-            std.posix.nanosleep(0, self.delay_ms * std.time.ns_per_ms);
+            const ts = std.c.timespec{ .sec = 0, .nsec = @intCast(self.delay_ms * std.time.ns_per_ms) };
+            _ = std.c.nanosleep(&ts, null);
         }
     }
 
@@ -178,7 +180,8 @@ pub const AsyncStreamProducer = struct {
     ) !void {
         while (try generator_fn(context)) |chunk| {
             try self.consumer.send(chunk);
-            std.posix.nanosleep(0, self.delay_ms * std.time.ns_per_ms);
+            const ts = std.c.timespec{ .sec = 0, .nsec = @intCast(self.delay_ms * std.time.ns_per_ms) };
+            _ = std.c.nanosleep(&ts, null);
         }
     }
 };
@@ -310,7 +313,8 @@ test "AsyncStreamConsumer basic operation" {
     try consumer.send("World!");
 
     // Give consumer time to process
-    std.posix.nanosleep(0, 50 * std.time.ns_per_ms);
+    const ts_wait = std.c.timespec{ .sec = 0, .nsec = 50 * std.time.ns_per_ms };
+    _ = std.c.nanosleep(&ts_wait, null);
 
     // Stop
     consumer.stop();

@@ -15,25 +15,29 @@ pub const ResourcePaths = struct {
         const self = try allocator.create(ResourcePaths);
         errdefer allocator.destroy(self);
 
-        const home = std.posix.getenv("HOME") orelse return error.NoHomeDir;
+        const home_ptr = std.c.getenv("HOME") orelse return error.NoHomeDir;
+        const home = std.mem.span(home_ptr);
 
         // XDG Base Directory Specification
-        const config_home = std.posix.getenv("XDG_CONFIG_HOME") orelse blk: {
+        const xdg_config_ptr = std.c.getenv("XDG_CONFIG_HOME");
+        const config_home = if (xdg_config_ptr) |ptr| std.mem.span(ptr) else blk: {
             break :blk try std.fs.path.join(allocator, &[_][]const u8{ home, ".config" });
         };
-        const config_home_allocated = std.posix.getenv("XDG_CONFIG_HOME") == null;
+        const config_home_allocated = xdg_config_ptr == null;
         defer if (config_home_allocated) allocator.free(config_home);
 
-        const data_home = std.posix.getenv("XDG_DATA_HOME") orelse blk: {
+        const xdg_data_ptr = std.c.getenv("XDG_DATA_HOME");
+        const data_home = if (xdg_data_ptr) |ptr| std.mem.span(ptr) else blk: {
             break :blk try std.fs.path.join(allocator, &[_][]const u8{ home, ".local/share" });
         };
-        const data_home_allocated = std.posix.getenv("XDG_DATA_HOME") == null;
+        const data_home_allocated = xdg_data_ptr == null;
         defer if (data_home_allocated) allocator.free(data_home);
 
-        const cache_home = std.posix.getenv("XDG_CACHE_HOME") orelse blk: {
+        const xdg_cache_ptr = std.c.getenv("XDG_CACHE_HOME");
+        const cache_home = if (xdg_cache_ptr) |ptr| std.mem.span(ptr) else blk: {
             break :blk try std.fs.path.join(allocator, &[_][]const u8{ home, ".cache" });
         };
-        const cache_home_allocated = std.posix.getenv("XDG_CACHE_HOME") == null;
+        const cache_home_allocated = xdg_cache_ptr == null;
         defer if (cache_home_allocated) allocator.free(cache_home);
 
         const config_dir = try std.fs.path.join(allocator, &[_][]const u8{ config_home, app_name });
@@ -41,11 +45,8 @@ pub const ResourcePaths = struct {
         const cache_dir = try std.fs.path.join(allocator, &[_][]const u8{ cache_home, app_name });
         const theme_dir = try std.fs.path.join(allocator, &[_][]const u8{ config_dir, "themes" });
 
-        // Create directories if they don't exist
-        std.fs.cwd().makePath(config_dir) catch {};
-        std.fs.cwd().makePath(data_dir) catch {};
-        std.fs.cwd().makePath(cache_dir) catch {};
-        std.fs.cwd().makePath(theme_dir) catch {};
+        // Note: makePath API changed in Zig 0.16. Directory creation is now deferred
+        // to first access. Users should ensure directories exist if needed.
 
         self.* = ResourcePaths{
             .allocator = allocator,

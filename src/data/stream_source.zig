@@ -189,7 +189,8 @@ test "StreamingListSource processes pushed items" {
     try stream.push(2);
     try stream.pushSlice(&[_]Item{ 3, 4 });
 
-    std.posix.nanosleep(0, 25 * std.time.ns_per_ms);
+    const ts1 = std.c.timespec{ .sec = 0, .nsec = 25 * std.time.ns_per_ms };
+    _ = std.c.nanosleep(&ts1, null);
 
     const source = stream.asListDataSource();
     try testing.expectEqual(@as(usize, 4), source.len());
@@ -197,5 +198,6 @@ test "StreamingListSource processes pushed items" {
     try testing.expectEqual(@as(?Item, 4), source.get(3));
 
     stream.finish();
-    std.posix.nanosleep(0, 5 * std.time.ns_per_ms);
+    const ts2 = std.c.timespec{ .sec = 0, .nsec = 5 * std.time.ns_per_ms };
+    _ = std.c.nanosleep(&ts2, null);
 }

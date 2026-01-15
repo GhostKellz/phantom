@@ -518,7 +518,7 @@ pub fn ThemeAwareWidget(comptime WidgetType: type) type {
                         try commands.append(detect_cmd);
                     }
                 },
-                .color_report => |_| {
+                .color_report => {
                     // Color report might affect theme detection
                     if (self.auto_detect) {
                         const detect_cmd = self.detectTheme() catch vxfw.Command.redraw;

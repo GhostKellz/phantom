@@ -185,7 +185,8 @@ pub const ZigZagBackend = struct {
 
             if (frame_duration < self.frame_budget_ms) {
                 const sleep_ms = self.frame_budget_ms - @as(u32, @intCast(frame_duration));
-                std.posix.nanosleep(0, sleep_ms * std.time.ns_per_ms);
+                const ts = std.c.timespec{ .sec = 0, .nsec = @intCast(sleep_ms * std.time.ns_per_ms) };
+                _ = std.c.nanosleep(&ts, null);
             }
 
             self.last_frame_time = frame_end;

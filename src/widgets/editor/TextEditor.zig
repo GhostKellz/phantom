@@ -374,7 +374,7 @@ pub fn deinit(widget: *Widget) void {
 }
 
 pub fn loadFile(self: *Self, path: []const u8) !void {
-    const file = try std.fs.cwd().openFile(path, .{});
+    const file = try std.Io.Dir.cwd().openFile(path, .{});
     defer file.close();
 
     const content = try file.readToEndAlloc(self.allocator, 100 * 1024 * 1024); // 100MB max
@@ -384,7 +384,7 @@ pub fn loadFile(self: *Self, path: []const u8) !void {
 }
 
 pub fn saveFile(self: *Self, path: []const u8) !void {
-    const file = try std.fs.cwd().createFile(path, .{});
+    const file = try std.Io.Dir.cwd().createFile(path, .{});
     defer file.close();
 
     try file.writeAll(self.buffer.rope.content.items);

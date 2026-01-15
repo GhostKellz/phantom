@@ -113,7 +113,7 @@ pub const zontom = @import("zontom");
 
 // For compatibility with existing code
 pub fn bufferedPrint() !void {
-    const stdout_file = std.fs.File.stdout().writer();
+    const stdout_file = std.Io.File.stdout().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
     try stdout.print("Phantom TUI Framework initialized!\n", .{});

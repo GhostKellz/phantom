@@ -29,7 +29,7 @@ pub const Target = union(enum) {
     /// Render directly to stdout.
     stdout,
     /// Render to a specific file handle.
-    file: std.fs.File,
+    file: std.Io.File,
     /// Render into an in-memory buffer (useful for testing).
     buffer: *ArrayList(u8),
 };

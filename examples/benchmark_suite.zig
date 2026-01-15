@@ -4,6 +4,16 @@
 const std = @import("std");
 const phantom = @import("phantom");
 
+/// Helper to write to stdout using C library
+fn writeStdout(data: []const u8) !void {
+    var written: usize = 0;
+    while (written < data.len) {
+        const result = std.c.write(std.posix.STDOUT_FILENO, data.ptr + written, data.len - written);
+        if (result < 0) return error.WriteFailed;
+        written += @intCast(result);
+    }
+}
+
 const BenchmarkResult = struct {
     name: []const u8,
     iterations: usize,
@@ -12,7 +22,7 @@ const BenchmarkResult = struct {
     min_ns: u64,
     max_ns: u64,
 
-    fn print(self: BenchmarkResult, file: std.fs.File, allocator: std.mem.Allocator) !void {
+    fn print(self: BenchmarkResult, allocator: std.mem.Allocator) !void {
         const line = try std.fmt.allocPrint(allocator, "{s:30} | {d:8} iter | {d:8} ns avg | {d:8} ns min | {d:8} ns max\n", .{
             self.name,
             self.iterations,
@@ -21,7 +31,7 @@ const BenchmarkResult = struct {
             self.max_ns,
         });
         defer allocator.free(line);
-        try file.writeAll(line);
+        try writeStdout(line);
     }
 };
 
@@ -57,11 +67,9 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const stdout = std.fs.File{ .handle = std.posix.STDOUT_FILENO };
-
-    try stdout.writeAll("\n=== Phantom TUI Framework Performance Benchmarks ===\n\n");
-    try stdout.writeAll("Benchmark                      | Iterations |   Avg (ns) |   Min (ns) |   Max (ns)\n");
-    try stdout.writeAll("-------------------------------|------------|------------|------------|------------\n");
+    try writeStdout("\n=== Phantom TUI Framework Performance Benchmarks ===\n\n");
+    try writeStdout("Benchmark                      | Iterations |   Avg (ns) |   Min (ns) |   Max (ns)\n");
+    try writeStdout("-------------------------------|------------|------------|------------|------------\n");
 
     // Layout benchmarks
     {
@@ -74,7 +82,7 @@ pub fn main() !void {
         });
 
         const result = try benchmark("Layout: 4-way vertical split", 10000, benchLayoutSplit, .{ allocator, layout, rect });
-        try result.print(stdout, allocator);
+        try result.print(allocator);
     }
 
     {
@@ -86,7 +94,7 @@ pub fn main() !void {
         });
 
         const result = try benchmark("Layout: 3-way horiz split", 10000, benchLayoutSplit, .{ allocator, layout, rect });
-        try result.print(stdout, allocator);
+        try result.print(allocator);
     }
 
     // Buffer operations
@@ -95,7 +103,7 @@ pub fn main() !void {
         defer buffer.deinit();
 
         const result = try benchmark("Buffer: writeText 100 chars", 10000, benchBufferWrite, .{&buffer});
-        try result.print(stdout, allocator);
+        try result.print(allocator);
     }
 
     {
@@ -103,29 +111,29 @@ pub fn main() !void {
         defer buffer.deinit();
 
         const result = try benchmark("Buffer: clear large (200x100)", 5000, benchBufferClear, .{&buffer});
-        try result.print(stdout, allocator);
+        try result.print(allocator);
     }
 
     // Style operations
     {
         const result = try benchmark("Style: create with colors", 50000, benchStyleCreate, .{});
-        try result.print(stdout, allocator);
+        try result.print(allocator);
     }
 
     // Color conversions
     {
         const result = try benchmark("Color: RGB to ANSI", 50000, benchColorConvert, .{});
-        try result.print(stdout, allocator);
+        try result.print(allocator);
     }
 
     // Rect operations
     {
         const result = try benchmark("Rect: intersections", 50000, benchRectIntersect, .{});
-        try result.print(stdout, allocator);
+        try result.print(allocator);
     }
 
-    try stdout.writeAll("\n=== Summary ===\n");
-    try stdout.writeAll("All benchmarks completed successfully\n\n");
+    try writeStdout("\n=== Summary ===\n");
+    try writeStdout("All benchmarks completed successfully\n\n");
 }
 
 fn benchLayoutSplit(allocator: std.mem.Allocator, layout: phantom.ConstraintLayout, rect: phantom.Rect) void {

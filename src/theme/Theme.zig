@@ -223,11 +223,36 @@ pub const Theme = struct {
     }
 
     /// Load theme from JSON file
+    /// Uses POSIX APIs for file reading (Zig 0.16+ compatible)
     pub fn loadFromFile(allocator: std.mem.Allocator, path: []const u8) !Theme {
-        const content = try std.fs.cwd().readFileAlloc(path, allocator, @enumFromInt(10 * 1024 * 1024)); // 10MB max
+        const content = try readFileContents(allocator, path, 10 * 1024 * 1024);
         defer allocator.free(content);
 
         return try parseJson(allocator, content);
+    }
+
+    /// Read file contents using POSIX APIs (doesn't require Io context)
+    fn readFileContents(allocator: std.mem.Allocator, path: []const u8, max_size: usize) ![]u8 {
+        const fd = std.posix.openat(std.posix.AT.FDCWD, path, .{ .ACCMODE = .RDONLY }, 0) catch |err| {
+            return err;
+        };
+        defer std.posix.close(fd);
+
+        // Read in chunks - standard approach that works across platforms
+        var buffer: std.ArrayList(u8) = .empty;
+        errdefer buffer.deinit(allocator);
+
+        var chunk: [8192]u8 = undefined;
+        while (true) {
+            const bytes_read = std.posix.read(fd, &chunk) catch |err| {
+                return err;
+            };
+            if (bytes_read == 0) break;
+            if (buffer.items.len + bytes_read > max_size) return error.FileTooBig;
+            try buffer.appendSlice(allocator, chunk[0..bytes_read]);
+        }
+
+        return try buffer.toOwnedSlice(allocator);
     }
 
     /// Parse theme from JSON string

@@ -9,6 +9,36 @@ const style_theme = @import("../style/theme.zig");
 
 const log = std.log.scoped(.theme_manifest);
 
+/// Simple file stat structure for change detection (using Linux statx)
+pub const FileStat = struct {
+    size: u64,
+    mtime_sec: i64,
+    mtime_nsec: u32,
+};
+
+/// Get file stats using Linux statx syscall
+fn getFileStat(allocator: std.mem.Allocator, path: []const u8) !FileStat {
+    const path_z = try allocator.dupeZ(u8, path);
+    defer allocator.free(path_z);
+
+    var statx_buf: std.os.linux.Statx = undefined;
+    const rc = std.os.linux.statx(
+        std.posix.AT.FDCWD,
+        path_z,
+        0, // flags
+        std.os.linux.STATX{ .SIZE = true, .MTIME = true },
+        &statx_buf,
+    );
+    if (std.posix.errno(rc) != .SUCCESS) {
+        return error.StatFailed;
+    }
+    return FileStat{
+        .size = statx_buf.size,
+        .mtime_sec = statx_buf.mtime.sec,
+        .mtime_nsec = statx_buf.mtime.nsec,
+    };
+}
+
 pub const ManifestLoader = struct {
     allocator: std.mem.Allocator,
     manager: *ThemeManager,
@@ -19,7 +49,7 @@ pub const ManifestLoader = struct {
         path: []const u8,
         origin: Origin,
         auto_activate: bool,
-        last_stat: ?std.fs.File.Stat = null,
+        last_stat: ?FileStat = null,
     };
 
     pub const RegisterOptions = struct {
@@ -73,7 +103,7 @@ pub const ManifestLoader = struct {
 
     pub fn refresh(self: *ManifestLoader) void {
         for (self.entries.items) |*entry| {
-            const stat = std.fs.cwd().statFile(entry.path) catch |err| {
+            const stat = getFileStat(self.allocator, entry.path) catch |err| {
                 log.warn("failed to stat manifest {s}: {}", .{ entry.path, err });
                 continue;
             };
@@ -102,7 +132,7 @@ pub const ManifestLoader = struct {
         return null;
     }
 
-    fn reloadEntry(self: *ManifestLoader, entry: *Entry, stat_hint: ?std.fs.File.Stat) !void {
+    fn reloadEntry(self: *ManifestLoader, entry: *Entry, stat_hint: ?FileStat) !void {
         var manifest = try style_theme.Manifest.loadFromFile(self.allocator, entry.path);
         defer manifest.deinit();
 
@@ -110,13 +140,13 @@ pub const ManifestLoader = struct {
             .auto_activate = entry.auto_activate,
         });
 
-        const stat = stat_hint orelse try std.fs.cwd().statFile(entry.path);
+        const stat = stat_hint orelse try getFileStat(self.allocator, entry.path);
         entry.last_stat = stat;
     }
 };
 
-fn statsEqual(a: std.fs.File.Stat, b: std.fs.File.Stat) bool {
-    return a.size == b.size and a.mtime.nanoseconds == b.mtime.nanoseconds;
+fn statsEqual(a: FileStat, b: FileStat) bool {
+    return a.size == b.size and a.mtime_sec == b.mtime_sec and a.mtime_nsec == b.mtime_nsec;
 }
 
 // Tests

@@ -337,10 +337,11 @@ pub const FrameTimer = struct {
                 else
                     @as(u32, @intCast(remaining));
 
-                std.posix.nanosleep(
-                    @as(u32, @intCast(seconds_chunk)),
-                    nanos_chunk,
-                );
+                const ts = std.c.timespec{
+                    .sec = @intCast(seconds_chunk),
+                    .nsec = @intCast(nanos_chunk),
+                };
+                _ = std.c.nanosleep(&ts, null);
 
                 const consumed = seconds_chunk * ns_per_s + nanos_chunk;
                 if (consumed == 0) break;

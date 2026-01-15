@@ -101,7 +101,8 @@ fn simulateLibraryInstall(allocator: std.mem.Allocator, library: []const u8, ver
     
     for (steps) |step| {
         std.log.info("   {s}\n", .{step});
-        std.posix.nanosleep(0, 500_000_000); // 500ms delay
+        const ts = std.c.timespec{ .sec = 0, .nsec = 500_000_000 };
+        _ = std.c.nanosleep(&ts, null); // 500ms delay
     }
 }
 

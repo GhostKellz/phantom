@@ -231,7 +231,7 @@ fn resolveLengthWithinCell(dim: Dimension, cell: u16, alignment: AxisAlignment) 
         },
         .px => |px| @min(px, cell),
         .percent => |pct| types.resolveDimension(.{ .percent = pct }, cell) orelse cell,
-        .fraction => |_| cell,
+        .fraction => cell,
     };
 }
 

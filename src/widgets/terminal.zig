@@ -622,7 +622,7 @@ pub const Terminal = struct {
             .tab => try self.appendTab(),
             .attributes => |seq| self.applyAttributes(seq),
             .erase_line => |payload| self.eraseLine(payload.mode),
-            .erase_display => |_| self.resetState(),
+            .erase_display => self.resetState(),
             .reset_terminal => self.resetState(),
             else => {},
         }

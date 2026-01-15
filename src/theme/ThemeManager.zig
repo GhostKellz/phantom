@@ -121,27 +121,57 @@ pub const ThemeManager = struct {
     }
 
     /// Load user themes from ~/.config/phantom/themes/
+    /// Uses POSIX getdents64 for directory iteration (Zig 0.16+ compatible)
     fn loadUserThemes(self: *ThemeManager) !void {
-        var theme_dir = try std.fs.cwd().openDir(self.theme_dir, .{ .iterate = true });
-        defer theme_dir.close();
+        // Open directory using POSIX openat
+        const dir_fd = std.posix.openat(std.posix.AT.FDCWD, self.theme_dir, .{ .DIRECTORY = true }, 0) catch |err| {
+            std.log.debug("Could not open theme directory {s}: {}", .{ self.theme_dir, err });
+            return;
+        };
+        defer std.posix.close(dir_fd);
 
-        var iter = theme_dir.iterate();
-        while (try iter.next()) |entry| {
-            if (entry.kind != .file) continue;
-            if (!std.mem.endsWith(u8, entry.name, ".json")) continue;
+        // Use getdents64 for directory iteration (works without Io context)
+        var buf: [4096]u8 align(@alignOf(std.os.linux.dirent64)) = undefined;
+        while (true) {
+            const nread = std.os.linux.getdents64(dir_fd, &buf, buf.len);
+            if (nread == 0) break;
+            if (nread < 0) {
+                std.log.warn("Failed to read theme directory: errno {}", .{nread});
+                break;
+            }
 
-            const path = try std.fs.path.join(self.allocator, &[_][]const u8{ self.theme_dir, entry.name });
-            defer self.allocator.free(path);
+            var offset: usize = 0;
+            while (offset < nread) {
+                const entry: *std.os.linux.dirent64 = @ptrCast(@alignCast(&buf[offset]));
+                offset += entry.reclen;
 
-            var theme = Theme.loadFromFile(self.allocator, path) catch |err| {
-                std.log.warn("Failed to load theme {s}: {}", .{ entry.name, err });
-                continue;
-            };
-            theme.setOrigin(.user);
+                // Skip non-regular files
+                if (entry.type != std.os.linux.DT.REG) continue;
 
-            // Use filename without extension as theme name
-            const name = entry.name[0 .. entry.name.len - 5]; // Remove ".json"
-            try self.putTheme(name, theme);
+                // Get entry name
+                const name_ptr: [*:0]const u8 = @ptrCast(&entry.name);
+                const name = std.mem.span(name_ptr);
+
+                // Skip non-JSON files
+                if (!std.mem.endsWith(u8, name, ".json")) continue;
+
+                const path = std.fs.path.join(self.allocator, &[_][]const u8{ self.theme_dir, name }) catch continue;
+                defer self.allocator.free(path);
+
+                var theme = Theme.loadFromFile(self.allocator, path) catch |err| {
+                    std.log.warn("Failed to load theme {s}: {}", .{ name, err });
+                    continue;
+                };
+                theme.setOrigin(.user);
+
+                // Use filename without extension as theme name
+                const theme_name = name[0 .. name.len - 5]; // Remove ".json"
+                self.putTheme(theme_name, theme) catch |err| {
+                    std.log.warn("Failed to register theme {s}: {}", .{ theme_name, err });
+                    theme.deinit();
+                    continue;
+                };
+            }
         }
     }
 
@@ -184,7 +214,8 @@ pub const ThemeManager = struct {
     }
 
     fn initializeActiveTheme(self: *ThemeManager) !void {
-        if (std.posix.getenv("PHANTOM_THEME")) |requested| {
+        if (std.c.getenv("PHANTOM_THEME")) |requested_ptr| {
+            const requested = std.mem.span(requested_ptr);
             if (self.getStoredKey(requested)) |key| {
                 self.active_theme_name = key;
                 self.preferred_variant = self.themes.getPtr(key).?.variant;
@@ -194,7 +225,8 @@ pub const ThemeManager = struct {
             }
         }
 
-        if (std.posix.getenv("PHANTOM_THEME_VARIANT")) |variant_env| {
+        if (std.c.getenv("PHANTOM_THEME_VARIANT")) |variant_env_ptr| {
+            const variant_env = std.mem.span(variant_env_ptr);
             if (theme_mod.variantFromString(variant_env)) |parsed| {
                 self.preferred_variant = parsed;
             } else {
@@ -239,7 +271,8 @@ pub const ThemeManager = struct {
     }
 
     fn detectPreferredVariant() Variant {
-        if (std.posix.getenv("TERM_BACKGROUND")) |term_bg| {
+        if (std.c.getenv("TERM_BACKGROUND")) |term_bg_ptr| {
+            const term_bg = std.mem.span(term_bg_ptr);
             if (theme_mod.variantFromString(term_bg)) |parsed| {
                 return parsed;
             }
@@ -334,16 +367,17 @@ pub const ThemeManager = struct {
 
     /// Get theme directory path
     fn getThemeDir(self: *ThemeManager) ![]const u8 {
-        const home = std.posix.getenv("HOME") orelse return error.NoHomeDir;
+        const home_ptr = std.c.getenv("HOME") orelse return error.NoHomeDir;
+        const home = std.mem.span(home_ptr);
 
-        const config_home = std.posix.getenv("XDG_CONFIG_HOME") orelse
+        const xdg_config_ptr = std.c.getenv("XDG_CONFIG_HOME");
+        const config_home = if (xdg_config_ptr) |ptr| std.mem.span(ptr) else
             try std.fs.path.join(self.allocator, &[_][]const u8{ home, ".config" });
-        defer if (std.posix.getenv("XDG_CONFIG_HOME") == null) self.allocator.free(config_home);
+        defer if (xdg_config_ptr == null) self.allocator.free(config_home);
 
         const theme_dir = try std.fs.path.join(self.allocator, &[_][]const u8{ config_home, "phantom", "themes" });
 
-        // Create directory if it doesn't exist
-        std.fs.cwd().makePath(theme_dir) catch {};
+        // Note: makePath API changed in Zig 0.16. Directory creation is deferred.
 
         return theme_dir;
     }

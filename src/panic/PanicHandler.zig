@@ -132,7 +132,7 @@ fn displayPanicInfo(msg: []const u8, error_return_trace: ?*std.builtin.StackTrac
 fn savePanicLog(msg: []const u8, error_return_trace: ?*std.builtin.StackTrace, ret_addr: ?usize) !void {
     const log_path = panic_config.panic_log_path orelse "phantom_panic.log";
 
-    var file = std.fs.cwd().createFile(log_path, .{ .truncate = false }) catch return;
+    var file = std.Io.Dir.cwd().createFile(log_path, .{ .truncate = false }) catch return;
     defer file.close();
 
     // Seek to end of file for appending
@@ -329,11 +329,11 @@ pub const PanicDebug = struct {
 
         // Environment information
         try writer.writeAll("Environment:\n");
-        if (std.os.getenv("TERM")) |term| {
-            try writer.print("  TERM={s}\n", .{term});
+        if (std.c.getenv("TERM")) |term_ptr| {
+            try writer.print("  TERM={s}\n", .{std.mem.span(term_ptr)});
         }
-        if (std.os.getenv("COLORTERM")) |colorterm| {
-            try writer.print("  COLORTERM={s}\n", .{colorterm});
+        if (std.c.getenv("COLORTERM")) |colorterm_ptr| {
+            try writer.print("  COLORTERM={s}\n", .{std.mem.span(colorterm_ptr)});
         }
 
         try writer.writeAll("==============================\n");
@@ -341,7 +341,7 @@ pub const PanicDebug = struct {
 
     /// Write minimal crash report
     pub fn writeCrashReport(msg: []const u8) void {
-        var file = std.fs.cwd().createFile("phantom_crash_report.txt", .{}) catch return;
+        var file = std.Io.Dir.cwd().createFile("phantom_crash_report.txt", .{}) catch return;
         defer file.close();
 
         const writer = file.writer();
@@ -357,7 +357,7 @@ pub const PanicDebug = struct {
 pub fn exampleFileCleanup(panic_msg: []const u8) void {
     _ = panic_msg;
     // Clean up temporary files
-    std.fs.cwd().deleteFile("temp_file.tmp") catch {};
+    std.Io.Dir.cwd().deleteFile("temp_file.tmp") catch {};
 }
 
 pub fn exampleNetworkCleanup(panic_msg: []const u8) void {

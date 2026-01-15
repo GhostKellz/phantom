@@ -516,8 +516,8 @@ pub const AnimationValue = union(enum) {
                 .rect = Rect.init(@as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.x)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.x)) * t)), @as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.y)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.y)) * t)), @as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.width)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.width)) * t)), @as(u16, @intFromFloat(@as(f32, @floatFromInt(rect.height)) * (1.0 - t) + @as(f32, @floatFromInt(other.rect.height)) * t))),
             },
             .float => |f| AnimationValue{ .float = f * (1.0 - t) + other.float * t },
-            .color => |_| other, // Color interpolation would be complex, just snap for now
-            .style => |_| other, // Style interpolation would be complex, just snap for now
+            .color => other, // Color interpolation would be complex, just snap for now
+            .style => other, // Style interpolation would be complex, just snap for now
             .int => |i| AnimationValue{ .int = @as(i32, @intFromFloat(@as(f32, @floatFromInt(i)) * (1.0 - t) + @as(f32, @floatFromInt(other.int)) * t)) },
         };
     }

@@ -2,17 +2,17 @@ const std = @import("std");
 const phantom = @import("phantom");
 const Rect = phantom.Rect;
 
-pub fn main() !void {
+pub fn main(init: std.process.Init.Minimal) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    var args_iter = std.process.Args.Iterator.init(init.args);
+    _ = args_iter.next(); // Skip program name
 
     var iterations: usize = 1_000;
-    if (args.len > 1) {
-        iterations = std.fmt.parseInt(usize, args[1], 10) catch iterations;
+    if (args_iter.next()) |iter_str| {
+        iterations = std.fmt.parseInt(usize, iter_str, 10) catch iterations;
     }
 
     var timer = try std.time.Timer.start();

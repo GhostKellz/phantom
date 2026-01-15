@@ -254,7 +254,13 @@ pub const Terminal = struct {
 
     fn writeAnsi(self: *Terminal, data: []const u8) !void {
         _ = self;
-        try std.fs.File.stdout().writeAll(data);
+        // Use direct C write for ANSI escape sequences
+        var written: usize = 0;
+        while (written < data.len) {
+            const result = std.c.write(std.posix.STDOUT_FILENO, data.ptr + written, data.len - written);
+            if (result < 0) return error.WriteFailed;
+            written += @intCast(result);
+        }
     }
 };
 
@@ -277,14 +283,15 @@ pub fn getTerminalSize() !Size {
     };
     
     var ws: WinSize = undefined;
-    const stdout_file = std.fs.File.stdout;
-    const stdout = stdout_file();
-    
+    const stdout = std.Io.File.stdout();
+
     const result = c.ioctl(stdout.handle, TIOCGWINSZ, &ws);
     if (result == -1) {
         // Fallback: try parsing environment variables
-        if (std.posix.getenv("COLUMNS")) |cols_str| {
-            if (std.posix.getenv("LINES")) |lines_str| {
+        if (std.c.getenv("COLUMNS")) |cols_ptr| {
+            if (std.c.getenv("LINES")) |lines_ptr| {
+                const cols_str = std.mem.span(cols_ptr);
+                const lines_str = std.mem.span(lines_ptr);
                 const cols = std.fmt.parseInt(u16, cols_str, 10) catch 80;
                 const lines = std.fmt.parseInt(u16, lines_str, 10) catch 24;
                 return Size.init(cols, lines);

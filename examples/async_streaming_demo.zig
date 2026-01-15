@@ -67,7 +67,10 @@ pub fn main() !void {
         consumer.close();
 
         // Wait for streaming to complete
-        std.posix.nanosleep(0, 100 * std.time.ns_per_ms);
+        {
+            const ts = std.c.timespec{ .sec = 0, .nsec = 100 * std.time.ns_per_ms };
+            _ = std.c.nanosleep(&ts, null);
+        }
         consumer.stop();
 
         // Print the result
@@ -102,7 +105,10 @@ pub fn main() !void {
 
                 for (messages) |msg| {
                     try producer.streamText(msg, 2);
-                    std.posix.nanosleep(0, 100 * std.time.ns_per_ms); // Pause between messages
+                    {
+            const ts = std.c.timespec{ .sec = 0, .nsec = 100 * std.time.ns_per_ms };
+            _ = std.c.nanosleep(&ts, null);
+        } // Pause between messages
                 }
 
                 cons.close();
@@ -113,7 +119,10 @@ pub fn main() !void {
         defer producer_handle.deinit();
 
         while (!producer_handle.isDone()) {
-            std.posix.nanosleep(0, 100 * std.time.ns_per_ms);
+            {
+            const ts = std.c.timespec{ .sec = 0, .nsec = 100 * std.time.ns_per_ms };
+            _ = std.c.nanosleep(&ts, null);
+        }
         }
 
         producer_handle.await() catch |err| {
@@ -156,7 +165,10 @@ pub fn main() !void {
 
                 for (logs) |log| {
                     try cons.send(log);
-                    std.posix.nanosleep(0, 150 * std.time.ns_per_ms); // 150ms between logs
+                    {
+                        const ts = std.c.timespec{ .sec = 0, .nsec = 150 * std.time.ns_per_ms };
+                        _ = std.c.nanosleep(&ts, null);
+                    } // 150ms between logs
                 }
 
                 cons.close();
@@ -167,7 +179,10 @@ pub fn main() !void {
         defer log_handle.deinit();
 
         while (!log_handle.isDone()) {
-            std.posix.nanosleep(0, 100 * std.time.ns_per_ms);
+            {
+            const ts = std.c.timespec{ .sec = 0, .nsec = 100 * std.time.ns_per_ms };
+            _ = std.c.nanosleep(&ts, null);
+        }
         }
 
         log_handle.await() catch |err| {

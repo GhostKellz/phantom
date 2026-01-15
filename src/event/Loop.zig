@@ -142,7 +142,8 @@ pub const EventLoop = struct {
             // Sleep if we finished early
             if (frame_duration < self.frame_time_budget_ms) {
                 const sleep_ms = self.frame_time_budget_ms - @as(u32, @intCast(frame_duration));
-                std.posix.nanosleep(0, sleep_ms * 1000000); // Convert to nanoseconds
+                const ts = std.c.timespec{ .sec = 0, .nsec = @intCast(sleep_ms * 1000000) };
+                _ = std.c.nanosleep(&ts, null); // Convert to nanoseconds
             }
 
             // Update performance metrics

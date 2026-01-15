@@ -243,9 +243,10 @@ pub const EventLoop = struct {
 
             if (sleep_ns) |ns| {
                 if (ns > 0) {
-                    const sleep_sec = ns / std.time.ns_per_s;
-                    const sleep_sub_ns = @as(u32, @intCast(ns % std.time.ns_per_s));
-                    std.posix.nanosleep(sleep_sec, sleep_sub_ns);
+                    const sleep_sec: isize = @intCast(ns / std.time.ns_per_s);
+                    const sleep_sub_ns: isize = @intCast(ns % std.time.ns_per_s);
+                    const ts = std.c.timespec{ .sec = sleep_sec, .nsec = sleep_sub_ns };
+                    _ = std.c.nanosleep(&ts, null);
                 }
             }
         }

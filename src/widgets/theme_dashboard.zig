@@ -363,21 +363,21 @@ pub const ThemeTokenDashboard = struct {
                 self.pending_tail_snap = self.follow_tail;
                 self.markUpdated();
             },
-            .appended => |_| {
+            .appended => {
                 self.event_counter += 1;
                 self.state = .ready;
                 if (self.follow_tail) self.pending_tail_snap = true;
                 self.markUpdated();
             },
-            .replaced => |_| {
+            .replaced => {
                 self.event_counter += 1;
                 self.markUpdated();
             },
-            .updated => |_| {
+            .updated => {
                 self.event_counter += 1;
                 self.markUpdated();
             },
-            .failed => |_| {
+            .failed => {
                 self.state = .failed;
                 self.markUpdated();
             },

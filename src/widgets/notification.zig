@@ -619,7 +619,8 @@ test "Notification expiration" {
     // Create a notification with very short duration
     var notification = Notification.init(1, "Test", "Test message", .info);
     notification.duration_ms = 1; // 1ms
-    std.posix.nanosleep(0, 10 * std.time.ns_per_ms); // Sleep for 10ms
+    const ts = std.c.timespec{ .sec = 0, .nsec = 10 * std.time.ns_per_ms };
+    _ = std.c.nanosleep(&ts, null); // Sleep for 10ms
 
     try std.testing.expect(notification.isExpired());
     try std.testing.expect(notification.getRemainingTime() == 0);

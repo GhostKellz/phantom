@@ -267,6 +267,7 @@ pub fn build(b: *std.Build) void {
             // definition if desireable (in the case of firmware for embedded devices).
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             // List of modules available for import in source files part of the
             // root module.
             .imports = &.{
@@ -279,7 +280,6 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    exe.linkLibC();
 
     // This declares intent for the executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
@@ -340,6 +340,22 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 
+    // Memory leak tests - comprehensive leak detection for local testing
+    const memory_tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tests/memory_leak_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{
+                .{ .name = "phantom", .module = mod },
+            },
+        }),
+    });
+    const run_memory_tests = b.addRunArtifact(memory_tests);
+    const memory_test_step = b.step("test-memory", "Run comprehensive memory leak tests");
+    memory_test_step.dependOn(&run_memory_tests.step);
+
     // Package Manager Demo - requires package-mgmt widgets
     if (features.package_mgmt) {
         const pkg_demo = b.addExecutable(.{
@@ -348,12 +364,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/simple_package_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        pkg_demo.linkLibC();
         b.installArtifact(pkg_demo);
 
         const run_pkg_demo = b.addRunArtifact(pkg_demo);
@@ -369,12 +385,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/ghostty_performance_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        ghostty_demo.linkLibC();
         b.installArtifact(ghostty_demo);
 
         const run_ghostty_demo = b.addRunArtifact(ghostty_demo);
@@ -390,12 +406,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/ai_chat_cli.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        ai_chat_demo.linkLibC();
         b.installArtifact(ai_chat_demo);
 
         const run_ai_chat_demo = b.addRunArtifact(ai_chat_demo);
@@ -411,12 +427,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/benchmark_suite.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        bench.linkLibC();
         b.installArtifact(bench);
 
         const run_bench = b.addRunArtifact(bench);
@@ -432,12 +448,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/zion_cli_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        zion_demo.linkLibC();
         b.installArtifact(zion_demo);
 
         const run_zion_demo = b.addRunArtifact(zion_demo);
@@ -453,12 +469,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/reaper_aur_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        reaper_demo.linkLibC();
         b.installArtifact(reaper_demo);
 
         const run_reaper_demo = b.addRunArtifact(reaper_demo);
@@ -474,12 +490,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/crypto_package_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        crypto_demo.linkLibC();
         b.installArtifact(crypto_demo);
 
         const run_crypto_demo = b.addRunArtifact(crypto_demo);
@@ -495,12 +511,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/reaper_aur_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        aur_demo.linkLibC();
         b.installArtifact(aur_demo);
 
         const run_aur_demo = b.addRunArtifact(aur_demo);
@@ -516,12 +532,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/package_manager_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        package_browser_demo.linkLibC();
         b.installArtifact(package_browser_demo);
 
         const run_package_browser_demo = b.addRunArtifact(package_browser_demo);
@@ -536,12 +552,12 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("examples/theme_gallery_demo.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "phantom", .module = mod },
             },
         }),
     });
-    theme_gallery_demo.linkLibC();
     b.installArtifact(theme_gallery_demo);
 
     const run_theme_gallery_demo = b.addRunArtifact(theme_gallery_demo);
@@ -555,12 +571,12 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("examples/vxfw_demo.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "phantom", .module = mod },
             },
         }),
     });
-    vxfw_demo.linkLibC();
     b.installArtifact(vxfw_demo);
 
     const run_vxfw_demo = b.addRunArtifact(vxfw_demo);
@@ -577,12 +593,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/fuzzy_search_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        fuzzy_search_demo.linkLibC();
         b.installArtifact(fuzzy_search_demo);
 
         const run_fuzzy_search_demo = b.addRunArtifact(fuzzy_search_demo);
@@ -597,12 +613,12 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("examples/grim_editor_demo.zig"),
             .target = target,
             .optimize = optimize,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "phantom", .module = mod },
             },
         }),
     });
-    grim_demo.linkLibC();
     b.installArtifact(grim_demo);
 
     const run_grim_demo = b.addRunArtifact(grim_demo);
@@ -616,13 +632,13 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("benches/unicode_bench.zig"),
             .target = target,
             .optimize = .ReleaseFast, // Always optimize benchmarks
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "phantom", .module = mod },
                 .{ .name = "gcode", .module = gcode_mod },
             },
         }),
     });
-    unicode_bench.linkLibC();
     b.installArtifact(unicode_bench);
 
     const run_unicode_bench = b.addRunArtifact(unicode_bench);
@@ -636,12 +652,12 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("benches/layout_sandbox.zig"),
             .target = target,
             .optimize = .ReleaseFast,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "phantom", .module = mod },
             },
         }),
     });
-    layout_sandbox.linkLibC();
     b.installArtifact(layout_sandbox);
 
     const run_layout_sandbox = b.addRunArtifact(layout_sandbox);
@@ -655,12 +671,12 @@ pub fn build(b: *std.Build) void {
             .root_source_file = b.path("benches/render_bench.zig"),
             .target = target,
             .optimize = .ReleaseFast,
+            .link_libc = true,
             .imports = &.{
                 .{ .name = "phantom", .module = mod },
             },
         }),
     });
-    render_bench.linkLibC();
     b.installArtifact(render_bench);
 
     const run_render_bench = b.addRunArtifact(render_bench);
@@ -681,12 +697,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/feature_showcase_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        feature_showcase.linkLibC();
         b.installArtifact(feature_showcase);
 
         const run_feature_showcase = b.addRunArtifact(feature_showcase);
@@ -702,12 +718,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/data_visualization_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        data_viz_demo.linkLibC();
         b.installArtifact(data_viz_demo);
 
         const run_data_viz_demo = b.addRunArtifact(data_viz_demo);
@@ -720,12 +736,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/data_dashboard_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        dashboard_demo.linkLibC();
         b.installArtifact(dashboard_demo);
 
         const run_dashboard_demo = b.addRunArtifact(dashboard_demo);
@@ -761,12 +777,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/grove_syntax_demo.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        grove_demo.linkLibC();
         b.installArtifact(grove_demo);
 
         const run_grove_demo = b.addRunArtifact(grove_demo);
@@ -781,12 +797,12 @@ pub fn build(b: *std.Build) void {
                 .root_source_file = b.path("examples/terminal_session_integration.zig"),
                 .target = target,
                 .optimize = optimize,
+                .link_libc = true,
                 .imports = &.{
                     .{ .name = "phantom", .module = mod },
                 },
             }),
         });
-        terminal_session_demo.linkLibC();
         b.installArtifact(terminal_session_demo);
 
         const run_terminal_session_demo = b.addRunArtifact(terminal_session_demo);

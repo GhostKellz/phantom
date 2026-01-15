@@ -286,7 +286,7 @@ pub const Session = struct {
     pub fn recycleEvent(self: *Session, event: Event) void {
         switch (event) {
             .data => |payload| self.allocator.free(payload),
-            .exit => |_| {},
+            .exit => {},
         }
     }
 
@@ -301,7 +301,7 @@ pub const Session = struct {
             const event = maybe_event orelse break;
             switch (event) {
                 .data => |payload| self.allocator.free(payload),
-                .exit => |_| {},
+                .exit => {},
             }
         }
     }

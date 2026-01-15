@@ -180,7 +180,8 @@ test "EventCoalescer resize coalescing" {
     defer events.deinit();
 
     // Wait for debounce time
-    std.posix.nanosleep(0, 60 * std.time.ns_per_ms);
+    const ts1 = std.c.timespec{ .sec = 0, .nsec = 60 * std.time.ns_per_ms };
+    _ = std.c.nanosleep(&ts1, null);
 
     try coalescer.flushPending(&events);
 
@@ -230,7 +231,8 @@ test "EventCoalescer mouse move coalescing" {
     var events = ArrayList(Event).init(testing.allocator);
     defer events.deinit();
 
-    std.posix.nanosleep(0, 20 * std.time.ns_per_ms);
+    const ts2 = std.c.timespec{ .sec = 0, .nsec = 20 * std.time.ns_per_ms };
+    _ = std.c.nanosleep(&ts2, null);
     try coalescer.flushPending(&events);
 
     // Should have only the last mouse position

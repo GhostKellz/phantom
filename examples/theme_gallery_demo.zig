@@ -291,6 +291,17 @@ fn galleryEventHandler(event: phantom.Event) !bool {
     return ui.handleEvent(event);
 }
 
+fn realpathAlloc(allocator: std.mem.Allocator, path: []const u8) ![]u8 {
+    // Create sentinel-terminated path for C API
+    const path_z = try allocator.dupeZ(u8, path);
+    defer allocator.free(path_z);
+
+    var buf: [std.posix.PATH_MAX]u8 = undefined;
+    const result = std.c.realpath(path_z, &buf) orelse return error.FileNotFound;
+    const len = std.mem.indexOfScalar(u8, &buf, 0) orelse buf.len;
+    return try allocator.dupe(u8, result[0..len]);
+}
+
 fn registerSampleManifests(allocator: std.mem.Allocator, loader: *ManifestLoader) !void {
     const samples = [_]struct {
         name: []const u8,
@@ -302,7 +313,7 @@ fn registerSampleManifests(allocator: std.mem.Allocator, loader: *ManifestLoader
     };
 
     for (samples) |sample| {
-        const absolute = try std.fs.cwd().realpathAlloc(allocator, sample.path);
+        const absolute = try realpathAlloc(allocator, sample.path);
         defer allocator.free(absolute);
         try loader.registerFile(sample.name, absolute, .{
             .origin = .dynamic,

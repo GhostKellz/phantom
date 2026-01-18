@@ -47,15 +47,19 @@
         },
         .zigzag = .{
             .url = "https://github.com/ghostkellz/zigzag/archive/main.tar.gz",
-            .hash = "zigzag-0.1.2-NmTasH6YCADKMhulgANnPjVbJcoPu-cLlIhxLt_ba1HR",
+            .hash = "zigzag-0.1.2-NmTasH6YCAAM4G_Xt1CrP7Hw3mFcwin1ThV2K9cOFJbx",
         },
         .zontom = .{
             .url = "https://github.com/ghostkellz/zontom/archive/main.tar.gz",
-            .hash = "zontom-0.1.1-2iAquFbVAgDeKvkk8UbehFI5x9GiFKt2ZT70LSJgVHqr",
+            .hash = "zontom-0.1.1-2iAquFbVAgAm9zC0xk3Ap33_lXEAp8mnxnMIGPlegRs8",
         },
         .grove = .{
             .url = "https://github.com/ghostkellz/grove/archive/main.tar.gz",
             .hash = "grove-0.2.2-rGFsN7xz6wShIkEECwKP5OWGic76ciHdHKekYTRfBD0l",
+        },
+        .zlog = .{
+            .url = "https://github.com/ghostkellz/zlog/archive/main.tar.gz",
+            .hash = "zlog-0.1.3-kS0sWOH2CABGOtRvTP3wlr4teAg2DjZ9guDasNqxBL4Y",
         },
     },
     .paths = .{

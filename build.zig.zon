@@ -43,7 +43,7 @@
         },
         .zfont = .{
             .url = "https://github.com/ghostkellz/zfont/archive/main.tar.gz",
-            .hash = "zfont-0.1.2-qcMRYIOICwCbUnUgHfLotz-tzXZk-lCrCbYrZVXmiTg7",
+            .hash = "zfont-0.1.3-qcMRYN2ICwAa0LwQJFpbPCV1OTJPKB5zTmRBhit5nxY7",
         },
         .zigzag = .{
             .url = "https://github.com/ghostkellz/zigzag/archive/main.tar.gz",

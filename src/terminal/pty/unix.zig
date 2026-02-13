@@ -1,6 +1,7 @@
 const std = @import("std");
 const types = @import("types.zig");
 const builtin = @import("builtin");
+const time_utils = @import("../../time/utils.zig");
 
 const posix = std.posix;
 
@@ -236,7 +237,7 @@ test "Session applies environment overrides" {
     while (total < buffer.len and attempts < 200) : (attempts += 1) {
         const written = try session.read(buffer[total..]);
         if (written == 0) {
-            std.time.sleep(5 * std.time.ns_per_ms);
+            time_utils.sleepMs(5);
             continue;
         }
         total += written;

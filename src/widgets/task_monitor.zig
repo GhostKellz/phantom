@@ -8,6 +8,7 @@ const Event = @import("../event.zig").Event;
 const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
 const ProgressBar = @import("progress.zig").ProgressBar;
+const time_utils = @import("../time/utils.zig");
 
 const Rect = geometry.Rect;
 const Style = style.Style;
@@ -28,13 +29,13 @@ pub const Task = struct {
     status: TaskStatus = .pending,
     progress: f64 = 0.0,
     message: []const u8 = "",
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
 
     pub fn init(allocator: std.mem.Allocator, id: []const u8, name: []const u8) !Task {
         return Task{
             .id = try allocator.dupe(u8, id),
             .name = try allocator.dupe(u8, name),
-            .timer = try std.time.Timer.start(),
+            .timer = try time_utils.Timer.start(),
         };
     }
 

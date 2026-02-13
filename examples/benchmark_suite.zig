@@ -36,7 +36,7 @@ const BenchmarkResult = struct {
 };
 
 fn benchmark(comptime name: []const u8, comptime iterations: usize, func: anytype, args: anytype) !BenchmarkResult {
-    var timer = try std.time.Timer.start();
+    var timer = try phantom.time_utils.Timer.start();
     var min: u64 = std.math.maxInt(u64);
     var max: u64 = 0;
 

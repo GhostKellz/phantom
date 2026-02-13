@@ -323,7 +323,7 @@ pub const FrameTimer = struct {
             if (remaining == 0) return;
 
             if (builtin.os.tag == .windows) {
-                std.time.sleep(remaining);
+                time_utils.sleep(remaining);
                 return;
             }
 

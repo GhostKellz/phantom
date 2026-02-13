@@ -6,6 +6,7 @@ const ThemeManager = theme_manager.ThemeManager;
 const Origin = @import("Theme.zig").Origin;
 const InstallOptions = ThemeManager.InstallOptions;
 const style_theme = @import("../style/theme.zig");
+const time_utils = @import("../time/utils.zig");
 
 const log = std.log.scoped(.theme_manifest);
 
@@ -235,7 +236,7 @@ test "ManifestLoader registers and refreshes themes" {
         \\}
     ;
 
-    try std.time.sleep(std.time.ns_per_ms * 2);
+    time_utils.sleepMs(2);
     try tmp.dir.writeFile("runtime.json", updated_json);
 
     loader.refresh();

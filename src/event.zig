@@ -4,6 +4,7 @@ const builtin = @import("builtin");
 const ArrayList = std.array_list.Managed;
 const posix = std.posix;
 const types = @import("event/types.zig");
+const time_utils = @import("time/utils.zig");
 
 pub const Key = types.Key;
 pub const MouseButton = types.MouseButton;
@@ -188,7 +189,7 @@ pub const EventLoop = struct {
         self.running = true;
         defer self.running = false;
 
-        var timer = try std.time.Timer.start();
+        var timer = try time_utils.Timer.start();
         self.last_tick_time_ns = timer.read();
 
         while (self.running) {
@@ -399,7 +400,7 @@ const SimpleBackend = struct {
     stdin_fd: std.posix.fd_t,
     stdin_flags_original: ?usize = null,
     read_buffer: [1024]u8 = undefined,
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
 
     fn init(allocator: std.mem.Allocator, config: Config) SimpleBackend {
         _ = config;
@@ -408,7 +409,7 @@ const SimpleBackend = struct {
             .queue = EventQueue.init(allocator),
             .input_parser = InputParser.init(),
             .stdin_fd = posix.STDIN_FILENO,
-            .timer = std.time.Timer.start() catch unreachable,
+            .timer = time_utils.Timer.start() catch unreachable,
         };
         backend.configureStdinNonBlocking() catch |err| {
             std.log.warn("SimpleBackend: failed to set non-blocking stdin: {}", .{err});
@@ -488,22 +489,23 @@ const SimpleBackend = struct {
     fn configureStdinNonBlocking(self: *SimpleBackend) !void {
         if (builtin.os.tag == .windows) return;
 
-        const flags = try posix.fcntl(self.stdin_fd, posix.F.GETFL, 0);
+        const flags = std.c.fcntl(self.stdin_fd, std.c.F.GETFL);
+        if (flags < 0) return error.FcntlFailed;
         self.stdin_flags_original = @intCast(flags);
 
-        const non_block: usize = 1 << @bitOffsetOf(posix.O, "NONBLOCK");
-        _ = try posix.fcntl(self.stdin_fd, posix.F.SETFL, flags | non_block);
+        const non_block: c_int = 1 << @bitOffsetOf(std.c.O, "NONBLOCK");
+        const set_result = std.c.fcntl(self.stdin_fd, std.c.F.SETFL, @as(c_int, @intCast(flags)) | non_block);
+        if (set_result < 0) return error.FcntlFailed;
     }
 
     fn restoreStdinFlags(self: *SimpleBackend) void {
         if (builtin.os.tag == .windows) return;
 
         if (self.stdin_flags_original) |flags| {
-            const result = posix.fcntl(self.stdin_fd, posix.F.SETFL, flags) catch |err| {
-                std.log.warn("SimpleBackend: failed to restore stdin flags: {}", .{err});
-                return;
-            };
-            _ = result;
+            const result = std.c.fcntl(self.stdin_fd, std.c.F.SETFL, @as(c_int, @intCast(flags)));
+            if (result < 0) {
+                std.log.warn("SimpleBackend: failed to restore stdin flags", .{});
+            }
         }
     }
 };

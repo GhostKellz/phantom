@@ -5,6 +5,7 @@
 const std = @import("std");
 const zfont = @import("zfont");
 const Allocator = std.mem.Allocator;
+const time_utils = @import("../time/utils.zig");
 
 const Self = @This();
 
@@ -15,7 +16,7 @@ max_cache_size: usize,
 current_cache_size: usize,
 gpu_cache: ?GPUGlyphCache,
 statistics: CacheStatistics,
-timer: std.time.Timer,
+timer: time_utils.Timer,
 
 pub const GlyphKey = struct {
     codepoint: u21,
@@ -196,7 +197,7 @@ pub fn init(allocator: Allocator, config: CacheConfig) !Self {
         .current_cache_size = 0,
         .gpu_cache = null,
         .statistics = .{},
-        .timer = try std.time.Timer.start(),
+        .timer = try time_utils.Timer.start(),
     };
 
     // Initialize GPU cache if enabled

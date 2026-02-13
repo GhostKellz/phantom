@@ -16,6 +16,7 @@ const EventPriority = @import("EventQueue.zig").EventPriority;
 const EventCoalescer = @import("EventCoalescer.zig").EventCoalescer;
 const CoalescingConfig = @import("EventCoalescer.zig").CoalescingConfig;
 const InputParser = @import("InputParser.zig").InputParser;
+const time_utils = @import("../time/utils.zig");
 
 const Event = types.Event;
 
@@ -51,7 +52,7 @@ pub const ZigZagBackend = struct {
     has_pending_input: bool = false,
 
     // Frame timing
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
     frame_rate_target: u32 = 60,
     last_frame_time: u64 = 0,
     frame_budget_ms: u32 = 16, // ~60 FPS (1000/60)
@@ -91,7 +92,7 @@ pub const ZigZagBackend = struct {
             .coalescer = EventCoalescer.initWithConfig(allocator, config.coalescing),
             .input_parser = InputParser.init(),
             .stdin_fd = posix.STDIN_FILENO,
-            .timer = try std.time.Timer.start(),
+            .timer = try time_utils.Timer.start(),
             .frame_rate_target = initial_rate,
             .frame_budget_ms = initial_budget_ms,
         };
@@ -294,22 +295,23 @@ pub const ZigZagBackend = struct {
     fn configureStdinNonBlocking(self: *ZigZagBackend) !void {
         if (builtin.os.tag == .windows) return;
 
-        const flags = try posix.fcntl(self.stdin_fd, posix.F.GETFL, 0);
+        const flags = std.c.fcntl(self.stdin_fd, std.c.F.GETFL);
+        if (flags < 0) return error.FcntlFailed;
         self.stdin_flags_original = @intCast(flags);
 
-        const non_block: usize = 1 << @bitOffsetOf(posix.O, "NONBLOCK");
-        _ = try posix.fcntl(self.stdin_fd, posix.F.SETFL, flags | non_block);
+        const non_block: c_int = 1 << @bitOffsetOf(std.c.O, "NONBLOCK");
+        const set_result = std.c.fcntl(self.stdin_fd, std.c.F.SETFL, @as(c_int, @intCast(flags)) | non_block);
+        if (set_result < 0) return error.FcntlFailed;
     }
 
     fn restoreStdinFlags(self: *ZigZagBackend) void {
         if (builtin.os.tag == .windows) return;
 
         if (self.stdin_flags_original) |flags| {
-            const result = posix.fcntl(self.stdin_fd, posix.F.SETFL, flags) catch |err| {
-                std.log.warn("ZigZagBackend: failed to restore stdin flags: {}", .{err});
-                return;
-            };
-            _ = result;
+            const result = std.c.fcntl(self.stdin_fd, std.c.F.SETFL, @as(c_int, @intCast(flags)));
+            if (result < 0) {
+                std.log.warn("ZigZagBackend: failed to restore stdin flags", .{});
+            }
         }
     }
 };

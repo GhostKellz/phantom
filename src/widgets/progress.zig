@@ -8,6 +8,7 @@ const Event = @import("../event.zig").Event;
 const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
 const emoji = @import("../emoji.zig");
+const time_utils = @import("../time/utils.zig");
 
 const Rect = geometry.Rect;
 const Style = style.Style;
@@ -29,7 +30,7 @@ pub const ProgressBar = struct {
     show_eta: bool = false,
 
     // Timing for ETA calculation
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
 
     // Styling
     bar_style: Style,
@@ -59,7 +60,7 @@ pub const ProgressBar = struct {
             .bar_style = Style.default(),
             .fill_style = Style.default().withFg(style.Color.green),
             .text_style = Style.default(),
-            .timer = try std.time.Timer.start(),
+            .timer = try time_utils.Timer.start(),
         };
         return progress;
     }

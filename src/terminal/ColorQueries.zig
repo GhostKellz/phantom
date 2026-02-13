@@ -3,6 +3,7 @@
 
 const std = @import("std");
 const vxfw = @import("../vxfw.zig");
+const time_utils = @import("../time/utils.zig");
 
 const Allocator = std.mem.Allocator;
 
@@ -12,7 +13,7 @@ pub const ColorQueryManager = struct {
     pending_queries: std.HashMap(QueryType, QueryContext, QueryTypeContext, std.hash_map.default_max_load_percentage),
     color_cache: std.HashMap(ColorType, Color, ColorTypeContext, std.hash_map.default_max_load_percentage),
     response_timeout_ms: u32 = 1000,
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
 
     const QueryTypeContext = struct {
         pub fn hash(self: @This(), key: QueryType) u64 {
@@ -41,7 +42,7 @@ pub const ColorQueryManager = struct {
             .allocator = allocator,
             .pending_queries = std.HashMap(QueryType, QueryContext, QueryTypeContext, std.hash_map.default_max_load_percentage).init(allocator),
             .color_cache = std.HashMap(ColorType, Color, ColorTypeContext, std.hash_map.default_max_load_percentage).init(allocator),
-            .timer = try std.time.Timer.start(),
+            .timer = try time_utils.Timer.start(),
         };
     }
 

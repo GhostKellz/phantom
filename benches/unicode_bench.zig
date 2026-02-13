@@ -59,7 +59,7 @@ pub fn main() !void {
 }
 
 fn benchmarkGcodeWidth(text: []const u8, iterations: usize) !f64 {
-    var timer = try std.time.Timer.start();
+    var timer = try phantom.time_utils.Timer.start();
 
     var i: usize = 0;
     while (i < iterations) : (i += 1) {
@@ -71,7 +71,7 @@ fn benchmarkGcodeWidth(text: []const u8, iterations: usize) !f64 {
 }
 
 fn benchmarkOldUnicodeWidth(text: []const u8, iterations: usize) !f64 {
-    var timer = try std.time.Timer.start();
+    var timer = try phantom.time_utils.Timer.start();
 
     var i: usize = 0;
     while (i < iterations) : (i += 1) {
@@ -85,7 +85,7 @@ fn benchmarkOldUnicodeWidth(text: []const u8, iterations: usize) !f64 {
 
 fn benchmarkGcodeGraphemes(allocator: std.mem.Allocator, text: []const u8, iterations: usize) !f64 {
     _ = allocator;
-    var timer = try std.time.Timer.start();
+    var timer = try phantom.time_utils.Timer.start();
 
     var i: usize = 0;
     while (i < iterations) : (i += 1) {
@@ -100,7 +100,7 @@ fn benchmarkGcodeGraphemes(allocator: std.mem.Allocator, text: []const u8, itera
 }
 
 fn benchmarkGcodeWords(text: []const u8, iterations: usize) !f64 {
-    var timer = try std.time.Timer.start();
+    var timer = try phantom.time_utils.Timer.start();
 
     var i: usize = 0;
     while (i < iterations) : (i += 1) {

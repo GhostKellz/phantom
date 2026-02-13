@@ -8,7 +8,12 @@ const Allocator = std.mem.Allocator;
 
 /// Global TTY instance for emergency recovery
 var global_tty: ?*TTY = null;
-var global_tty_mutex = std.Thread.Mutex{};
+var global_tty_mutex: std.Io.Mutex = std.Io.Mutex.init;
+
+/// Get the Io instance for mutex operations
+fn getIo() std.Io {
+    return std.Io.Threaded.global_single_threaded.ioBasic();
+}
 
 /// TTY management structure
 pub const TTY = struct {
@@ -298,8 +303,9 @@ const EMERGENCY_RESET = "\x1b[!p\x1b[?1049l\x1b[?25h\x1b[0m";
 
 /// Initialize global TTY instance
 pub fn initGlobal(allocator: Allocator, fd: std.os.fd_t) !void {
-    global_tty_mutex.lock();
-    defer global_tty_mutex.unlock();
+    const io = getIo();
+    global_tty_mutex.lockUncancelable(io);
+    defer global_tty_mutex.unlock(io);
 
     if (global_tty != null) {
         return; // Already initialized
@@ -312,8 +318,9 @@ pub fn initGlobal(allocator: Allocator, fd: std.os.fd_t) !void {
 
 /// Deinitialize global TTY instance
 pub fn deinitGlobal() void {
-    global_tty_mutex.lock();
-    defer global_tty_mutex.unlock();
+    const io = getIo();
+    global_tty_mutex.lockUncancelable(io);
+    defer global_tty_mutex.unlock(io);
 
     if (global_tty) |tty| {
         const allocator = tty.allocator;
@@ -325,8 +332,9 @@ pub fn deinitGlobal() void {
 
 /// Get global TTY instance (thread-safe)
 pub fn getGlobal() ?*TTY {
-    global_tty_mutex.lock();
-    defer global_tty_mutex.unlock();
+    const io = getIo();
+    global_tty_mutex.lockUncancelable(io);
+    defer global_tty_mutex.unlock(io);
     return global_tty;
 }
 
@@ -340,8 +348,9 @@ pub fn emergencyRestoreGlobal() void {
 
 /// Check if global TTY is initialized
 pub fn isGlobalInitialized() bool {
-    global_tty_mutex.lock();
-    defer global_tty_mutex.unlock();
+    const io = getIo();
+    global_tty_mutex.lockUncancelable(io);
+    defer global_tty_mutex.unlock(io);
     return global_tty != null;
 }
 

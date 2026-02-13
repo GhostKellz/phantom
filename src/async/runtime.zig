@@ -6,6 +6,7 @@ const std = @import("std");
 const zsync = @import("zsync");
 const phantom = @import("../root.zig");
 const time_utils = @import("../time/utils.zig");
+const Io = std.Io;
 
 pub const LifecycleHooks = struct {
     context: ?*anyopaque = null,
@@ -318,11 +319,16 @@ const GlobalState = struct {
 };
 
 var global_state = GlobalState{};
-var global_mutex = std.Thread.Mutex{};
+var global_mutex: Io.Mutex = Io.Mutex.init;
+
+fn getGlobalIo() Io {
+    return Io.Threaded.global_single_threaded.ioBasic();
+}
 
 pub fn ensureGlobal(allocator: std.mem.Allocator, config: Config) !*AsyncRuntime {
-    global_mutex.lock();
-    defer global_mutex.unlock();
+    const io = getGlobalIo();
+    global_mutex.lockUncancelable(io);
+    defer global_mutex.unlock(io);
 
     if (global_state.runtime) |runtime| {
         return runtime;
@@ -342,20 +348,22 @@ pub fn startGlobal(allocator: std.mem.Allocator, config: Config) !*AsyncRuntime 
 }
 
 pub fn globalRuntime() ?*AsyncRuntime {
-    global_mutex.lock();
-    defer global_mutex.unlock();
+    const io = getGlobalIo();
+    global_mutex.lockUncancelable(io);
+    defer global_mutex.unlock(io);
     return global_state.runtime;
 }
 
 pub fn shutdownGlobal() void {
+    const io = getGlobalIo();
     var runtime: ?*AsyncRuntime = null;
 
-    global_mutex.lock();
+    global_mutex.lockUncancelable(io);
     if (global_state.runtime) |rt| {
         runtime = rt;
         global_state.runtime = null;
     }
-    global_mutex.unlock();
+    global_mutex.unlock(io);
 
     if (runtime) |rt| {
         rt.deinit();

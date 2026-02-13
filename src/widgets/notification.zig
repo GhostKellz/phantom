@@ -8,6 +8,7 @@ const Event = @import("../event.zig").Event;
 const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
 const theme_mod = @import("../theme/mod.zig");
+const time_utils = @import("../time/utils.zig");
 
 const Rect = geometry.Rect;
 const Position = geometry.Position;
@@ -116,7 +117,7 @@ pub const Notification = struct {
 
     // Timing
     duration_ms: u64 = 3000, // 3 seconds default
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
     auto_dismiss: bool = true,
 
     // Styling
@@ -167,7 +168,7 @@ pub const Notification = struct {
             .message = message,
             .notification_type = notification_type,
             .position = .top_right,
-            .timer = std.time.Timer.start() catch unreachable,
+            .timer = time_utils.Timer.start() catch unreachable,
             .style = default_style,
             .title_style = title_style,
             .message_style = default_style,

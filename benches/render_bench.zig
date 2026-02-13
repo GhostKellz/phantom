@@ -55,7 +55,7 @@ fn benchmarkFontRendering(allocator: std.mem.Allocator) !void {
     const iterations = 10000;
 
     for (test_texts) |text| {
-        var timer = try std.time.Timer.start();
+        var timer = try phantom.time_utils.Timer.start();
 
         var i: usize = 0;
         while (i < iterations) : (i += 1) {
@@ -98,7 +98,7 @@ fn benchmarkFullFrame(allocator: std.mem.Allocator) !void {
     }
 
     // Simulate frame rendering
-    var timer = try std.time.Timer.start();
+    var timer = try phantom.time_utils.Timer.start();
     const frames = 1000;
 
     var frame: usize = 0;

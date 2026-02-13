@@ -8,6 +8,7 @@ const ArrayList = std.array_list.Managed;
 const EventQueue = @import("EventQueue.zig").EventQueue;
 const geometry = @import("../geometry.zig");
 const Position = geometry.Position;
+const time_utils = @import("../time/utils.zig");
 
 pub const CoalescingConfig = struct {
     /// Debounce time for resize events (ms)
@@ -28,7 +29,7 @@ pub const EventCoalescer = struct {
     config: CoalescingConfig,
 
     // Coalescing state
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
     last_resize_time: ?u64 = null,
     last_resize_event: ?Event = null,
 
@@ -40,7 +41,7 @@ pub const EventCoalescer = struct {
         return EventCoalescer{
             .allocator = allocator,
             .config = CoalescingConfig{},
-            .timer = std.time.Timer.start() catch unreachable,
+            .timer = time_utils.Timer.start() catch unreachable,
         };
     }
 
@@ -48,7 +49,7 @@ pub const EventCoalescer = struct {
         return EventCoalescer{
             .allocator = allocator,
             .config = config,
-            .timer = std.time.Timer.start() catch unreachable,
+            .timer = time_utils.Timer.start() catch unreachable,
         };
     }
 

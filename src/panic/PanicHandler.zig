@@ -189,7 +189,8 @@ fn writeStackTrace(writer: anytype, trace: *std.builtin.StackTrace) !void {
 /// Register cleanup function to be called on panic
 pub const CleanupRegistry = struct {
     cleanup_functions: std.array_list.AlignedManaged(CleanupFunction, null),
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.Io.Mutex = std.Io.Mutex.init,
+    io: std.Io,
 
     const CleanupFunction = struct {
         func: *const fn ([]const u8) void,
@@ -201,6 +202,7 @@ pub const CleanupRegistry = struct {
     pub fn init(allocator: std.mem.Allocator) CleanupRegistry {
         return CleanupRegistry{
             .cleanup_functions = std.array_list.AlignedManaged(CleanupFunction, null).init(allocator),
+            .io = std.Io.Threaded.global_single_threaded.ioBasic(),
         };
     }
 
@@ -225,10 +227,10 @@ pub const CleanupRegistry = struct {
 
     /// Register a cleanup function
     pub fn registerCleanup(self: *CleanupRegistry, name: []const u8, func: *const fn ([]const u8) void) !void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
 
-        try self.cleanup_functions.append(CleanupFunction{
+        try self.cleanup_functions.append(self.cleanup_functions.allocator, CleanupFunction{
             .func = func,
             .name = name,
         });
@@ -243,8 +245,8 @@ pub const CleanupRegistry = struct {
 
     /// Run all cleanup functions
     pub fn runCleanup(self: *CleanupRegistry, panic_msg: []const u8) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
 
         for (self.cleanup_functions.items) |cleanup| {
             cleanup.func(panic_msg);

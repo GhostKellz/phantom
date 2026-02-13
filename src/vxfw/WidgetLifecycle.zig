@@ -4,6 +4,7 @@
 const std = @import("std");
 const vxfw = @import("../vxfw.zig");
 const geometry = @import("../geometry.zig");
+const time_utils = @import("../time/utils.zig");
 
 const Allocator = std.mem.Allocator;
 const Rect = geometry.Rect;
@@ -79,7 +80,7 @@ pub const LifecycleManager = struct {
     focused_widget: ?vxfw.Widget = null,
     next_tick_id: u32 = 1,
     tick_timers: std.array_list.AlignedManaged(TickTimer, null),
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
 
     const ManagedWidget = struct {
         widget: vxfw.Widget,
@@ -102,7 +103,7 @@ pub const LifecycleManager = struct {
             .allocator = allocator,
             .widgets = std.array_list.AlignedManaged(ManagedWidget, null).init(allocator),
             .tick_timers = std.array_list.AlignedManaged(TickTimer, null).init(allocator),
-            .timer = try std.time.Timer.start(),
+            .timer = try time_utils.Timer.start(),
         };
     }
 

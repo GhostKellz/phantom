@@ -4,6 +4,7 @@ const builtin = @import("builtin");
 const async_mod = @import("../../async/mod.zig");
 const pty = @import("../pty.zig");
 const types = pty;
+const time_utils = @import("../../time/utils.zig");
 
 const runtime_mod = async_mod.runtime;
 const AsyncRuntime = runtime_mod.AsyncRuntime;
@@ -427,7 +428,7 @@ test "Session pumps PTY output to channel" {
                 },
             }
         } else {
-            std.time.sleep(5 * std.time.ns_per_ms);
+            time_utils.sleepMs(5);
         }
         iterations += 1;
     }
@@ -489,7 +490,7 @@ test "Manager orchestrates PTY sessions" {
             }
             manager.recycleEvent(session_event.handle, event) catch {};
         } else {
-            std.time.sleep(5 * std.time.ns_per_ms);
+            time_utils.sleepMs(5);
         }
         iterations += 1;
     }

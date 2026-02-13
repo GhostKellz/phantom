@@ -9,6 +9,7 @@ const event_types = @import("types.zig");
 const Allocator = std.mem.Allocator;
 const Event = event_types.Event;
 const SystemEvent = event_types.SystemEvent;
+const Io = std.Io;
 
 /// Event priority levels used for scheduling
 pub const EventPriority = enum(u8) {
@@ -50,8 +51,9 @@ pub const EventQueue = struct {
     allocator: Allocator,
     queues: [priority_count]std.array_list.AlignedManaged(QueuedEvent, null),
     commands: std.array_list.AlignedManaged(vxfw.Command, null),
-    mutex: std.Thread.Mutex = .{},
-    condition: std.Thread.Condition = .{},
+    mutex: Io.Mutex = Io.Mutex.init,
+    condition: Io.Condition = Io.Condition.init,
+    io: Io,
     is_shutdown: bool = false,
     max_queue_size: usize = 10000,
     dropped_events: u64 = 0,
@@ -68,12 +70,13 @@ pub const EventQueue = struct {
             .allocator = allocator,
             .queues = queues_init,
             .commands = std.array_list.AlignedManaged(vxfw.Command, null).init(allocator),
+            .io = Io.Threaded.global_single_threaded.ioBasic(),
         };
     }
 
     pub fn deinit(self: *EventQueue) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
 
         // Clean up queued events
         inline for (&self.queues) |*queue| {
@@ -92,8 +95,8 @@ pub const EventQueue = struct {
 
     /// Push an event to the queue
     pub fn pushEvent(self: *EventQueue, event: Event, priority: EventPriority) !void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
 
         if (self.is_shutdown) return;
 
@@ -117,7 +120,7 @@ pub const EventQueue = struct {
         try self.pushIntoSubqueue(queued_event);
 
         // Notify waiting threads
-        self.condition.signal();
+        self.condition.signal(self.io);
     }
 
     /// Push an event with automatically derived priority
@@ -127,16 +130,16 @@ pub const EventQueue = struct {
 
     /// Pop the highest priority event from the queue
     pub fn popEvent(self: *EventQueue) ?QueuedEvent {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
 
         return self.popEventUnlocked();
     }
 
-    /// Wait for an event (blocking)
+    /// Wait for an event (blocking with optional timeout)
     pub fn waitForEvent(self: *EventQueue, timeout_ms: ?u32) ?QueuedEvent {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
 
         const deadline = if (timeout_ms) |ms|
             time_utils.monotonicTimestampMs() + @as(u64, ms)
@@ -147,11 +150,14 @@ pub const EventQueue = struct {
             if (deadline) |d| {
                 const now = time_utils.monotonicTimestampMs();
                 if (now >= d) break;
-
-                const remaining_ms = d - now;
-                self.condition.timedWait(&self.mutex, remaining_ms * std.time.ns_per_ms) catch break;
+                // Release mutex, sleep briefly, reacquire
+                self.mutex.unlock(self.io);
+                // Small sleep to avoid busy-waiting (1ms poll interval)
+                self.io.sleep(Io.Duration.fromMilliseconds(1), .awake) catch {};
+                self.mutex.lockUncancelable(self.io);
             } else {
-                self.condition.wait(&self.mutex);
+                // Blocking wait on condition
+                self.condition.waitUncancelable(self.io, &self.mutex);
             }
         }
 
@@ -160,50 +166,50 @@ pub const EventQueue = struct {
 
     /// Push a command to the command queue
     pub fn pushCommand(self: *EventQueue, command: vxfw.Command) !void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
 
         if (self.is_shutdown) return;
 
-            try self.commands.append(try CommandCloneExt.clone(command, self.allocator));
-        self.condition.signal();
+        try self.commands.append(try CommandCloneExt.clone(command, self.allocator));
+        self.condition.signal(self.io);
     }
 
     /// Pop all commands from the queue
     pub fn popCommands(self: *EventQueue) ![]vxfw.Command {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
 
-    const commands = try self.commands.toOwnedSlice();
+        const commands = try self.commands.toOwnedSlice();
         self.commands = std.array_list.AlignedManaged(vxfw.Command, null).init(self.allocator);
         return commands;
     }
 
     /// Check if queue is empty
     pub fn isEmpty(self: *EventQueue) bool {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
         return self.total_events == 0 and self.commands.items.len == 0;
     }
 
     /// Get queue size
     pub fn size(self: *EventQueue) usize {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
         return self.total_events;
     }
 
     /// Get command queue size
     pub fn commandSize(self: *EventQueue) usize {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
         return self.commands.items.len;
     }
 
     /// Clear all events and commands
     pub fn clear(self: *EventQueue) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
 
         inline for (&self.queues) |*queue| {
             for (queue.items) |*event| {
@@ -222,17 +228,17 @@ pub const EventQueue = struct {
 
     /// Shutdown the queue
     pub fn shutdown(self: *EventQueue) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
 
         self.is_shutdown = true;
-        self.condition.broadcast();
+        self.condition.broadcast(self.io);
     }
 
     /// Get statistics
     pub fn getStats(self: *EventQueue) QueueStats {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.mutex.lockUncancelable(self.io);
+        defer self.mutex.unlock(self.io);
 
         return QueueStats{
             .event_count = self.total_events,
@@ -380,8 +386,8 @@ pub const FilteredEventQueue = struct {
     /// Pop event that matches any filter
     pub fn popFilteredEvent(self: *FilteredEventQueue) ?QueuedEvent {
         const queue = self.queue;
-        queue.mutex.lock();
-        defer queue.mutex.unlock();
+        queue.mutex.lockUncancelable(queue.io);
+        defer queue.mutex.unlock(queue.io);
 
         inline for (priority_order) |priority| {
             const idx = priorityIndex(priority);

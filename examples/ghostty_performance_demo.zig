@@ -9,14 +9,14 @@ var gpu_text: *phantom.widgets.Text = undefined;
 var mem_text: *phantom.widgets.Text = undefined;
 var fps_text: *phantom.widgets.Text = undefined;
 var frame_counter: u64 = 0;
-var start_time: std.time.Timer = undefined;
+var start_time: phantom.time_utils.Timer = undefined;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    start_time = try std.time.Timer.start();
+    start_time = try phantom.time_utils.Timer.start();
 
     var app = try phantom.App.init(allocator, .{
         .title = "Ghostty Performance Monitor",

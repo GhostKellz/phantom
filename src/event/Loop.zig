@@ -6,6 +6,7 @@ const vxfw = @import("../vxfw.zig");
 const EventQueue = @import("EventQueue.zig").EventQueue;
 const QueuedEvent = @import("EventQueue.zig").QueuedEvent;
 const EventPriority = @import("EventQueue.zig").EventPriority;
+const time_utils = @import("../time/utils.zig");
 
 const Allocator = std.mem.Allocator;
 
@@ -41,7 +42,7 @@ pub const EventLoop = struct {
     render_budget_ms: u32 = 12, // Leave 4ms for event processing
 
     // Timer for consistent timing
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
 
     pub fn init(allocator: Allocator) !EventLoop {
         return EventLoop{
@@ -52,7 +53,7 @@ pub const EventLoop = struct {
             .pre_frame_hooks = std.array_list.AlignedManaged(FrameHook, null).init(allocator),
             .post_frame_hooks = std.array_list.AlignedManaged(FrameHook, null).init(allocator),
             .input_processor = InputProcessor.init(allocator),
-            .timer = try std.time.Timer.start(),
+            .timer = try time_utils.Timer.start(),
         };
     }
 
@@ -355,7 +356,7 @@ const TickScheduler = struct {
         self.pending_ticks.deinit();
     }
 
-    fn schedule(self: *TickScheduler, widget: vxfw.Widget, delay_ms: u32, timer: *std.time.Timer) !void {
+    fn schedule(self: *TickScheduler, widget: vxfw.Widget, delay_ms: u32, timer: *time_utils.Timer) !void {
         const now = @as(i64, @intCast(timer.read() / std.time.ns_per_ms));
         const deadline = now + delay_ms;
         try self.pending_ticks.add(ScheduledTick{
@@ -364,7 +365,7 @@ const TickScheduler = struct {
         });
     }
 
-    fn processTicks(self: *TickScheduler, event_queue: *EventQueue, timer: *std.time.Timer) !void {
+    fn processTicks(self: *TickScheduler, event_queue: *EventQueue, timer: *time_utils.Timer) !void {
         const now = @as(i64, @intCast(timer.read() / std.time.ns_per_ms));
 
         while (self.pending_ticks.peek()) |tick| {
@@ -384,7 +385,7 @@ const TickScheduler = struct {
 const TimerManager = struct {
     allocator: Allocator,
     timers: std.array_list.AlignedManaged(Timer, null),
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
 
     const Timer = struct {
         name: []u8,
@@ -399,7 +400,7 @@ const TimerManager = struct {
         return TimerManager{
             .allocator = allocator,
             .timers = std.array_list.AlignedManaged(Timer, null).init(allocator),
-            .timer = std.time.Timer.start() catch unreachable,
+            .timer = time_utils.Timer.start() catch unreachable,
         };
     }
 
@@ -473,12 +474,12 @@ const InputProcessor = struct {
     key_repeat_rate_ms: u32 = 50,
     last_key_time: i64 = 0,
     last_key: ?vxfw.Key = null,
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
 
     fn init(allocator: Allocator) InputProcessor {
         return InputProcessor{
             .allocator = allocator,
-            .timer = std.time.Timer.start() catch unreachable,
+            .timer = time_utils.Timer.start() catch unreachable,
         };
     }
 

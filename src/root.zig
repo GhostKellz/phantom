@@ -1,16 +1,17 @@
 //! Phantom - The Next-Gen TUI Framework for Zig
 //! A lightning-fast, async-native TUI framework inspired by Ratatui
 //!
-//! Version 0.8.0 - Production-ready release:
-//! - Full Zig 0.16.0-dev API migration completed
+//! Version 0.8.4 - Production-ready release:
+//! - Full Zig 0.16.0-dev.2535+b5bd49460 API migration completed
 //! - Modernized layout engine with constraint solver
 //! - Enhanced theme system with hot-reload support
 //! - Improved async runtime with nursery patterns
 //! - Production-grade error handling and testing
+//! - Updated to use std.Io based synchronization primitives
 const std = @import("std");
 
 /// Phantom version
-pub const version = "0.8.0";
+pub const version = "0.8.4";
 
 // Build-time configuration
 pub const phantom_config = @import("phantom_config");
@@ -100,6 +101,9 @@ pub const unicode_helpers = @import("text/unicode_helpers.zig");
 // Resource management
 pub const resource_paths = @import("config/paths.zig");
 
+// Time utilities (Timer, timestamps)
+pub const time_utils = @import("time/utils.zig");
+
 // Constraint-based layout system
 pub const Constraint = @import("layout/constraint.zig").Constraint;
 pub const ConstraintLayout = @import("layout/constraint.zig").Layout;
@@ -113,11 +117,11 @@ pub const zontom = @import("zontom");
 
 // For compatibility with existing code
 pub fn bufferedPrint() !void {
-    const stdout_file = std.Io.File.stdout().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
-    try stdout.print("Phantom TUI Framework initialized!\n", .{});
-    try bw.flush();
+    const io = std.Io.Threaded.global_single_threaded.ioBasic();
+    var buffer: [256]u8 = undefined;
+    const stdout_file = std.Io.File.stdout();
+    var writer = stdout_file.writer(io, &buffer);
+    try writer.print("Phantom TUI Framework initialized!\n", .{});
 }
 
 // Test utilities

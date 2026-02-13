@@ -3,6 +3,7 @@ const std = @import("std");
 const ArrayList = std.array_list.Managed;
 const geometry = @import("geometry.zig");
 const style = @import("style.zig");
+const time_utils = @import("time/utils.zig");
 
 const Position = geometry.Position;
 const Size = geometry.Size;
@@ -587,7 +588,7 @@ pub const Animation = struct {
     fill_mode: AnimationFillMode = .none,
 
     // State
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
     state: AnimationState = .idle,
     current_time: f32 = 0.0,
     current_iteration: u32 = 0,
@@ -601,7 +602,7 @@ pub const Animation = struct {
             .allocator = allocator,
             .keyframes = ArrayList(Keyframe).init(allocator),
             .duration_ms = duration_ms,
-            .timer = std.time.Timer.start() catch unreachable,
+            .timer = time_utils.Timer.start() catch unreachable,
         };
     }
 
@@ -951,14 +952,14 @@ test "Transition rect morph" {
 
     const transition = try Transitions.rectMorph(&manager, from, to, spec);
 
-    std.time.sleep(50 * std.time.ns_per_ms);
+    time_utils.sleep(50 * std.time.ns_per_ms);
     manager.update();
 
     const mid_rect = transition.currentRect().?;
     try std.testing.expect(mid_rect.height > from.height);
     try std.testing.expect(mid_rect.height <= to.height);
 
-    std.time.sleep(80 * std.time.ns_per_ms);
+    time_utils.sleep(80 * std.time.ns_per_ms);
     manager.update();
 
     try std.testing.expect(transition.state == .completed);
@@ -975,7 +976,7 @@ test "Transition manager auto remove" {
 
     const transition = try Transitions.fade(&manager, 0.0, 1.0, TransitionSpec{ .duration_ms = 10, .auto_remove = true });
     const id = transition.id;
-    std.time.sleep(50 * std.time.ns_per_ms);
+    time_utils.sleep(50 * std.time.ns_per_ms);
     manager.update();
     try std.testing.expect(manager.get(id) == null);
 }

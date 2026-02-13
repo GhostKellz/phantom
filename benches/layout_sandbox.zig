@@ -1,6 +1,7 @@
 const std = @import("std");
 const phantom = @import("phantom");
 const Rect = phantom.Rect;
+const Timer = phantom.time_utils.Timer;
 
 pub fn main(init: std.process.Init.Minimal) !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -15,7 +16,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
         iterations = std.fmt.parseInt(usize, iter_str, 10) catch iterations;
     }
 
-    var timer = try std.time.Timer.start();
+    var timer = try Timer.start();
     var checksum: u64 = 0;
 
     var i: usize = 0;

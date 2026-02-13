@@ -6,6 +6,7 @@ const Cell = @import("../terminal.zig").Cell;
 const Event = @import("../event.zig").Event;
 const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
+const time_utils = @import("../time/utils.zig");
 
 const Rect = geometry.Rect;
 const Style = style.Style;
@@ -26,7 +27,7 @@ pub const StreamingText = struct {
     lines: std.ArrayList([]const u8),
     
     // Streaming state
-    timer: std.time.Timer,
+    timer: time_utils.Timer,
     is_streaming: bool = false,
     typing_speed: u64 = 50, // Characters per second
     chunk_buffer: std.ArrayList(u8),
@@ -69,7 +70,7 @@ pub const StreamingText = struct {
             .text = std.ArrayList(u8){},
             .lines = std.ArrayList([]const u8){},
             .chunk_buffer = std.ArrayList(u8){},
-            .timer = try std.time.Timer.start(),
+            .timer = try time_utils.Timer.start(),
             .text_style = Style.default(),
             .streaming_style = Style.default().withFg(style.Color.cyan),
             .cursor_style = Style.default().withFg(style.Color.white).withBg(style.Color.blue),

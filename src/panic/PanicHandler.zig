@@ -202,7 +202,7 @@ pub const CleanupRegistry = struct {
     pub fn init(allocator: std.mem.Allocator) CleanupRegistry {
         return CleanupRegistry{
             .cleanup_functions = std.array_list.AlignedManaged(CleanupFunction, null).init(allocator),
-            .io = std.Io.Threaded.global_single_threaded.ioBasic(),
+            .io = std.Io.Threaded.global_single_threaded.io(),
         };
     }
 

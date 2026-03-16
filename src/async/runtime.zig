@@ -322,7 +322,7 @@ var global_state = GlobalState{};
 var global_mutex: Io.Mutex = Io.Mutex.init;
 
 fn getGlobalIo() Io {
-    return Io.Threaded.global_single_threaded.ioBasic();
+    return Io.Threaded.global_single_threaded.io();
 }
 
 pub fn ensureGlobal(allocator: std.mem.Allocator, config: Config) !*AsyncRuntime {

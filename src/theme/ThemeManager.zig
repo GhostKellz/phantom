@@ -128,7 +128,7 @@ pub const ThemeManager = struct {
             std.log.debug("Could not open theme directory {s}: {}", .{ self.theme_dir, err });
             return;
         };
-        defer std.posix.close(dir_fd);
+        defer std.Io.Threaded.closeFd(dir_fd);
 
         // Use getdents64 for directory iteration (works without Io context)
         var buf: [4096]u8 align(@alignOf(std.os.linux.dirent64)) = undefined;

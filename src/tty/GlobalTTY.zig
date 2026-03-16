@@ -12,7 +12,7 @@ var global_tty_mutex: std.Io.Mutex = std.Io.Mutex.init;
 
 /// Get the Io instance for mutex operations
 fn getIo() std.Io {
-    return std.Io.Threaded.global_single_threaded.ioBasic();
+    return std.Io.Threaded.global_single_threaded.io();
 }
 
 /// TTY management structure

@@ -126,7 +126,7 @@ pub const Manifest = struct {
         const fd = std.posix.openat(std.posix.AT.FDCWD, path, .{ .ACCMODE = .RDONLY }, 0) catch |err| {
             return err;
         };
-        defer std.posix.close(fd);
+        defer std.Io.Threaded.closeFd(fd);
 
         // Read in chunks - standard approach that works across platforms
         var buffer: std.ArrayList(u8) = .empty;

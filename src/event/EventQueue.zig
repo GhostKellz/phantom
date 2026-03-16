@@ -70,7 +70,7 @@ pub const EventQueue = struct {
             .allocator = allocator,
             .queues = queues_init,
             .commands = std.array_list.AlignedManaged(vxfw.Command, null).init(allocator),
-            .io = Io.Threaded.global_single_threaded.ioBasic(),
+            .io = Io.Threaded.global_single_threaded.io(),
         };
     }
 

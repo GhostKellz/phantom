@@ -117,7 +117,7 @@ pub const zontom = @import("zontom");
 
 // For compatibility with existing code
 pub fn bufferedPrint() !void {
-    const io = std.Io.Threaded.global_single_threaded.ioBasic();
+    const io = std.Io.Threaded.global_single_threaded.io();
     var buffer: [256]u8 = undefined;
     const stdout_file = std.Io.File.stdout();
     var writer = stdout_file.writer(io, &buffer);

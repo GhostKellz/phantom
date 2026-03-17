@@ -51,7 +51,7 @@
         },
         .zontom = .{
             .url = "https://github.com/ghostkellz/zontom/archive/main.tar.gz",
-            .hash = "zontom-0.1.2-2iAquFbVAgBx2F0p9WtsRUa3GmQgNz76seEQo-ov3qCK",
+            .hash = "zontom-0.1.2-2iAquFbVAgAwHAr5QJYJX9pHd5ZBBP4mKA6O9-HWHOn1",
         },
         .grove = .{
             .url = "https://github.com/ghostkellz/grove/archive/main.tar.gz",

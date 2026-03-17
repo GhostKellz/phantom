@@ -47,7 +47,7 @@
         },
         .zigzag = .{
             .url = "https://github.com/ghostkellz/zigzag/archive/main.tar.gz",
-            .hash = "zigzag-0.1.3-NmTasOaaCADKIw3-fLs66mX2rztAM5Ij7X_EiRGlP-RI",
+            .hash = "zigzag-0.1.3-NmTasOaaCAAjMwTQnx97Cm13XCAEFi8OlKyRoKgrAYPw",
         },
         .zontom = .{
             .url = "https://github.com/ghostkellz/zontom/archive/main.tar.gz",
@@ -59,7 +59,7 @@
         },
         .zlog = .{
             .url = "https://github.com/ghostkellz/zlog/archive/main.tar.gz",
-            .hash = "zlog-0.1.4-kS0sWCoECQADgUPjxOtdfajejhSeQ4IyW0SYn88wvkc6",
+            .hash = "zlog-0.1.4-kS0sWCoECQDeNmUp-rVlKfpgeBBVMn6Ooi5CNyQt0UUj",
         },
     },
     .paths = .{

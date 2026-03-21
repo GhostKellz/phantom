@@ -714,7 +714,7 @@ test "buildThemeTokenEntries captures palette and semantic tokens" {
 
     // Inject a palette token for validation
     {
-        var entry = try theme.palette_tokens.getOrPut("brandPurple");
+        const entry = try theme.palette_tokens.getOrPut("brandPurple");
         if (!entry.found_existing) {
             entry.key_ptr.* = try allocator.dupe(u8, "brandPurple");
         }

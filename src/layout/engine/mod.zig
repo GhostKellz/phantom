@@ -72,9 +72,9 @@ pub const ConstraintSpace = struct {
     pub fn init(allocator: std.mem.Allocator) ConstraintSpace {
         return ConstraintSpace{
             .allocator = allocator,
-            .variables = .{},
-            .constraints = .{},
-            .non_negative = .{},
+            .variables = .empty,
+            .constraints = .empty,
+            .non_negative = .empty,
         };
     }
 
@@ -93,7 +93,7 @@ pub const ConstraintSpace = struct {
     }
 
     pub fn addConstraint(self: *ConstraintSpace, spec: ConstraintSpec) !void {
-        var terms_buffer = ArrayListUnmanaged(Term){};
+        var terms_buffer: ArrayListUnmanaged(Term) = .empty;
         defer terms_buffer.deinit(self.allocator);
 
         try terms_buffer.ensureTotalCapacity(self.allocator, spec.terms.len + 1);
@@ -259,7 +259,7 @@ pub const LayoutBuilder = struct {
         return LayoutBuilder{
             .allocator = allocator,
             .space = ConstraintSpace.init(allocator),
-            .rects = .{},
+            .rects = .empty,
         };
     }
 

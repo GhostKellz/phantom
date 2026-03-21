@@ -33,9 +33,9 @@ const ChatState = struct {
 
         state.* = .{
             .allocator = allocator,
-            .messages = .{},
-            .input_buffer = .{},
-            .command_history = .{},
+            .messages = .empty,
+            .input_buffer = .empty,
+            .command_history = .empty,
             .history_index = 0,
             .scroll_offset = 0,
             .is_streaming = false,
@@ -132,7 +132,7 @@ var global_state: *ChatState = undefined;
 var global_app: *phantom.App = undefined;
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -271,7 +271,7 @@ fn renderMessages(buffer: *phantom.Buffer, area: phantom.Rect) !void {
         };
 
         // Word wrap the message
-        var lines: std.ArrayList([]const u8) = .{};
+        var lines: std.ArrayList([]const u8) = .empty;
         defer lines.deinit(buffer.allocator);
 
         var start: usize = 0;

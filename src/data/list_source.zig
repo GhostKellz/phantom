@@ -150,8 +150,8 @@ pub fn InMemoryListSource(comptime Item: type) type {
 
         allocator: std.mem.Allocator,
         state: State = .idle,
-        items: ArrayListUnmanaged(Item) = .{},
-        observers: ArrayListUnmanaged(ObserverType) = .{},
+        items: ArrayListUnmanaged(Item) = .empty,
+        observers: ArrayListUnmanaged(ObserverType) = .empty,
 
         pub fn init(allocator: std.mem.Allocator) Self {
             return .{ .allocator = allocator };
@@ -328,8 +328,8 @@ test "ListDataSource vtable contract" {
 
         state: State = .idle,
         allocator: std.mem.Allocator,
-        items: ArrayListUnmanaged(Item) = .{},
-        observers: ArrayListUnmanaged(ObserverType) = .{},
+        items: ArrayListUnmanaged(Item) = .empty,
+        observers: ArrayListUnmanaged(ObserverType) = .empty,
 
         fn init(allocator: std.mem.Allocator) Self {
             return Self{

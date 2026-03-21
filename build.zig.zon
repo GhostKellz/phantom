@@ -26,7 +26,7 @@
     .fingerprint = 0x6896f6ae04964713, // Changing this has security and trust implications.
     // Tracks the earliest Zig version that the package considers to be a
     // supported use case.
-    .minimum_zig_version = "0.16.0-dev.2736+3b515fbed",
+    .minimum_zig_version = "0.16.0-dev.2960+ce1f7136a",
     // This field is optional.
     // Each dependency must either provide a `url` and `hash`, or a `path`.
     // `zig build --fetch` can be used to fetch all dependencies of a package, recursively.
@@ -34,8 +34,8 @@
     // internet connectivity.
     .dependencies = .{
         .zsync = .{
-            .url = "https://github.com/ghostkellz/zsync/archive/main.tar.gz",
-            .hash = "zsync-0.7.7-KAuhefiZGACgJRl7uJ1tvJrU9w74XtShEKyZun1ue0uJ",
+            .url = "https://github.com/ghostkellz/zsync/archive/refs/tags/v0.7.8.tar.gz",
+            .hash = "zsync-0.7.8-KAuheQufGABcQSjcE59uKuXJtH8PNSe39fxrTiFlsTYl",
         },
         .gcode = .{
             .url = "https://github.com/ghostkellz/gcode/archive/main.tar.gz",
@@ -47,7 +47,7 @@
         },
         .zigzag = .{
             .url = "https://github.com/ghostkellz/zigzag/archive/main.tar.gz",
-            .hash = "zigzag-0.1.3-NmTasOaaCAAjMwTQnx97Cm13XCAEFi8OlKyRoKgrAYPw",
+            .hash = "zigzag-0.1.3-NmTasOaaCABRsdF22qQJwXTGgiRajddRcYToGdCcdUKo",
         },
         .zontom = .{
             .url = "https://github.com/ghostkellz/zontom/archive/main.tar.gz",

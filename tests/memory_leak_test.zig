@@ -10,12 +10,12 @@ const ManifestLoader = phantom.theme.ManifestLoader;
 const style_theme = phantom.style_theme;
 
 /// Test allocator that detects leaks
-fn getTestAllocator() std.heap.GeneralPurposeAllocator(.{
+fn getTestAllocator() std.heap.DebugAllocator(.{
     .stack_trace_frames = 10,
     .safety = true,
     .never_unmap = true,
 }) {
-    return .{};
+    return .init;
 }
 
 test "Theme parsing and cleanup - no leaks" {

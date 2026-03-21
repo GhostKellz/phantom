@@ -12,7 +12,7 @@ var frame_counter: u64 = 0;
 var start_time: phantom.time_utils.Timer = undefined;
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

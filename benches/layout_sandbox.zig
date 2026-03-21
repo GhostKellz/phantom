@@ -4,7 +4,7 @@ const Rect = phantom.Rect;
 const Timer = phantom.time_utils.Timer;
 
 pub fn main(init: std.process.Init.Minimal) !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var gpa: std.heap.DebugAllocator(.{}) = .init;
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
@@ -27,7 +27,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
         const root = try builder.createNode();
         try builder.setRect(root, Rect{ .x = 0, .y = 0, .width = 240, .height = 120 });
 
-        var row_handles = [_]phantom.layout.engine.LayoutNodeHandle{
+        const row_handles = [_]phantom.layout.engine.LayoutNodeHandle{
             try builder.createNode(),
             try builder.createNode(),
             try builder.createNode(),
@@ -42,7 +42,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
 
         // Build a simple column inside the first and third segments to stress nested solves.
         {
-            var col_handles = [_]phantom.layout.engine.LayoutNodeHandle{
+            const col_handles = [_]phantom.layout.engine.LayoutNodeHandle{
                 try builder.createNode(),
                 try builder.createNode(),
             };
@@ -54,7 +54,7 @@ pub fn main(init: std.process.Init.Minimal) !void {
         }
 
         {
-            var col_handles = [_]phantom.layout.engine.LayoutNodeHandle{
+            const col_handles = [_]phantom.layout.engine.LayoutNodeHandle{
                 try builder.createNode(),
                 try builder.createNode(),
                 try builder.createNode(),

@@ -73,7 +73,7 @@ pub const BarChart = struct {
 
         return BarChart{
             .allocator = allocator,
-            .datasets = .{},
+            .datasets = .empty,
             .orientation = config.orientation,
             .bar_width = config.bar_width,
             .bar_gap = config.bar_gap,

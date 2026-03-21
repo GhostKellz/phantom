@@ -92,7 +92,7 @@ pub const Session = struct {
         }
 
         const cmd_utf8 = cmd_builder.items;
-        var cmd_utf16 = try std.unicode.utf8ToUtf16LeWithNull(allocator, cmd_utf8);
+        const cmd_utf16 = try std.unicode.utf8ToUtf16LeWithNull(allocator, cmd_utf8);
         defer allocator.free(cmd_utf16);
         const command_line = @constCast(cmd_utf16.ptr);
 
@@ -109,7 +109,7 @@ pub const Session = struct {
             return error.SpawnFailed;
         }
 
-        var attr_list_buf = try allocator.alloc(u8, attr_list_size);
+        const attr_list_buf = try allocator.alloc(u8, attr_list_size);
         defer allocator.free(attr_list_buf);
         std.mem.set(u8, attr_list_buf, 0);
         const attr_list: windows.LPPROC_THREAD_ATTRIBUTE_LIST = @ptrCast(attr_list_buf.ptr);

@@ -647,7 +647,7 @@ fn normalizeKey(raw: []const u8, buffer: []u8) []const u8 {
 }
 
 fn putColor(map: *std.StringHashMap(Color), allocator: std.mem.Allocator, key: []const u8, value: Color) !void {
-    var entry = try map.getOrPut(key);
+    const entry = try map.getOrPut(key);
     if (!entry.found_existing) {
         entry.key_ptr.* = try allocator.dupe(u8, key);
     }

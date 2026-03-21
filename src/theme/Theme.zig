@@ -483,7 +483,7 @@ fn freeStringKeys(comptime V: type, allocator: std.mem.Allocator, map: *std.Stri
 }
 
 fn putColor(map: *std.StringHashMap(Color), allocator: std.mem.Allocator, key: []const u8, value: Color) !void {
-    var entry = try map.getOrPut(key);
+    const entry = try map.getOrPut(key);
     if (!entry.found_existing) {
         entry.key_ptr.* = try allocator.dupe(u8, key);
     }

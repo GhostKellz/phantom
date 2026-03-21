@@ -226,7 +226,7 @@ pub const App = struct {
     }
 
     fn resolveWidgetRect(self: *App, widget: *Widget, target: Rect) !Rect {
-        var entry = try self.widget_transitions.getOrPut(widget);
+        const entry = try self.widget_transitions.getOrPut(widget);
         if (!entry.found_existing) {
             entry.value_ptr.* = WidgetTransitionState{};
         }

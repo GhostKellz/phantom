@@ -120,7 +120,7 @@ pub const Canvas = struct {
 
         return Canvas{
             .allocator = allocator,
-            .shapes = .{},
+            .shapes = .empty,
             .width = config.width,
             .height = config.height,
             .background = config.background,

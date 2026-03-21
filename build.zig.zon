@@ -55,7 +55,7 @@
         },
         .grove = .{
             .url = "https://github.com/ghostkellz/grove/archive/main.tar.gz",
-            .hash = "grove-0.2.2-rGFsN8CJ9AQ5wyIA7F3ZmavCfv2os2_ivDbISGfA5xXU",
+            .hash = "grove-0.2.2-rGFsN-CJ9AQJNkTuvvL8nw70_ueMhbClflpSadR6IFpP",
         },
         .zlog = .{
             .url = "https://github.com/ghostkellz/zlog/archive/main.tar.gz",

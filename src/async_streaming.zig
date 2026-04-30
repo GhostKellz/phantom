@@ -4,7 +4,7 @@
 
 const std = @import("std");
 const zsync = @import("zsync");
-const async = @import("async/mod.zig");
+const async_mod = @import("async/mod.zig");
 const StreamingText = @import("widgets/streaming_text.zig").StreamingText;
 
 /// Async stream consumer that feeds chunks to a StreamingText widget
@@ -12,15 +12,15 @@ pub const AsyncStreamConsumer = struct {
     allocator: std.mem.Allocator,
     widget: *StreamingText,
     channel: zsync.channels_mod.Channel([]const u8),
-    runtime: *async.AsyncRuntime,
+    runtime: *async_mod.AsyncRuntime,
     running: std.atomic.Value(bool),
     consumer_task: ?ConsumerTaskHandle = null,
 
-    const ConsumerTaskHandle = async.TaskHandle(@TypeOf(consumeTask));
+    const ConsumerTaskHandle = async_mod.TaskHandle(consumeTask);
 
     pub fn init(
         allocator: std.mem.Allocator,
-        runtime: *async.AsyncRuntime,
+        runtime: *async_mod.AsyncRuntime,
         widget: *StreamingText,
     ) !*AsyncStreamConsumer {
         const self = try allocator.create(AsyncStreamConsumer);
@@ -70,7 +70,7 @@ pub const AsyncStreamConsumer = struct {
 
         self.widget.startStreaming();
 
-        const handle = try self.runtime.spawn(@TypeOf(consumeTask), .{self});
+        const handle = try self.runtime.spawn(consumeTask, .{self});
         self.consumer_task = handle;
     }
 
@@ -84,7 +84,7 @@ pub const AsyncStreamConsumer = struct {
             defer self.consumer_task = null;
 
             var caught_err: ?anyerror = null;
-            task.await() catch |err| {
+            task.wait() catch |err| {
                 caught_err = err;
             };
             task.deinit();
@@ -189,7 +189,7 @@ pub const AsyncStreamProducer = struct {
 /// Example: Simulate AI chat response streaming
 pub fn simulateAIChatResponse(
     allocator: std.mem.Allocator,
-    runtime: *async.AsyncRuntime,
+    runtime: *async_mod.AsyncRuntime,
     widget: *StreamingText,
 ) !*AsyncStreamConsumer {
     const consumer = try AsyncStreamConsumer.init(allocator, runtime, widget);
@@ -228,8 +228,8 @@ pub fn simulateAIChatResponse(
         }
     };
 
-    const ProducerHandle = async.TaskHandle(@TypeOf(ProducerTask.produce));
-    const handle = try runtime.spawn(@TypeOf(ProducerTask.produce), .{ allocator, consumer });
+    const ProducerHandle = async_mod.TaskHandle(ProducerTask.produce);
+    const handle = try runtime.spawn(ProducerTask.produce, .{ allocator, consumer });
 
     const HandleCleanup = struct {
         fn run(alloc: std.mem.Allocator, ptr: *ProducerHandle) !void {
@@ -237,7 +237,7 @@ pub fn simulateAIChatResponse(
             var h = ptr.*;
 
             var caught_err: ?anyerror = null;
-            h.await() catch |err| {
+            h.wait() catch |err| {
                 caught_err = err;
             };
             h.deinit();
@@ -251,7 +251,7 @@ pub fn simulateAIChatResponse(
     const handle_ptr = allocator.create(ProducerHandle) catch |alloc_err| {
         var cleanup = handle;
         var caught_err: ?anyerror = null;
-        cleanup.await() catch |err| {
+        cleanup.wait() catch |err| {
             caught_err = err;
         };
         cleanup.deinit();
@@ -264,13 +264,13 @@ pub fn simulateAIChatResponse(
     };
     handle_ptr.* = handle;
 
-    _ = runtime.spawn(@TypeOf(HandleCleanup.run), .{ allocator, handle_ptr }) catch |spawn_err| {
+    _ = runtime.spawn(HandleCleanup.run, .{ allocator, handle_ptr }) catch |spawn_err| {
         const cleanup_ptr = handle_ptr;
         defer allocator.destroy(cleanup_ptr);
 
         var cleanup = cleanup_ptr.*;
         var caught_err: ?anyerror = null;
-        cleanup.await() catch |err| {
+        cleanup.wait() catch |err| {
             caught_err = err;
         };
         cleanup.deinit();
@@ -291,7 +291,7 @@ test "AsyncStreamConsumer basic operation" {
     const allocator = testing.allocator;
 
     // Create runtime
-    var rt = try async.AsyncRuntime.init(allocator, .{ .worker_threads = 1 });
+    var rt = try async_mod.AsyncRuntime.init(allocator, .{ .worker_threads = 1 });
     defer rt.deinit();
 
     try rt.start();

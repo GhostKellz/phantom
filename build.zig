@@ -43,7 +43,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
             .crypto = false,
             .system = false,
             .advanced = true,
-            .terminal_widget = true,
+            .terminal_widget = false,
         };
     } else if (std.mem.eql(u8, preset, "crypto")) {
         features = Features{
@@ -53,7 +53,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
             .crypto = true,
             .system = false,
             .advanced = true,
-            .terminal_widget = true,
+            .terminal_widget = false,
         };
     } else if (std.mem.eql(u8, preset, "system")) {
         features = Features{
@@ -63,7 +63,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
             .crypto = false,
             .system = true,
             .advanced = true,
-            .terminal_widget = true,
+            .terminal_widget = false,
         };
     } else if (std.mem.eql(u8, preset, "full")) {
         features = Features{
@@ -73,7 +73,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
             .crypto = true,
             .system = true,
             .advanced = true,
-            .terminal_widget = true,
+            .terminal_widget = false,
         };
     } else {
         // Unknown preset, default to full
@@ -85,7 +85,7 @@ fn resolveFeatures(preset: []const u8, explicit: struct {
             .crypto = true,
             .system = true,
             .advanced = true,
-            .terminal_widget = true,
+            .terminal_widget = false,
         };
     }
 
@@ -188,12 +188,25 @@ pub fn build(b: *std.Build) void {
     });
     const grove_mod = grove_dep.module("grove");
 
-    // Get zontom dependency for TOML parsing
-    const zontom_dep = b.dependency("zontom", .{
-        .target = target,
-        .optimize = optimize,
-    });
-    const zontom_mod = zontom_dep.module("zontom");
+    const generated_files = b.addWriteFiles();
+    const pty_header_source =
+        "#define _GNU_SOURCE 1\n" ++
+        "#include <stdlib.h>\n" ++
+        "#include <unistd.h>\n" ++
+        "#include <sys/ioctl.h>\n" ++
+        "#include <sys/wait.h>\n" ++
+        "#include <termios.h>\n" ++
+        "#include <pty.h>\n";
+    const pty_c_mod = if (target.result.os.tag == .windows) null else blk: {
+        const pty_header = generated_files.add("phantom_pty.h", pty_header_source);
+        const pty_translate = b.addTranslateC(.{
+            .root_source_file = pty_header,
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        });
+        break :blk pty_translate.createModule();
+    };
 
     const mod = b.addModule("phantom", .{
         .root_source_file = b.path("src/root.zig"),
@@ -204,9 +217,11 @@ pub fn build(b: *std.Build) void {
             .{ .name = "zfont", .module = zfont_mod },
             .{ .name = "zigzag", .module = zigzag_mod },
             .{ .name = "grove", .module = grove_mod },
-            .{ .name = "zontom", .module = zontom_mod },
         },
     });
+    if (pty_c_mod) |module| {
+        mod.addImport("phantom_pty_c", module);
+    }
 
     // Pass feature flags as comptime constants to the module
     // This creates conditional compilation based on build options
@@ -238,53 +253,21 @@ pub fn build(b: *std.Build) void {
     // Add the config module as an import to the main phantom module
     mod.addImport("phantom_config", phantom_mod);
 
-    // Here we define an executable. An executable needs to have a root module
-    // which needs to expose a `main` function. While we could add a main function
-    // to the module defined above, it's sometimes preferable to split business
-    // business logic and the CLI into two separate modules.
-    //
-    // If your goal is to create a Zig library for others to use, consider if
-    // it might benefit from also exposing a CLI tool. A parser library for a
-    // data serialization format could also bundle a CLI syntax checker, for example.
-    //
-    // If instead your goal is to create an executable, consider if users might
-    // be interested in also being able to embed the core functionality of your
-    // program in their own executable in order to avoid the overhead involved in
-    // subprocessing your CLI tool.
-    //
-    // If neither case applies to you, feel free to delete the declaration you
-    // don't need and to put everything under a single module.
+    const install_optional_artifacts = b.option(bool, "install-optional-artifacts", "Install demos and benchmarks during the default `zig build` step") orelse false;
+
     const exe = b.addExecutable(.{
         .name = "phantom",
         .root_module = b.createModule(.{
-            // b.createModule defines a new module just like b.addModule but,
-            // unlike b.addModule, it does not expose the module to consumers of
-            // this package, which is why in this case we don't have to give it a name.
             .root_source_file = b.path("src/main.zig"),
-            // Target and optimization levels must be explicitly wired in when
-            // defining an executable or library (in the root module), and you
-            // can also hardcode a specific target for an executable or library
-            // definition if desireable (in the case of firmware for embedded devices).
             .target = target,
             .optimize = optimize,
             .link_libc = true,
-            // List of modules available for import in source files part of the
-            // root module.
             .imports = &.{
-                // Here "phantom" is the name you will use in your source code to
-                // import this module (e.g. `@import("phantom")`). The name is
-                // repeated because you are allowed to rename your imports, which
-                // can be extremely useful in case of collisions (which can happen
-                // importing modules from different packages).
                 .{ .name = "phantom", .module = mod },
             },
         }),
     });
 
-    // This declares intent for the executable to be installed into the
-    // install prefix when running `zig build` (i.e. when executing the default
-    // step). By default the install prefix is `zig-out/` but can be overridden
-    // by passing `--prefix` or `-p`.
     b.installArtifact(exe);
 
     // This creates a top level step. Top level steps have a name and can be
@@ -370,7 +353,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(pkg_demo);
+        if (install_optional_artifacts) b.installArtifact(pkg_demo);
 
         const run_pkg_demo = b.addRunArtifact(pkg_demo);
         const pkg_demo_step = b.step("demo-pkg", "Run the package manager demo");
@@ -391,7 +374,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(ghostty_demo);
+        if (install_optional_artifacts) b.installArtifact(ghostty_demo);
 
         const run_ghostty_demo = b.addRunArtifact(ghostty_demo);
         const ghostty_demo_step = b.step("demo-ghostty", "Run the Ghostty NVIDIA performance demo");
@@ -412,7 +395,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(ai_chat_demo);
+        if (install_optional_artifacts) b.installArtifact(ai_chat_demo);
 
         const run_ai_chat_demo = b.addRunArtifact(ai_chat_demo);
         const ai_chat_demo_step = b.step("demo-ai-chat", "Run the AI Chat CLI demo");
@@ -433,7 +416,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(bench);
+        if (install_optional_artifacts) b.installArtifact(bench);
 
         const run_bench = b.addRunArtifact(bench);
         const bench_step = b.step("benchmark", "Run performance benchmarks");
@@ -454,7 +437,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(zion_demo);
+        if (install_optional_artifacts) b.installArtifact(zion_demo);
 
         const run_zion_demo = b.addRunArtifact(zion_demo);
         const zion_demo_step = b.step("demo-zion", "Run the ZION CLI interactive demo");
@@ -475,7 +458,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(reaper_demo);
+        if (install_optional_artifacts) b.installArtifact(reaper_demo);
 
         const run_reaper_demo = b.addRunArtifact(reaper_demo);
         const reaper_demo_step = b.step("demo-reaper", "Run the Reaper AUR dependencies demo");
@@ -496,7 +479,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(crypto_demo);
+        if (install_optional_artifacts) b.installArtifact(crypto_demo);
 
         const run_crypto_demo = b.addRunArtifact(crypto_demo);
         const crypto_demo_step = b.step("demo-crypto", "Run the crypto/blockchain package demo");
@@ -517,7 +500,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(aur_demo);
+        if (install_optional_artifacts) b.installArtifact(aur_demo);
 
         const run_aur_demo = b.addRunArtifact(aur_demo);
         const aur_demo_step = b.step("demo-aur", "Run the AUR dependencies demo");
@@ -538,12 +521,15 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(package_browser_demo);
+        if (install_optional_artifacts) b.installArtifact(package_browser_demo);
 
         const run_package_browser_demo = b.addRunArtifact(package_browser_demo);
         const package_browser_demo_step = b.step("demo-package-browser", "Run the universal package browser demo");
         package_browser_demo_step.dependOn(&run_package_browser_demo.step);
     }
+
+    // Canonical demo steps - the strongest curated entry points
+    const demo_step = b.step("demo", "Build the curated flagship Phantom demos");
 
     // Theme Gallery Demo - manifest hot reload showcase
     const theme_gallery_demo = b.addExecutable(.{
@@ -558,11 +544,14 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    b.installArtifact(theme_gallery_demo);
+    if (install_optional_artifacts) b.installArtifact(theme_gallery_demo);
 
+    const theme_gallery_demo_step = b.step("demo-theme-gallery", "Build the theme gallery manifest demo");
+    theme_gallery_demo_step.dependOn(&theme_gallery_demo.step);
     const run_theme_gallery_demo = b.addRunArtifact(theme_gallery_demo);
-    const theme_gallery_demo_step = b.step("demo-theme-gallery", "Run the theme gallery manifest demo");
-    theme_gallery_demo_step.dependOn(&run_theme_gallery_demo.step);
+    const run_theme_gallery_demo_step = b.step("run-theme-gallery", "Run the theme gallery manifest demo");
+    run_theme_gallery_demo_step.dependOn(&run_theme_gallery_demo.step);
+    demo_step.dependOn(&theme_gallery_demo.step);
 
     // VXFW Widget Framework Demo - always available
     const vxfw_demo = b.addExecutable(.{
@@ -577,11 +566,13 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    b.installArtifact(vxfw_demo);
+    if (install_optional_artifacts) b.installArtifact(vxfw_demo);
 
+    const vxfw_demo_step = b.step("demo-vxfw", "Build the VXFW widget framework demo");
+    vxfw_demo_step.dependOn(&vxfw_demo.step);
     const run_vxfw_demo = b.addRunArtifact(vxfw_demo);
-    const vxfw_demo_step = b.step("demo-vxfw", "Run the VXFW widget framework demo");
-    vxfw_demo_step.dependOn(&run_vxfw_demo.step);
+    const run_vxfw_demo_step = b.step("run-vxfw-demo", "Run the VXFW widget framework demo");
+    run_vxfw_demo_step.dependOn(&run_vxfw_demo.step);
 
     // Fuzzy Search Demo - requires advanced widgets
     // TODO: Temporarily disabled due to Zig 0.16 type system compatibility issues
@@ -599,7 +590,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(fuzzy_search_demo);
+        if (install_optional_artifacts) b.installArtifact(fuzzy_search_demo);
 
         const run_fuzzy_search_demo = b.addRunArtifact(fuzzy_search_demo);
         const fuzzy_search_demo_step = b.step("demo-fuzzy", "Run the fuzzy search theme picker demo");
@@ -619,7 +610,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    b.installArtifact(grim_demo);
+    if (install_optional_artifacts) b.installArtifact(grim_demo);
 
     const run_grim_demo = b.addRunArtifact(grim_demo);
     const grim_demo_step = b.step("demo-grim", "Run the Grim editor feature showcase");
@@ -639,7 +630,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    b.installArtifact(unicode_bench);
+    if (install_optional_artifacts) b.installArtifact(unicode_bench);
 
     const run_unicode_bench = b.addRunArtifact(unicode_bench);
     const unicode_bench_step = b.step("bench-unicode", "Run Unicode performance benchmarks");
@@ -658,7 +649,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    b.installArtifact(layout_sandbox);
+    if (install_optional_artifacts) b.installArtifact(layout_sandbox);
 
     const run_layout_sandbox = b.addRunArtifact(layout_sandbox);
     const layout_sandbox_step = b.step("bench-layout", "Run layout engine sandbox benchmark");
@@ -677,7 +668,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    b.installArtifact(render_bench);
+    if (install_optional_artifacts) b.installArtifact(render_bench);
 
     const run_render_bench = b.addRunArtifact(render_bench);
     const render_bench_step = b.step("bench-render", "Run rendering performance benchmarks");
@@ -703,11 +694,13 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(feature_showcase);
+        if (install_optional_artifacts) b.installArtifact(feature_showcase);
 
+        const feature_showcase_step = b.step("demo-feature-showcase", "Build the feature showcase demo");
+        feature_showcase_step.dependOn(&feature_showcase.step);
         const run_feature_showcase = b.addRunArtifact(feature_showcase);
-        const feature_showcase_step = b.step("demo-feature-showcase", "Run the feature showcase demo");
-        feature_showcase_step.dependOn(&run_feature_showcase.step);
+        const run_feature_showcase_step = b.step("run-feature-showcase", "Run the feature showcase demo");
+        run_feature_showcase_step.dependOn(&run_feature_showcase.step);
     }
 
     // Data Visualization Demo - Ratatui parity showcase
@@ -724,11 +717,13 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(data_viz_demo);
+        if (install_optional_artifacts) b.installArtifact(data_viz_demo);
 
+        const data_viz_demo_step = b.step("demo-data-visualization", "Build the data visualization demo");
+        data_viz_demo_step.dependOn(&data_viz_demo.step);
         const run_data_viz_demo = b.addRunArtifact(data_viz_demo);
-        const data_viz_demo_step = b.step("demo-data-visualization", "Run the data visualization demo");
-        data_viz_demo_step.dependOn(&run_data_viz_demo.step);
+        const run_data_viz_demo_step = b.step("run-data-visualization", "Run the data visualization demo");
+        run_data_viz_demo_step.dependOn(&run_data_viz_demo.step);
 
         const dashboard_demo = b.addExecutable(.{
             .name = "data_dashboard_demo",
@@ -742,11 +737,14 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(dashboard_demo);
+        if (install_optional_artifacts) b.installArtifact(dashboard_demo);
 
+        const dashboard_demo_step = b.step("demo-data-dashboard", "Build the data-bound dashboard demo");
+        dashboard_demo_step.dependOn(&dashboard_demo.step);
         const run_dashboard_demo = b.addRunArtifact(dashboard_demo);
-        const dashboard_demo_step = b.step("demo-data-dashboard", "Run the data-bound dashboard demo");
-        dashboard_demo_step.dependOn(&run_dashboard_demo.step);
+        const run_dashboard_demo_step = b.step("run-data-dashboard", "Run the data-bound dashboard demo");
+        run_dashboard_demo_step.dependOn(&run_dashboard_demo.step);
+        demo_step.dependOn(&dashboard_demo.step);
     }
 
     // Stability Test Demo
@@ -762,7 +760,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(stability_test);
+        if (install_optional_artifacts) b.installArtifact(stability_test);
 
         const run_stability_test = b.addRunArtifact(stability_test);
         const stability_test_step = b.step("demo-stability-test", "Run the stability test demo");
@@ -783,14 +781,17 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(grove_demo);
+        if (install_optional_artifacts) b.installArtifact(grove_demo);
 
+        const grove_demo_step = b.step("run-grove-demo", "Build the Grove syntax highlighting demo");
+        grove_demo_step.dependOn(&grove_demo.step);
         const run_grove_demo = b.addRunArtifact(grove_demo);
-        const grove_demo_step = b.step("run-grove-demo", "Run the Grove syntax highlighting demo");
-        grove_demo_step.dependOn(&run_grove_demo.step);
+        const live_grove_demo_step = b.step("run-grove-demo-live", "Run the Grove syntax highlighting demo");
+        live_grove_demo_step.dependOn(&run_grove_demo.step);
     }
 
-    if (features.advanced and features.data_widgets) {
+    const terminal_demo_enabled = features.advanced and features.data_widgets and features.terminal_widget;
+    if (terminal_demo_enabled) {
         const terminal_session_demo = b.addExecutable(.{
             .name = "terminal_session_integration",
             .root_module = b.createModule(.{
@@ -803,11 +804,35 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        b.installArtifact(terminal_session_demo);
+        if (install_optional_artifacts) b.installArtifact(terminal_session_demo);
 
+        const terminal_session_demo_step = b.step("demo-terminal-session", "Build the terminal session integration demo");
+        terminal_session_demo_step.dependOn(&terminal_session_demo.step);
         const run_terminal_session_demo = b.addRunArtifact(terminal_session_demo);
-        const terminal_session_demo_step = b.step("demo-terminal-session", "Run the terminal session integration demo");
-        terminal_session_demo_step.dependOn(&run_terminal_session_demo.step);
+        const run_terminal_session_demo_step = b.step("run-terminal-session", "Run the terminal session integration demo");
+        run_terminal_session_demo_step.dependOn(&run_terminal_session_demo.step);
+        demo_step.dependOn(&terminal_session_demo.step);
+
+        const workspace_demo = b.addExecutable(.{
+            .name = "workspace_demo",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("examples/workspace_demo.zig"),
+                .target = target,
+                .optimize = optimize,
+                .link_libc = true,
+                .imports = &.{
+                    .{ .name = "phantom", .module = mod },
+                },
+            }),
+        });
+        if (install_optional_artifacts) b.installArtifact(workspace_demo);
+
+        const workspace_demo_step = b.step("demo-workspace", "Build the canonical Phantom workspace demo");
+        workspace_demo_step.dependOn(&workspace_demo.step);
+        const run_workspace_demo = b.addRunArtifact(workspace_demo);
+        const run_workspace_demo_step = b.step("run-workspace", "Run the canonical Phantom workspace demo");
+        run_workspace_demo_step.dependOn(&run_workspace_demo.step);
+        demo_step.dependOn(&workspace_demo.step);
     }
 
     // Just like flags, top level steps are also listed in the `--help` menu.

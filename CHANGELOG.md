@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.7] - 2026-04-30
+
+### Added
+- `SECURITY.md`
+- Build-time translated-C PTY bindings for the Unix terminal backend instead of source-level `@cImport`
+- Curated widget convenience APIs including `Block.setTitle`, `Block.setBorderStyle`, `Block.setStyle`, and `ScrollbarState.init`
+- Stronger widget coverage with terminal scrollback and idle-placeholder tests plus dashboard preset coverage
+- A real PTY-backed terminal session integration example and a more focused curated feature showcase demo
+
+### Changed
+- Verified Phantom against the current Zig `0.17.0-dev` workspace baseline
+- Updated `zsync` to `v0.8.0`
+- Updated `gcode` to `v0.1.2`
+- Updated `zfont` to `v0.1.4`
+- Updated `zigzag` to `v0.1.4`
+- Updated `flash` to `v0.3.4`
+- Updated `grove` to `v0.2.7`
+- Removed the archived `zontom` dependency and related stale public surface
+- Narrowed the default build/install graph so `zig build` no longer installs optional demos and benchmarks by default
+- Kept terminal widget support opt-in in presets while preserving explicit `-Dterminal-widget=true` enablement
+- Curated the root export surface to better match the intended public API
+- Reworked the README around the current supported path, current package metadata, curated demos, theming, and support expectations
+- Added routed workspace polish including tab overflow windowing, per-line editor diagnostics, richer terminal mouse forwarding, and real filesystem-backed workspace file open/save in the canonical demo
+
+### Fixed
+- Restored the main build and test path on the current Zig baseline
+- Fixed stale fuzz-test callback usage in `src/main.zig`
+- Fixed `scripts/run-tests.sh` to use valid current optimize flags
+- Migrated Phantom PTY integration away from removed `@cImport` patterns
+- Updated parts of the async and terminal session path for current `zsync` and Zig call conventions
+- Fixed the supported workspace path so `examples/workspace_demo.zig` reflects real file-backed editor behavior rather than seeded in-memory buffers
+
+### Documentation
+- Reorganized docs into a cleaner structure under `docs/`
+- Kept `docs/README.md` as the uppercase entry point and normalized the rest of the docs tree to lowercase kebab-case names
+- Replaced stale high-drift docs with shorter current references across getting started, reference, guides, architecture, and widgets sections
+- Removed stale version references and prerelease framing from the roadmap and package guidance
+- Tightened workspace and API docs to reflect the current supported editor, terminal, and stateful-widget path more honestly
+
+### Verification
+- Verified `zig build`
+- Verified `zig build test`
+- Verified `zig build -Dterminal-widget=true demo-workspace`
+- Verified `scripts/run-tests.sh`
+
+---
+
 ## [0.8.0-rc8] - 2025-11-08
 
 ### 🎯 Release Focus

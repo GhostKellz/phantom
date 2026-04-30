@@ -1,10 +1,41 @@
-//! Feature Showcase Demo - ACTUAL working TUI
-//! Shows real widgets rendering in a clean TUI
+//! Feature Showcase Demo - curated overview of the recommended Phantom path.
 
 const std = @import("std");
 const phantom = @import("phantom");
 
 var global_app: *phantom.App = undefined;
+
+const showcase_text =
+    \\Phantom is strongest when you build around a small, composable core.
+    \\
+    \\Recommended path:
+    \\  1. Start with phantom.App
+    \\  2. Compose core widgets from phantom.widgets
+    \\  3. Prefer phantom.layout.engine for new layout work
+    \\  4. Add themes, dashboards, syntax highlighting, or terminal sessions only as needed
+    \\
+    \\Canonical demos:
+    \\  - zig build demo-theme-gallery
+    \\  - zig build demo-data-dashboard
+    \\  - zig build demo-vxfw
+    \\  - zig build -Dterminal-widget=true demo-terminal-session
+    \\
+    \\Supported surface:
+    \\  - App, widgets, layout.engine
+    \\  - themes and manifest loading
+    \\  - data dashboards and async runtime helpers
+    \\  - Grove-backed syntax highlighting
+    \\
+    \\Advanced surface:
+    \\  - vxfw for lower-level widget control
+    \\  - richer package/system/domain widgets where they fit your app
+    \\
+    \\Terminal path:
+    \\  - PTY sessions are available behind -Dterminal-widget=true
+    \\  - use the terminal demo as the reference integration path
+    \\
+    \\Press q or Ctrl+C to quit.
+;
 
 pub fn main() !void {
     var gpa: std.heap.DebugAllocator(.{}) = .init;
@@ -19,65 +50,6 @@ pub fn main() !void {
     defer app.deinit();
     global_app = &app;
 
-    // Create showcase content
-    const showcase_text =
-        \\╔═══════════════════════════════════════════════════════════╗
-        \\║          PHANTOM TUI - FEATURE SHOWCASE                   ║
-        \\╚═══════════════════════════════════════════════════════════╝
-        \\
-        \\✨ WORKING FEATURES:
-        \\
-        \\📦 WIDGETS (49 available):
-        \\  • Text - Multi-line rendering with styling
-        \\  • ListView - Virtualized lists with filtering
-        \\  • Block - Bordered containers
-        \\  • Container - Vertical/horizontal layouts
-        \\  • FlexRow/FlexColumn - Flexible layouts
-        \\  • Input - Text input with focus
-        \\  • Button - Interactive buttons
-        \\  • Chart/BarChart - Data visualization
-        \\  • Canvas - Custom drawing
-        \\  • Spinner - Loading animations
-        \\
-        \\⚡ RENDERING:
-        \\  ✓ Clean alternate screen mode
-        \\  ✓ Proper termios configuration
-        \\  ✓ Double buffering for flicker-free updates
-        \\  ✓ Unicode/emoji support
-        \\  ✓ RGB true color + 256 color palette
-        \\
-        \\🎮 INPUT:
-        \\  ✓ Keyboard events (Ctrl, Alt, Function keys)
-        \\  ✓ Mouse support (click, drag, scroll)
-        \\  ✓ Focus management
-        \\
-        \\🎨 THEMES:
-        \\  ✓ Built-in themes (ghost-hacker-blue, tokyo-night)
-        \\  ✓ Custom theme support
-        \\  ✓ Runtime theme switching
-        \\
-        \\📊 LAYOUT:
-        \\  ✓ Constraint-based layouts
-        \\  ✓ Flex layouts with gap/justify
-        \\  ✓ Grid system
-        \\  ✓ Z-index layering
-        \\
-        \\🚀 PERFORMANCE:
-        \\  ✓ Event loop: < 1ms tick latency
-        \\  ✓ Layout solver: O(n) complexity
-        \\  ✓ Render diff: Only changed cells updated
-        \\  ✓ ListView virtualization: 1000+ items performant
-        \\
-        \\✅ QUALITY (v0.8.1):
-        \\  ✓ Zero terminal bleed-through
-        \\  ✓ No stdout contamination
-        \\  ✓ Proper cleanup on exit
-        \\  ✓ Zig 0.16.0-dev compatible
-        \\  ✓ Memory leak free
-        \\
-        \\Press 'q' or Ctrl+C to exit
-    ;
-
     var text_widget = try phantom.widgets.Text.initWithStyle(
         allocator,
         showcase_text,
@@ -86,7 +58,6 @@ pub fn main() !void {
 
     try app.addWidget(&text_widget.widget);
     try app.event_loop.addHandler(handleEvent);
-
     try app.run();
 }
 

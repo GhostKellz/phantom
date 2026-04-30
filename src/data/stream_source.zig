@@ -4,7 +4,7 @@
 
 const std = @import("std");
 const zsync = @import("zsync");
-const async = @import("../async/mod.zig");
+const async_mod = @import("../async/mod.zig");
 const data = @import("list_source.zig");
 
 /// Streaming list source that feeds items from a zsync channel into an
@@ -21,7 +21,7 @@ pub fn StreamingListSource(comptime Item: type) type {
 
     return struct {
         const Self = @This();
-        const ConsumerTaskHandle = async.TaskHandle(@TypeOf(consumeTask));
+        const ConsumerTaskHandle = async_mod.TaskHandle(consumeTask);
 
         /// Runtime configuration options.
         pub const Options = struct {
@@ -32,7 +32,7 @@ pub fn StreamingListSource(comptime Item: type) type {
         };
 
         allocator: std.mem.Allocator,
-        runtime: *async.AsyncRuntime,
+        runtime: *async_mod.AsyncRuntime,
         base: BaseType,
         channel: ChannelType,
         running: std.atomic.Value(bool),
@@ -43,7 +43,7 @@ pub fn StreamingListSource(comptime Item: type) type {
         /// at a stable memory location to begin consuming channel messages.
         pub fn init(
             allocator: std.mem.Allocator,
-            runtime: *async.AsyncRuntime,
+            runtime: *async_mod.AsyncRuntime,
             options: Options,
         ) !Self {
             var channel = try ChannelType.init(allocator, options.channel_capacity);
@@ -80,7 +80,7 @@ pub fn StreamingListSource(comptime Item: type) type {
 
             self.base.setState(self.options.start_state);
 
-            const handle = try self.runtime.spawn(@TypeOf(consumeTask), .{self});
+            const handle = try self.runtime.spawn(consumeTask, .{self});
             self.consumer_task = handle;
         }
 
@@ -100,7 +100,7 @@ pub fn StreamingListSource(comptime Item: type) type {
                 defer self.consumer_task = null;
 
                 var caught_err: ?anyerror = null;
-                task.await() catch |err| {
+                task.wait() catch |err| {
                     caught_err = err;
                 };
                 task.deinit();
@@ -175,7 +175,7 @@ test "StreamingListSource processes pushed items" {
     const Item = u32;
     const allocator = testing.allocator;
 
-    var runtime = try async.AsyncRuntime.init(allocator, .{ .worker_threads = 1 });
+    var runtime = try async_mod.AsyncRuntime.init(allocator, .{ .worker_threads = 1 });
     defer runtime.deinit();
     try runtime.start();
     defer runtime.shutdown();

@@ -12,6 +12,8 @@ pub const List = if (config.enable_basic_widgets) @import("list.zig").List else 
 pub const Button = if (config.enable_basic_widgets) @import("button.zig").Button else void;
 pub const Input = if (config.enable_basic_widgets) @import("input.zig").Input else void;
 pub const TextArea = if (config.enable_basic_widgets) @import("textarea.zig").TextArea else void;
+pub const CodeEditor = if (config.enable_advanced) @import("editor/CodeEditor.zig").CodeEditor else void;
+pub const CodeEditorConfig = if (config.enable_advanced) @import("editor/CodeEditor.zig").Config else void;
 
 // Data display widgets - conditionally exported
 pub const ProgressBar = if (config.enable_data_widgets) @import("progress.zig").ProgressBar else void;
@@ -105,53 +107,69 @@ pub const DiffLine = if (config.enable_advanced) @import("diff.zig").DiffLine el
 pub const Markdown = if (config.enable_advanced) @import("markdown.zig").Markdown else void;
 
 test {
-    // Import all widget tests
-    _ = @import("text.zig");
-    _ = @import("block.zig");
-    _ = @import("list.zig");
-    _ = @import("button.zig");
-    _ = @import("input.zig");
-    _ = @import("textarea.zig");
-    _ = @import("progress.zig");
-    _ = @import("table.zig");
-    _ = @import("task_monitor.zig");
-    _ = @import("data_list.zig");
-    _ = @import("data_status.zig");
-    _ = @import("theme_dashboard.zig");
-    _ = @import("streaming_text.zig");
-    _ = @import("code_block.zig");
+    if (config.enable_basic_widgets) {
+        _ = @import("text.zig");
+        _ = @import("block.zig");
+        _ = @import("list.zig");
+        _ = @import("button.zig");
+        _ = @import("input.zig");
+        _ = @import("textarea.zig");
+        _ = @import("border.zig");
+        _ = @import("spinner.zig");
+        _ = @import("scrollbar.zig");
+    }
 
-    // Import new widget tests
-    _ = @import("universal_package_browser.zig");
-    _ = @import("aur_dependencies.zig");
-    _ = @import("blockchain_package_browser.zig");
-    _ = @import("command_builder.zig");
-    _ = @import("network_topology.zig");
-    _ = @import("system_monitor.zig");
+    if (config.enable_data_widgets) {
+        _ = @import("progress.zig");
+        _ = @import("table.zig");
+        _ = @import("task_monitor.zig");
+        _ = @import("data_list.zig");
+        _ = @import("data_status.zig");
+        _ = @import("theme_dashboard.zig");
+        _ = @import("bar_chart.zig");
+        _ = @import("chart.zig");
+        _ = @import("gauge.zig");
+        _ = @import("sparkline.zig");
+        _ = @import("presets.zig");
+    }
 
-    _ = @import("scroll_view.zig");
-    _ = @import("list_view.zig");
-    _ = @import("rich_text.zig");
-    _ = @import("border.zig");
-    _ = @import("spinner.zig");
-    _ = @import("flex.zig");
+    if (config.enable_package_mgmt) {
+        _ = @import("universal_package_browser.zig");
+        _ = @import("aur_dependencies.zig");
+    }
 
-    _ = @import("container.zig");
-    _ = @import("stack.zig");
-    _ = @import("tabs.zig");
-    _ = @import("status_bar.zig");
-    _ = @import("toast_overlay.zig");
-    _ = @import("popover.zig");
-    if (config.enable_terminal_widget) _ = @import("terminal.zig");
+    if (config.enable_crypto) {
+        _ = @import("blockchain_package_browser.zig");
+    }
 
-    _ = @import("bar_chart.zig");
-    _ = @import("chart.zig");
-    _ = @import("gauge.zig");
-    _ = @import("sparkline.zig");
-    _ = @import("calendar.zig");
-    _ = @import("canvas.zig");
-    _ = @import("presets.zig");
-    _ = @import("tree.zig");
-    _ = @import("diff.zig");
-    _ = @import("markdown.zig");
+    if (config.enable_system) {
+        _ = @import("command_builder.zig");
+        _ = @import("network_topology.zig");
+        _ = @import("system_monitor.zig");
+    }
+
+    if (config.enable_advanced) {
+        _ = @import("streaming_text.zig");
+        _ = @import("code_block.zig");
+        _ = @import("scroll_view.zig");
+        _ = @import("list_view.zig");
+        _ = @import("rich_text.zig");
+        _ = @import("flex.zig");
+        _ = @import("container.zig");
+        _ = @import("stack.zig");
+        _ = @import("tabs.zig");
+        _ = @import("status_bar.zig");
+        _ = @import("toast_overlay.zig");
+        _ = @import("popover.zig");
+        _ = @import("calendar.zig");
+        _ = @import("canvas.zig");
+        _ = @import("tree.zig");
+        _ = @import("diff.zig");
+        _ = @import("markdown.zig");
+        _ = @import("syntax_highlight.zig");
+    }
+
+    if (config.enable_terminal_widget) {
+        _ = @import("terminal.zig");
+    }
 }

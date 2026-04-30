@@ -261,3 +261,17 @@ test "DashboardLayouts chat interface" {
     // Messages: remaining (should be 18 lines)
     try testing.expect(areas[1].height >= 18);
 }
+
+test "DashboardLayouts monitoring returns six regions" {
+    const testing = std.testing;
+
+    const area = phantom.Rect{ .x = 0, .y = 0, .width = 120, .height = 40 };
+    const areas = try DashboardLayouts.monitoring(testing.allocator, area);
+    defer testing.allocator.free(areas);
+
+    try testing.expectEqual(@as(usize, 6), areas.len);
+    try testing.expectEqual(@as(u16, 2), areas[0].height);
+    try testing.expectEqual(@as(u16, 1), areas[5].height);
+    try testing.expect(areas[1].width > 0);
+    try testing.expect(areas[4].height > 0);
+}

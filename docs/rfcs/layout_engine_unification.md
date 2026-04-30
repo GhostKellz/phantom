@@ -171,7 +171,7 @@ for (solution.assignments()) |assignment| {
 
 ## 12. Risks & Mitigations
 
-- **Solver complexity**: Start with simplified Cassowary and iterate; maintain fallback greedy mode during beta.
+- **Solver complexity**: Start with simplified Cassowary and iterate; maintain a fallback greedy mode while the solver hardens.
 - **Performance regressions**: Establish baseline benchmarks before rollout; gate release on meeting targets.
 - **API churn**: Ship RFC-backed design and migration guide early to collect feedback; keep wrappers until v0.9.
 

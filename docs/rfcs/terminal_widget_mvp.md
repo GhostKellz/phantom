@@ -50,7 +50,7 @@ Grim and Zeke both require an embedded terminal widget that matches the capabili
    - Provide logging hooks for debugging.
 7. **Example & documentation**
    - Ship `examples/terminal_demo.zig` showing split view + command execution.
-   - Update `docs/WIDGET_CATALOG.md` and integration guides.
+   - Update the widget inventory/reference docs and integration guides.
 8. **Testing**
    - Unit tests for parser, scrollback, selection.
    - Integration test that runs a simple PTY command (`printf`/`dir`) and validates output.
@@ -165,9 +165,8 @@ pub const Terminal = struct {
 
 - Create `examples/terminal_demo.zig` featuring a split layout with editor stub and terminal.
 - Update docs:
-  - `docs/WIDGET_CATALOG.md` entry with screenshots.
-  - `docs/integrations/GRIM_INTEGRATION.md` section about hooking LSP diagnostics to terminal.
-  - `docs/integrations/ZEKE_INTEGRATION.md` for streaming command responses.
+  - `docs/reference/widget-inventory.md` entry with screenshots.
+  - downstream integration notes for editor and CLI consumers as the feature stabilizes.
 - Record short screencast once feature stabilizes (Phase 2 deliverable).
 
 ## 14. Rollout & Risks

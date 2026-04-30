@@ -16,9 +16,9 @@ Usage: scripts/run-tests.sh [options]
 Options:
   --skip-build        Skip the initial `zig build` step.
   --skip-tests        Skip running `zig build test`.
-  --release-safe      Build and test using -Drelease-safe.
-  --release-fast      Build and test using -Drelease-fast.
-  --release-small     Build and test using -Drelease-small.
+  --release-safe      Build and test using -O ReleaseSafe.
+  --release-fast      Build and test using -O ReleaseFast.
+  --release-small     Build and test using -O ReleaseSmall.
   --zig-flag <flag>   Pass an arbitrary flag through to both build and test commands.
   --help              Show this message and exit.
 
@@ -29,6 +29,7 @@ EOF
 RUN_BUILD=true
 RUN_TESTS=true
 RELEASE_FLAG=""
+RELEASE_VALUE=""
 FORWARDED_FLAGS=()
 TEST_EXTRA_ARGS=()
 
@@ -47,7 +48,11 @@ while [[ $# -gt 0 ]]; do
 				echo "Only one release flag may be specified" >&2
 				exit 1
 			fi
-			RELEASE_FLAG="-D${1#--}"
+			case "$1" in
+				--release-safe) RELEASE_FLAG="-O"; RELEASE_VALUE="ReleaseSafe" ;;
+				--release-fast) RELEASE_FLAG="-O"; RELEASE_VALUE="ReleaseFast" ;;
+				--release-small) RELEASE_FLAG="-O"; RELEASE_VALUE="ReleaseSmall" ;;
+			esac
 			shift
 			;;
 		--zig-flag)
@@ -86,7 +91,7 @@ echo "Using ${ZIG_BIN} ${ZIG_VERSION}"
 
 COMMON_FLAGS=()
 if [[ -n "${RELEASE_FLAG}" ]]; then
-	COMMON_FLAGS+=("${RELEASE_FLAG}")
+	COMMON_FLAGS+=("${RELEASE_FLAG}" "${RELEASE_VALUE}")
 fi
 if [[ ${#FORWARDED_FLAGS[@]} -gt 0 ]]; then
 	COMMON_FLAGS+=("${FORWARDED_FLAGS[@]}")

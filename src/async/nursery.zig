@@ -13,7 +13,7 @@ pub const Nursery = struct {
 
     const TaskSlot = struct {
         ptr: *anyopaque,
-        awaitFn: *const fn (*anyopaque) anyerror!void,
+        waitFn: *const fn (*anyopaque) anyerror!void,
         cancelFn: *const fn (*anyopaque) void,
         deinitFn: *const fn (*anyopaque, std.mem.Allocator) void,
     };
@@ -45,9 +45,9 @@ pub const Nursery = struct {
 
             const Self = @This();
 
-            fn await(ptr: *anyopaque) anyerror!void {
+            fn wait(ptr: *anyopaque) anyerror!void {
                 const node = @as(*Self, @ptrCast(@alignCast(ptr)));
-                try node.handle.await();
+                try node.handle.wait();
             }
 
             fn cancel(ptr: *anyopaque) void {
@@ -67,7 +67,7 @@ pub const Nursery = struct {
 
         try self.tasks.append(TaskSlot{
             .ptr = node,
-            .awaitFn = Node.await,
+            .waitFn = Node.wait,
             .cancelFn = Node.cancel,
             .deinitFn = Node.deinit,
         });
@@ -76,7 +76,7 @@ pub const Nursery = struct {
     pub fn waitAll(self: *Nursery) !void {
         var first_err: ?anyerror = null;
         for (self.tasks.items) |slot| {
-            slot.awaitFn(slot.ptr) catch |err| {
+            slot.waitFn(slot.ptr) catch |err| {
                 if (first_err == null) first_err = err;
             };
         }

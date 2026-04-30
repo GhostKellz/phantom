@@ -23,6 +23,10 @@ pub const ScrollbarState = struct {
     viewport_length: usize = 0,
 
     pub fn new(content_length: usize) ScrollbarState {
+        return ScrollbarState.init(content_length);
+    }
+
+    pub fn init(content_length: usize) ScrollbarState {
         return .{ .content_length = content_length };
     }
 

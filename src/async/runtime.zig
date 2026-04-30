@@ -134,7 +134,7 @@ pub const AsyncRuntime = struct {
     /// Spawn an async task (functions must return `!void`)
     pub fn spawn(
         self: *AsyncRuntime,
-        comptime Func: type,
+        comptime Func: anytype,
         args: anytype,
     ) !TaskHandle(Func) {
         if (!self.running) return error.RuntimeNotRunning;
@@ -149,7 +149,7 @@ pub const AsyncRuntime = struct {
     pub fn spawnOn(
         self: *AsyncRuntime,
         worker_id: u32,
-        comptime Func: type,
+        comptime Func: anytype,
         args: anytype,
     ) !TaskHandle(Func) {
         _ = worker_id; // thread pool scheduling handled by zsync runtime
@@ -205,14 +205,13 @@ pub const AsyncRuntime = struct {
 };
 
 /// Task handle for awaiting async results
-pub fn TaskHandle(comptime Func: type) type {
-    const fn_info = @typeInfo(Func);
+pub fn TaskHandle(comptime Func: anytype) type {
+    const FuncType = switch (@typeInfo(@TypeOf(Func))) {
+        .type => Func,
+        else => @TypeOf(Func),
+    };
+    const fn_info = @typeInfo(FuncType);
     if (fn_info != .@"fn") @compileError("AsyncRuntime.spawn requires a function");
-    const return_type_opt = fn_info.@"fn".return_type;
-    if (return_type_opt == null) @compileError("AsyncRuntime.spawn expects functions returning !void");
-    const ReturnType = return_type_opt.?;
-    // TODO: Restore return type validation once Zig compiler bug is resolved
-
     const FutureState = zsync.Future.State;
 
     return struct {
@@ -222,11 +221,8 @@ pub fn TaskHandle(comptime Func: type) type {
         const Self = @This();
 
         /// Wait for the task to complete
-        pub fn await(self: *Self) ReturnType {
-            self.future.await() catch |err| {
-                return @errorCast(err);
-            };
-            return;
+        pub fn wait(self: *Self) !void {
+            try @field(zsync.Future, "await")(&self.future);
         }
 
         /// Check if the task has completed
@@ -241,7 +237,8 @@ pub fn TaskHandle(comptime Func: type) type {
 
         /// Release runtime resources associated with this task
         pub fn deinit(self: *Self) void {
-            self.future.destroy(self.runtime.allocator);
+            _ = self.runtime;
+            self.future.destroy();
         }
     };
 }
@@ -281,7 +278,7 @@ pub fn Channel(comptime T: type) type {
 
             self.* = Self{
                 .allocator = allocator,
-                .channel = try zsync.boundedChannel(T, capacity),
+                .channel = try zsync.channels.bounded(T, allocator, capacity),
             };
 
             return self;
@@ -299,7 +296,7 @@ pub fn Channel(comptime T: type) type {
 
         /// Receive a value from the channel (blocks if empty)
         pub fn receive(self: *Self) !T {
-            return try self.channel.receive();
+            return try self.channel.recv();
         }
 
         /// Try to send without blocking
@@ -309,7 +306,7 @@ pub fn Channel(comptime T: type) type {
 
         /// Try to receive without blocking
         pub fn tryReceive(self: *Self) !?T {
-            return try self.channel.tryReceive();
+            return self.channel.tryRecv();
         }
     };
 }
@@ -454,10 +451,10 @@ test "AsyncRuntime spawn task" {
 
     var result_storage = std.atomic.Value(i32).init(0);
     var state = ExampleState{ .result = &result_storage };
-    var task = try runtime.spawn(@TypeOf(exampleAsyncTask), .{ &state, 10, 20 });
+    var task = try runtime.spawn(exampleAsyncTask, .{ &state, 10, 20 });
     defer task.deinit();
 
-    try task.await();
+    try task.wait();
 
     try testing.expectEqual(@as(i32, 30), result_storage.load(.acquire));
 }

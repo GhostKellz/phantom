@@ -10,6 +10,7 @@ const MouseEvent = @import("../event.zig").MouseEvent;
 const MouseButton = @import("../event.zig").MouseButton;
 const geometry = @import("../geometry.zig");
 const style = @import("../style.zig");
+const Scrollbar = @import("scrollbar.zig").Scrollbar;
 
 const Rect = geometry.Rect;
 const Style = style.Style;
@@ -45,6 +46,13 @@ pub const Row = struct {
 
 /// Table widget for displaying tabular data
 pub const Table = struct {
+    pub const State = struct {
+        selected_row: ?usize = null,
+        selected_col: ?usize = null,
+        scroll_offset_row: usize = 0,
+        scroll_offset_col: usize = 0,
+    };
+
     widget: Widget,
     allocator: std.mem.Allocator,
 
@@ -71,6 +79,8 @@ pub const Table = struct {
     show_borders: bool = true,
     selectable: bool = true,
     column_spacing: u16 = 1,
+    is_focused: bool = false,
+    show_scrollbar: bool = true,
 
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
@@ -81,6 +91,9 @@ pub const Table = struct {
         .handleEvent = handleEvent,
         .resize = resize,
         .deinit = deinit,
+        .canFocus = canFocus,
+        .focus = focusWidget,
+        .blur = blurWidget,
     };
 
     pub fn init(allocator: std.mem.Allocator) !*Table {
@@ -95,6 +108,8 @@ pub const Table = struct {
             .selected_style = Style.default().withBg(style.Color.blue),
             .border_style = Style.default(),
             .calculated_widths = ArrayList(u16).init(allocator),
+            .is_focused = false,
+            .show_scrollbar = true,
         };
         return table;
     }
@@ -176,6 +191,10 @@ pub const Table = struct {
         self.column_spacing = spacing;
     }
 
+    pub fn setShowScrollbar(self: *Table, enabled: bool) void {
+        self.show_scrollbar = enabled;
+    }
+
     pub fn selectNext(self: *Table) void {
         if (!self.selectable or self.rows.items.len == 0) return;
 
@@ -207,6 +226,36 @@ pub const Table = struct {
             }
         }
         return null;
+    }
+
+    pub fn state(self: *const Table) State {
+        return .{
+            .selected_row = self.selected_row,
+            .selected_col = self.selected_col,
+            .scroll_offset_row = self.scroll_offset_row,
+            .scroll_offset_col = self.scroll_offset_col,
+        };
+    }
+
+    pub fn applyState(self: *Table, new_state: State) void {
+        self.scroll_offset_row = new_state.scroll_offset_row;
+        self.scroll_offset_col = new_state.scroll_offset_col;
+        self.selected_row = if (new_state.selected_row) |row|
+            if (row < self.rows.items.len) row else null
+        else
+            null;
+        self.selected_col = if (new_state.selected_col) |col|
+            if (col < self.columns.items.len) col else null
+        else
+            null;
+    }
+
+    pub fn scrollbarState(self: *const Table, viewport_length: usize) @import("scrollbar.zig").ScrollbarState {
+        var scrollbar_state = @import("scrollbar.zig").ScrollbarState.init(self.rows.items.len);
+        _ = scrollbar_state.setPosition(self.scroll_offset_row);
+        _ = scrollbar_state.setViewportLength(viewport_length);
+        _ = scrollbar_state.setContentLength(self.rows.items.len);
+        return scrollbar_state;
     }
 
     fn calculateColumnWidths(self: *Table) void {
@@ -331,18 +380,24 @@ pub const Table = struct {
 
         if (area.height == 0 or area.width == 0) return;
 
+        const has_scrollbar = self.show_scrollbar and self.rows.items.len > area.height and area.width > 1;
+        const render_area = if (has_scrollbar)
+            Rect.init(area.x, area.y, area.width - 1, area.height)
+        else
+            area;
+
         // Calculate column widths
         self.calculateColumnWidths();
 
         // Draw outer border
         if (self.show_borders) {
-            self.drawBorder(buffer, area.x, area.y, area.width, area.height);
+            self.drawBorder(buffer, render_area.x, render_area.y, render_area.width, render_area.height);
         }
 
         // Calculate content area
-        var content_area = area;
+        var content_area = render_area;
         if (self.show_borders) {
-            content_area = Rect.init(area.x + 1, area.y + 1, area.width - 2, area.height - 2);
+            content_area = Rect.init(render_area.x + 1, render_area.y + 1, render_area.width - 2, render_area.height - 2);
         }
 
         if (content_area.height == 0 or content_area.width == 0) return;
@@ -386,6 +441,14 @@ pub const Table = struct {
         else
             0;
 
+        if (self.selected_row) |selected| {
+            if (selected < self.scroll_offset_row) {
+                self.scroll_offset_row = selected;
+            } else if (visible_rows > 0 and selected >= self.scroll_offset_row + visible_rows) {
+                self.scroll_offset_row = selected - visible_rows + 1;
+            }
+        }
+
         var row_idx = self.scroll_offset_row;
         var displayed_rows: u16 = 0;
 
@@ -399,7 +462,12 @@ pub const Table = struct {
                 const col_width = self.calculated_widths.items[col_idx];
                 const cell_text = if (col_idx < row.cells.len) row.cells[col_idx] else "";
 
-                const cell_style = if (is_selected) self.selected_style else row.style;
+                const cell_style = if (is_selected)
+                    if (self.is_focused) self.selected_style else self.selected_style.withBg(style.Color.bright_black)
+                else if (row.style.bg != null or row.style.fg != null or row.style.attributes != style.Attributes.none())
+                    row.style
+                else
+                    self.row_style;
 
                 self.drawCell(buffer, current_x, current_y, col_width, cell_text, column.alignment, cell_style);
 
@@ -417,6 +485,12 @@ pub const Table = struct {
             displayed_rows += 1;
             current_y += 1;
         }
+
+        if (has_scrollbar) {
+            const scrollbar = Scrollbar.init(.vertical_right);
+            var scrollbar_state = self.scrollbarState(content_area.height);
+            scrollbar.render(buffer, area, &scrollbar_state);
+        }
     }
 
     fn handleEvent(widget: *Widget, event: Event) bool {
@@ -427,6 +501,28 @@ pub const Table = struct {
         switch (event) {
             .key => |key| {
                 switch (key) {
+                    .page_up => {
+                        const step = if (self.area.height > 4) self.area.height - 4 else 1;
+                        self.scroll_offset_row = self.scroll_offset_row -| step;
+                        return true;
+                    },
+                    .page_down => {
+                        const step = if (self.area.height > 4) self.area.height - 4 else 1;
+                        self.scroll_offset_row += step;
+                        return true;
+                    },
+                    .home => {
+                        self.selected_row = if (self.rows.items.len > 0) 0 else null;
+                        self.scroll_offset_row = 0;
+                        return true;
+                    },
+                    .end => {
+                        if (self.rows.items.len > 0) {
+                            self.selected_row = self.rows.items.len - 1;
+                            self.scroll_offset_row = self.rows.items.len - 1;
+                        }
+                        return true;
+                    },
                     .up => {
                         self.selectPrevious();
                         return true;
@@ -461,6 +557,21 @@ pub const Table = struct {
         const self: *Table = @fieldParentPtr("widget", widget);
         self.area = area;
         self.calculateColumnWidths();
+    }
+
+    fn canFocus(widget: *Widget) bool {
+        const self: *Table = @fieldParentPtr("widget", widget);
+        return self.selectable and self.rows.items.len > 0;
+    }
+
+    fn focusWidget(widget: *Widget) void {
+        const self: *Table = @fieldParentPtr("widget", widget);
+        self.is_focused = true;
+    }
+
+    fn blurWidget(widget: *Widget) void {
+        const self: *Table = @fieldParentPtr("widget", widget);
+        self.is_focused = false;
     }
 
     fn deinit(widget: *Widget) void {

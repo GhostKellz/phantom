@@ -12,6 +12,7 @@ const style = @import("style.zig");
 const widget_mod = @import("widget.zig");
 const animation = @import("animation.zig");
 const ArrayList = std.array_list.Managed;
+const Key = @import("event.zig").Key;
 
 const AutoHashMap = std.AutoHashMap;
 
@@ -53,6 +54,7 @@ pub const App = struct {
 
     // Widget storage
     widgets: ArrayList(*Widget),
+    focused_widget: ?*Widget = null,
     transition_manager: animation.TransitionManager,
     widget_transitions: AutoHashMap(*Widget, WidgetTransitionState),
 
@@ -90,11 +92,19 @@ pub const App = struct {
     pub fn addWidget(self: *App, widget: *Widget) !void {
         try self.widgets.append(widget);
         try self.widget_transitions.put(widget, WidgetTransitionState{});
+        if (self.focused_widget == null and widget.canFocus()) {
+            self.setFocusedWidget(widget);
+        }
         self.needs_redraw = true;
     }
 
     /// Remove a widget from the application
     pub fn removeWidget(self: *App, widget: *Widget) void {
+        if (self.focused_widget == widget) {
+            widget.blur();
+            self.focused_widget = null;
+        }
+
         if (self.widget_transitions.fetchRemove(widget)) |entry| {
             if (entry.value.active_transition) |id| {
                 self.transition_manager.release(id);
@@ -104,7 +114,56 @@ pub const App = struct {
         for (self.widgets.items, 0..) |w, i| {
             if (w == widget) {
                 _ = self.widgets.swapRemove(i);
+                if (self.focused_widget == null) {
+                    self.focusFirstWidget();
+                }
                 self.needs_redraw = true;
+                return;
+            }
+        }
+    }
+
+    pub fn setFocusedWidget(self: *App, widget: *Widget) void {
+        if (!widget.canFocus()) return;
+        if (self.focused_widget == widget) return;
+
+        if (self.focused_widget) |focused| {
+            focused.blur();
+        }
+
+        self.focused_widget = widget;
+        widget.focus();
+        self.needs_redraw = true;
+    }
+
+    pub fn focusNextWidget(self: *App) void {
+        if (self.widgets.items.len == 0) return;
+
+        var start_index: usize = 0;
+        if (self.focused_widget) |focused| {
+            for (self.widgets.items, 0..) |widget, idx| {
+                if (widget == focused) {
+                    start_index = idx + 1;
+                    break;
+                }
+            }
+        }
+
+        var offset: usize = 0;
+        while (offset < self.widgets.items.len) : (offset += 1) {
+            const idx = (start_index + offset) % self.widgets.items.len;
+            const widget = self.widgets.items[idx];
+            if (widget.canFocus()) {
+                self.setFocusedWidget(widget);
+                return;
+            }
+        }
+    }
+
+    fn focusFirstWidget(self: *App) void {
+        for (self.widgets.items) |widget| {
+            if (widget.canFocus()) {
+                self.setFocusedWidget(widget);
                 return;
             }
         }
@@ -358,8 +417,8 @@ pub const App = struct {
                 std.log.debug("App command set_mouse_shape: {}", .{shape});
             },
             .request_focus => |widget| {
-                std.log.debug("App command request_focus received", .{});
                 _ = widget;
+                self.invalidate();
             },
             .query_color => |kind| {
                 std.log.debug("App command query_color: {}", .{kind});
@@ -383,25 +442,42 @@ fn appEventHandler(event: Event) !bool {
                     try app.processPendingCommands();
                     return true;
                 },
+                .tab => {
+                    app.focusNextWidget();
+                    app.needs_redraw = true;
+                    try app.processPendingCommands();
+                    return false;
+                },
                 else => {
-                    // Forward to widgets
+                    if (app.focused_widget) |focused| {
+                        if (focused.handleEvent(event)) {
+                            app.needs_redraw = true;
+                            try app.processPendingCommands();
+                            return false;
+                        }
+                    }
+
                     for (app.widgets.items) |widget| {
+                        if (widget == app.focused_widget) continue;
                         if (widget.handleEvent(event)) {
                             app.needs_redraw = true;
-                            break;
+                            try app.processPendingCommands();
+                            return false;
                         }
                     }
                 },
             }
         },
         .mouse => |mouse_event| {
-            // Handle mouse events by dispatching to the focused widget
             app.needs_redraw = true;
 
-            // Handle mouse events on widgets (simplified for now)
             for (app.widgets.items) |widget| {
-                // Dispatch mouse event to all widgets for now
-                _ = widget.handleEvent(Event.fromMouse(mouse_event));
+                if (widget.handleEvent(Event.fromMouse(mouse_event))) {
+                    if (widget.canFocus()) {
+                        app.setFocusedWidget(widget);
+                    }
+                    break;
+                }
             }
         },
         .system => |sys_event| {
@@ -553,4 +629,121 @@ test "App resize notifies widgets" {
     try std.testing.expectEqual(expected_rect, widget.last_resize.?);
 
     app.removeWidget(&widget.widget);
+}
+
+const FocusTestWidget = struct {
+    widget: Widget,
+    allocator: std.mem.Allocator,
+    focusable: bool = true,
+    focused: bool = false,
+    handled_keys: usize = 0,
+    last_key: ?Key = null,
+
+    const vtable = Widget.WidgetVTable{
+        .render = focusTestRender,
+        .deinit = focusTestDeinit,
+        .handleEvent = focusTestHandleEvent,
+        .resize = null,
+        .getConstraints = null,
+        .canFocus = focusTestCanFocus,
+        .focus = focusTestFocus,
+        .blur = focusTestBlur,
+    };
+
+    fn init(allocator: std.mem.Allocator, focusable: bool) !*FocusTestWidget {
+        const self = try allocator.create(FocusTestWidget);
+        self.* = .{
+            .widget = .{ .vtable = &vtable },
+            .allocator = allocator,
+            .focusable = focusable,
+        };
+        return self;
+    }
+
+    fn focusTestRender(widget: *Widget, buffer: *Buffer, area: Rect) void {
+        _ = widget;
+        _ = buffer;
+        _ = area;
+    }
+
+    fn focusTestDeinit(widget: *Widget) void {
+        const self: *FocusTestWidget = @fieldParentPtr("widget", widget);
+        self.allocator.destroy(self);
+    }
+
+    fn focusTestHandleEvent(widget: *Widget, event: Event) bool {
+        const self: *FocusTestWidget = @fieldParentPtr("widget", widget);
+        switch (event) {
+            .key => |key| {
+                self.handled_keys += 1;
+                self.last_key = key;
+                return true;
+            },
+            else => return false,
+        }
+    }
+
+    fn focusTestCanFocus(widget: *Widget) bool {
+        const self: *FocusTestWidget = @fieldParentPtr("widget", widget);
+        return self.focusable;
+    }
+
+    fn focusTestFocus(widget: *Widget) void {
+        const self: *FocusTestWidget = @fieldParentPtr("widget", widget);
+        self.focused = true;
+    }
+
+    fn focusTestBlur(widget: *Widget) void {
+        const self: *FocusTestWidget = @fieldParentPtr("widget", widget);
+        self.focused = false;
+    }
+};
+
+test "App focusNextWidget skips unfocusable widgets" {
+    const allocator = std.testing.allocator;
+
+    var app = try App.init(allocator, AppConfig{});
+    defer app.deinit();
+
+    const first = try FocusTestWidget.init(allocator, true);
+    const second = try FocusTestWidget.init(allocator, false);
+    const third = try FocusTestWidget.init(allocator, true);
+
+    try app.addWidget(&first.widget);
+    try app.addWidget(&second.widget);
+    try app.addWidget(&third.widget);
+
+    try std.testing.expect(app.focused_widget == &first.widget);
+    try std.testing.expect(first.focused);
+    try std.testing.expect(!third.focused);
+
+    app.focusNextWidget();
+
+    try std.testing.expect(app.focused_widget == &third.widget);
+    try std.testing.expect(!first.focused);
+    try std.testing.expect(third.focused);
+}
+
+test "App routes key events to focused widget first" {
+    const allocator = std.testing.allocator;
+
+    var app = try App.init(allocator, AppConfig{});
+    defer app.deinit();
+
+    const first = try FocusTestWidget.init(allocator, true);
+    const second = try FocusTestWidget.init(allocator, true);
+
+    try app.addWidget(&first.widget);
+    try app.addWidget(&second.widget);
+
+    app.setFocusedWidget(&second.widget);
+    app_context = &app;
+    defer app_context = null;
+
+    _ = try appEventHandler(Event.fromKey(.left));
+
+    try std.testing.expectEqual(@as(usize, 0), first.handled_keys);
+    try std.testing.expectEqual(@as(usize, 1), second.handled_keys);
+    try std.testing.expect(second.last_key != null);
+    try std.testing.expect(second.last_key.? == .left);
 }

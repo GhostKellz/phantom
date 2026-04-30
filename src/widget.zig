@@ -106,6 +106,15 @@ pub const Widget = struct {
 
         /// Get size constraints for layout (OPTIONAL)
         getConstraints: ?*const fn (self: *Widget) SizeConstraints = null,
+
+        /// Whether this widget can receive focus (OPTIONAL)
+        canFocus: ?*const fn (self: *Widget) bool = null,
+
+        /// Notify widget that it gained focus (OPTIONAL)
+        focus: ?*const fn (self: *Widget) void = null,
+
+        /// Notify widget that it lost focus (OPTIONAL)
+        blur: ?*const fn (self: *Widget) void = null,
     };
 
     /// Render this widget to the buffer
@@ -139,6 +148,25 @@ pub const Widget = struct {
             return getter(self);
         }
         return SizeConstraints.unconstrained();
+    }
+
+    pub fn canFocus(self: *Widget) bool {
+        if (self.vtable.canFocus) |checker| {
+            return checker(self);
+        }
+        return false;
+    }
+
+    pub fn focus(self: *Widget) void {
+        if (self.vtable.focus) |handler| {
+            handler(self);
+        }
+    }
+
+    pub fn blur(self: *Widget) void {
+        if (self.vtable.blur) |handler| {
+            handler(self);
+        }
     }
 };
 

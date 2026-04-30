@@ -2,18 +2,17 @@ const std = @import("std");
 const builtin = @import("builtin");
 const types = @import("pty/types.zig");
 
-const unix_backend = @import("pty/unix.zig");
-const windows_backend = @import("pty/windows.zig");
+const Backend = switch (builtin.os.tag) {
+    .windows => @import("pty/windows.zig"),
+    else => @import("pty/unix.zig"),
+};
 
 pub const Config = types.Config;
 pub const Error = types.Error;
 pub const ExitStatus = types.ExitStatus;
 
 pub const Session = struct {
-    const Impl = switch (builtin.os.tag) {
-        .windows => windows_backend.Session,
-        else => unix_backend.Session,
-    };
+    const Impl = Backend.Session;
 
     impl: Impl,
 

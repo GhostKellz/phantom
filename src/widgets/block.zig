@@ -10,6 +10,23 @@ const style = @import("../style.zig");
 const Rect = geometry.Rect;
 const Style = style.Style;
 
+pub const TitleAlignment = enum {
+    left,
+    center,
+    right,
+};
+
+pub const Padding = struct {
+    top: u16 = 0,
+    right: u16 = 0,
+    bottom: u16 = 0,
+    left: u16 = 0,
+
+    pub fn all(value: u16) Padding {
+        return .{ .top = value, .right = value, .bottom = value, .left = value };
+    }
+};
+
 /// Border style configuration
 pub const BorderStyle = struct {
     top: u21 = '─',
@@ -56,6 +73,8 @@ pub const Block = struct {
     border_style: ?BorderStyle,
     block_style: Style,
     inner_area: Rect,
+    title_alignment: TitleAlignment = .left,
+    padding: Padding = .{},
 
     const vtable = Widget.WidgetVTable{
         .render = render,
@@ -78,6 +97,10 @@ pub const Block = struct {
     }
 
     pub fn withTitle(self: *Block, title: []const u8) !void {
+        try self.setTitle(title);
+    }
+
+    pub fn setTitle(self: *Block, title: []const u8) !void {
         if (self.title) |old_title| {
             self.allocator.free(old_title);
         }
@@ -85,10 +108,18 @@ pub const Block = struct {
     }
 
     pub fn withBorderStyle(self: *Block, border_style: BorderStyle) void {
+        self.setBorderStyle(border_style);
+    }
+
+    pub fn setBorderStyle(self: *Block, border_style: BorderStyle) void {
         self.border_style = border_style;
     }
 
     pub fn withStyle(self: *Block, block_style: Style) void {
+        self.setStyle(block_style);
+    }
+
+    pub fn setStyle(self: *Block, block_style: Style) void {
         self.block_style = block_style;
     }
 
@@ -96,8 +127,33 @@ pub const Block = struct {
         self.border_style = null;
     }
 
+    pub fn setTitleAlignment(self: *Block, alignment: TitleAlignment) void {
+        self.title_alignment = alignment;
+    }
+
+    pub fn setPadding(self: *Block, padding: Padding) void {
+        self.padding = padding;
+    }
+
     pub fn getInnerArea(self: *const Block) Rect {
         return self.inner_area;
+    }
+
+    pub fn innerAreaFor(self: *const Block, area: Rect) Rect {
+        var inner = area;
+
+        if (self.border_style != null) {
+            inner.x += 1;
+            inner.y += 1;
+            inner.width = inner.width -| 2;
+            inner.height = inner.height -| 2;
+        }
+
+        inner.x += self.padding.left;
+        inner.y += self.padding.top;
+        inner.width = inner.width -| (self.padding.left + self.padding.right);
+        inner.height = inner.height -| (self.padding.top + self.padding.bottom);
+        return inner;
     }
 
     fn render(widget: *Widget, buffer: *Buffer, area: Rect) void {
@@ -106,17 +162,7 @@ pub const Block = struct {
         if (area.width == 0 or area.height == 0) return;
 
         // Calculate inner area
-        if (self.border_style) |border| {
-            _ = border;
-            self.inner_area = Rect.init(
-                area.x + 1,
-                area.y + 1,
-                @max(0, area.width -| 2),
-                @max(0, area.height -| 2),
-            );
-        } else {
-            self.inner_area = area;
-        }
+        self.inner_area = self.innerAreaFor(area);
 
         // Fill background
         buffer.fill(area, Cell.withStyle(self.block_style));
@@ -128,7 +174,12 @@ pub const Block = struct {
 
         // Draw title if present
         if (self.title) |title| {
-            const title_x = area.x + 1;
+            const title_width: u16 = @intCast(@min(title.len, area.width));
+            const title_x = switch (self.title_alignment) {
+                .left => area.x + @min(@as(u16, 1), area.width),
+                .center => area.x + (area.width -| title_width) / 2,
+                .right => area.x + (area.width -| title_width) -| 1,
+            };
             const title_y = area.y;
             buffer.writeText(title_x, title_y, title, self.block_style);
         }
@@ -169,16 +220,7 @@ pub const Block = struct {
         const self: *Block = @fieldParentPtr("widget", widget);
 
         // Update inner area based on new size
-        if (self.border_style != null) {
-            self.inner_area = Rect.init(
-                area.x + 1,
-                area.y + 1,
-                @max(0, area.width -| 2),
-                @max(0, area.height -| 2),
-            );
-        } else {
-            self.inner_area = area;
-        }
+        self.inner_area = self.innerAreaFor(area);
     }
 
     fn deinit(widget: *Widget) void {

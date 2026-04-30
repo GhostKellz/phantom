@@ -4,16 +4,7 @@ const builtin = @import("builtin");
 const time_utils = @import("../../time/utils.zig");
 
 const posix = std.posix;
-
-const c = @cImport({
-    @cDefine("_GNU_SOURCE", "1");
-    @cInclude("stdlib.h");
-    @cInclude("unistd.h");
-    @cInclude("sys/ioctl.h");
-    @cInclude("sys/wait.h");
-    @cInclude("termios.h");
-    @cInclude("pty.h");
-});
+const c = @import("phantom_pty_c");
 
 fn makeWinsize(columns: u16, rows: u16) c.struct_winsize {
     return c.struct_winsize{
@@ -135,7 +126,7 @@ pub const Session = struct {
             }
 
             const file_ptr: [*c]const u8 = @ptrCast(argv_ptrs[0].?);
-            const argv_ptr: [*c]?[*c]const u8 = @ptrCast(argv_ptrs.ptr);
+            const argv_ptr: [*c]const [*c]u8 = @ptrCast(@alignCast(argv_ptrs.ptr));
             _ = c.execvp(file_ptr, argv_ptr);
             c._exit(127);
         }
@@ -145,10 +136,13 @@ pub const Session = struct {
 
         // Set master to non-blocking mode
         const fd = @as(posix.fd_t, master_fd);
-        errdefer posix.close(fd);
-        const flags = try posix.fcntl(fd, posix.F.GETFL, 0);
-        const non_block = @as(usize, @intCast(@intFromEnum(posix.O.NONBLOCK)));
-        try posix.fcntl(fd, posix.F.SETFL, flags | non_block);
+        errdefer _ = c.close(master_fd);
+        const flags = std.c.fcntl(master_fd, std.c.F.GETFL);
+        if (flags < 0) return error.OpenPtyFailed;
+        const non_block: c_int = 1 << @bitOffsetOf(std.c.O, "NONBLOCK");
+        if (std.c.fcntl(master_fd, std.c.F.SETFL, @as(c_int, @intCast(flags)) | non_block) < 0) {
+            return error.OpenPtyFailed;
+        }
 
         return Session{
             .allocator = allocator,
@@ -159,12 +153,15 @@ pub const Session = struct {
 
     pub fn read(self: *Session, buffer: []u8) !usize {
         while (true) {
-            const result = posix.read(self.master_fd, buffer) catch |err| switch (err) {
-                error.Interrupted => continue,
-                error.WouldBlock => return 0,
-                else => return err,
-            };
-            return result;
+            const result = c.read(self.master_fd, buffer.ptr, buffer.len);
+            if (result > 0) return @intCast(result);
+            if (result == 0) return 0;
+
+            switch (std.c.errno(result)) {
+                .INTR => continue,
+                .AGAIN => return 0,
+                else => return error.ReadFailed,
+            }
         }
     }
 
@@ -172,13 +169,18 @@ pub const Session = struct {
         var offset: usize = 0;
         while (offset < bytes.len) {
             const slice = bytes[offset..];
-            const written = posix.write(self.master_fd, slice) catch |err| switch (err) {
-                error.Interrupted => continue,
-                error.WouldBlock => return if (offset == 0) err else offset,
-                else => return err,
-            };
+            const written = c.write(self.master_fd, slice.ptr, slice.len);
+            if (written > 0) {
+                offset += @intCast(written);
+                continue;
+            }
             if (written == 0) return error.WriteFailed;
-            offset += written;
+
+            switch (std.c.errno(written)) {
+                .INTR => continue,
+                .AGAIN => return if (offset == 0) error.WouldBlock else offset,
+                else => return error.WriteFailed,
+            }
         }
         return bytes.len;
     }
@@ -212,7 +214,7 @@ pub const Session = struct {
 
     pub fn deinit(self: *Session) void {
         if (self.master_fd != -1) {
-            _ = posix.close(self.master_fd);
+            _ = c.close(self.master_fd);
             self.master_fd = -1;
         }
     }

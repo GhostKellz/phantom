@@ -263,9 +263,9 @@ pub const EventLoop = struct {
             }
         };
 
-        var task = try runtime.spawn(@TypeOf(Runner.run), .{self});
+        var task = try runtime.spawn(Runner.run, .{self});
         defer task.deinit();
-        try task.await();
+        try task.wait();
     }
 
     pub fn stop(self: *EventLoop) void {

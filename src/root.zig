@@ -1,20 +1,10 @@
-//! Phantom - The Next-Gen TUI Framework for Zig
-//! A lightning-fast, async-native TUI framework inspired by Ratatui
-//!
-//! Version 0.8.4 - Production-ready release:
-//! - Full Zig 0.16.0-dev.2535+b5bd49460 API migration completed
-//! - Modernized layout engine with constraint solver
-//! - Enhanced theme system with hot-reload support
-//! - Improved async runtime with nursery patterns
-//! - Production-grade error handling and testing
-//! - Updated to use std.Io based synchronization primitives
+//! Phantom TUI framework public API.
 const std = @import("std");
 
 /// Phantom version
-pub const version = "0.8.4";
+pub const version = "0.8.7";
 
-// Build-time configuration
-pub const phantom_config = @import("phantom_config");
+const phantom_config = @import("phantom_config");
 
 // Core exports
 pub const App = @import("app.zig").App;
@@ -23,7 +13,7 @@ pub const Terminal = @import("terminal.zig").Terminal;
 pub const Event = @import("event.zig").Event;
 pub const Key = @import("event.zig").Key;
 pub const EventLoop = @import("event.zig").EventLoop;
-pub const terminal_session = @import("terminal/session/mod.zig");
+pub const terminal_session = if (phantom_config.enable_terminal_widget) @import("terminal/session/mod.zig") else struct {};
 pub const data = @import("data/list_source.zig");
 pub const data_streaming = @import("data/stream_source.zig");
 
@@ -61,9 +51,6 @@ pub const Cell = @import("terminal.zig").Cell; // Required for Buffer.setCell
 // Modern UI utilities - always available
 pub const emoji = @import("emoji.zig");
 
-// Async runtime - always available
-pub const runtime = @import("runtime.zig");
-
 // Async streaming integration (zsync channels + StreamingText)
 pub const async_streaming = @import("async_streaming.zig");
 
@@ -96,13 +83,6 @@ pub const theme = @import("theme/mod.zig");
 
 // Text processing
 pub const fuzzy = @import("text/fuzzy.zig");
-pub const unicode_helpers = @import("text/unicode_helpers.zig");
-
-// Resource management
-pub const resource_paths = @import("config/paths.zig");
-
-// Time utilities (Timer, timestamps)
-pub const time_utils = @import("time/utils.zig");
 
 // Constraint-based layout system
 pub const Constraint = @import("layout/constraint.zig").Constraint;
@@ -110,25 +90,8 @@ pub const ConstraintLayout = @import("layout/constraint.zig").Layout;
 pub const LayoutDirection = @import("layout/constraint.zig").Direction;
 
 // Tree-sitter syntax highlighting
-pub const grove = @import("grove");
+pub const grove = if (phantom_config.enable_advanced) @import("grove") else struct {};
 
-// TOML parser
-pub const zontom = @import("zontom");
-
-// For compatibility with existing code
-pub fn bufferedPrint() !void {
-    const io = std.Io.Threaded.global_single_threaded.io();
-    var buffer: [256]u8 = undefined;
-    const stdout_file = std.Io.File.stdout();
-    var writer = stdout_file.writer(io, &buffer);
-    try writer.print("Phantom TUI Framework initialized!\n", .{});
-}
-
-// Test utilities
-pub fn add(a: i32, b: i32) i32 {
-    return a + b;
-}
-
-test "basic add functionality" {
-    try std.testing.expect(add(3, 7) == 10);
+test {
+    _ = std;
 }

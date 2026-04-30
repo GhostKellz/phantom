@@ -243,7 +243,7 @@ pub const Session = struct {
 
         if (self.reader_task) |*task| {
             task.cancel();
-            task.await() catch {};
+            task.wait() catch {};
             task.deinit();
             self.reader_task = null;
         }
@@ -263,7 +263,7 @@ pub const Session = struct {
     pub fn write(self: *Session, bytes: []const u8) !usize {
         const impl = if (self.pty_session) |*sess| sess else return error.NotRunning;
         const written = try impl.write(bytes);
-        self.metrics.bytes_written.fetchAdd(written, .monotonic);
+        _ = self.metrics.bytes_written.fetchAdd(written, .monotonic);
         return written;
     }
 
@@ -292,7 +292,7 @@ pub const Session = struct {
     }
 
     fn notifyExit(self: *Session, status: types.ExitStatus) void {
-        self.metrics.exits.fetchAdd(1, .monotonic);
+        _ = self.metrics.exits.fetchAdd(1, .monotonic);
         _ = self.event_channel.trySend(.{ .exit = status }) catch {};
     }
 
@@ -315,10 +315,6 @@ fn readerLoop(sess: *Session) !void {
         const child = if (sess.pty_session) |*session| session else break;
 
         const amount = child.read(&buffer) catch |err| switch (err) {
-            error.WouldBlock => {
-                sess.runtime.yield() catch {};
-                continue;
-            },
             else => {
                 const status = child.pollExit() catch {
                     sess.notifyExit(.still_running);
@@ -350,7 +346,7 @@ fn readerLoop(sess: *Session) !void {
         }
 
         const duped = sess.allocator.dupe(u8, buffer[0..amount]) catch {
-            sess.metrics.dropped_bytes.fetchAdd(amount, .monotonic);
+            _ = sess.metrics.dropped_bytes.fetchAdd(amount, .monotonic);
             sess.runtime.yield() catch {};
             continue;
         };
@@ -361,11 +357,11 @@ fn readerLoop(sess: *Session) !void {
         };
 
         if (!sent) {
-            sess.metrics.dropped_bytes.fetchAdd(amount, .monotonic);
+            _ = sess.metrics.dropped_bytes.fetchAdd(amount, .monotonic);
             sess.allocator.free(duped);
             sess.runtime.yield() catch {};
         } else {
-            sess.metrics.bytes_read.fetchAdd(amount, .monotonic);
+            _ = sess.metrics.bytes_read.fetchAdd(amount, .monotonic);
         }
     }
 
@@ -509,4 +505,63 @@ test "Manager orchestrates PTY sessions" {
 
     manager.release(handle);
     try testing.expectEqual(@as(usize, 0), manager.sessionCount());
+}
+
+test "Manager resize propagates to interactive PTY session" {
+    if (builtin.os.tag == .windows) return;
+
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var runtime = try AsyncRuntime.init(allocator, .{ .worker_threads = 1 });
+    defer runtime.deinit();
+    try runtime.start();
+    defer runtime.shutdown();
+
+    var manager = try Manager.init(allocator, runtime);
+    defer manager.deinit();
+
+    const handle = try manager.spawn(.{
+        .command = &.{ "/bin/sh", "-i" },
+        .columns = 80,
+        .rows = 24,
+    });
+    defer manager.release(handle);
+
+    var warmup: usize = 0;
+    while (warmup < 40) : (warmup += 1) {
+        if (try manager.tryNextEvent()) |evt| {
+            manager.recycleEvent(evt.handle, evt.event) catch {};
+        } else {
+            time_utils.sleepMs(5);
+        }
+    }
+
+    try manager.resize(handle, 91, 33);
+    _ = try manager.write(handle, "stty size\r");
+
+    var buffer = ArrayList(u8).init(allocator);
+    defer buffer.deinit();
+
+    var iterations: usize = 0;
+    while (iterations < 400) : (iterations += 1) {
+        if (try manager.tryNextEvent()) |session_event| {
+            const event = session_event.event;
+            switch (event) {
+                .data => |payload| {
+                    try buffer.appendSlice(payload);
+                },
+                .exit => {},
+            }
+            manager.recycleEvent(session_event.handle, event) catch {};
+
+            if (std.mem.indexOf(u8, buffer.items, "33 91") != null) {
+                break;
+            }
+        } else {
+            time_utils.sleepMs(5);
+        }
+    }
+
+    try testing.expect(std.mem.indexOf(u8, buffer.items, "33 91") != null);
 }

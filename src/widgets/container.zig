@@ -41,12 +41,16 @@ pub const Container = struct {
     gap: u16 = 0,
     /// Padding around children
     padding: u16 = 0,
+    focused_child_index: ?usize = null,
 
     const vtable = Widget.WidgetVTable{
         .render = render,
         .deinit = deinit,
         .handleEvent = handleEvent,
         .resize = resize,
+        .canFocus = canFocus,
+        .focus = focusWidget,
+        .blur = blurWidget,
     };
 
     pub fn init(allocator: std.mem.Allocator, direction: LayoutDirection) !*Container {
@@ -98,6 +102,7 @@ pub const Container = struct {
     /// Clear all children
     pub fn clear(self: *Container) void {
         self.children.clearRetainingCapacity();
+        self.focused_child_index = null;
     }
 
     /// Set layout direction
@@ -113,6 +118,43 @@ pub const Container = struct {
     /// Set padding around children
     pub fn setPadding(self: *Container, padding: u16) void {
         self.padding = padding;
+    }
+
+    pub fn focusChild(self: *Container, child: *Widget) void {
+        for (self.children.items, 0..) |entry, idx| {
+            if (entry.widget == child and entry.widget.canFocus()) {
+                self.setFocusedChildIndex(idx);
+                return;
+            }
+        }
+    }
+
+    pub fn focusNextChild(self: *Container) void {
+        if (self.children.items.len == 0) return;
+
+        var start_index: usize = 0;
+        if (self.focused_child_index) |idx| start_index = idx + 1;
+
+        var offset: usize = 0;
+        while (offset < self.children.items.len) : (offset += 1) {
+            const idx = (start_index + offset) % self.children.items.len;
+            const child = self.children.items[idx];
+            if (child.visible and child.widget.canFocus()) {
+                self.setFocusedChildIndex(idx);
+                return;
+            }
+        }
+    }
+
+    fn setFocusedChildIndex(self: *Container, idx: usize) void {
+        if (self.focused_child_index) |current| {
+            if (current == idx) return;
+            if (current < self.children.items.len) {
+                self.children.items[current].widget.blur();
+            }
+        }
+        self.focused_child_index = idx;
+        self.children.items[idx].widget.focus();
     }
 
     /// Calculate layout for children
@@ -212,11 +254,34 @@ pub const Container = struct {
     fn handleEvent(widget: *Widget, event: Event) bool {
         const self: *Container = @fieldParentPtr("widget", widget);
 
+        switch (event) {
+            .key => |key| {
+                if (key == .tab) {
+                    self.focusNextChild();
+                    return true;
+                }
+            },
+            else => {},
+        }
+
+        if (self.focused_child_index) |idx| {
+            if (idx < self.children.items.len) {
+                const child = self.children.items[idx];
+                if (child.visible and child.widget.handleEvent(event)) {
+                    return true;
+                }
+            }
+        }
+
         // Forward event to all children (first to last)
-        for (self.children.items) |child| {
+        for (self.children.items, 0..) |child, idx| {
             if (!child.visible) continue;
+            if (self.focused_child_index == idx) continue;
 
             if (child.widget.handleEvent(event)) {
+                if (child.widget.canFocus()) {
+                    self.setFocusedChildIndex(idx);
+                }
                 return true; // Event consumed
             }
         }
@@ -249,6 +314,29 @@ pub const Container = struct {
         self.children.deinit();
         self.allocator.destroy(self);
     }
+
+    fn canFocus(widget: *Widget) bool {
+        const self: *Container = @fieldParentPtr("widget", widget);
+        for (self.children.items) |child| {
+            if (child.visible and child.widget.canFocus()) return true;
+        }
+        return false;
+    }
+
+    fn focusWidget(widget: *Widget) void {
+        const self: *Container = @fieldParentPtr("widget", widget);
+        self.focusNextChild();
+    }
+
+    fn blurWidget(widget: *Widget) void {
+        const self: *Container = @fieldParentPtr("widget", widget);
+        if (self.focused_child_index) |idx| {
+            if (idx < self.children.items.len) {
+                self.children.items[idx].widget.blur();
+            }
+        }
+        self.focused_child_index = null;
+    }
 };
 
 test "Container init and deinit" {
@@ -271,4 +359,112 @@ test "Container layout calculation" {
     // Layout should work even with no children
     const area = Rect{ .x = 0, .y = 0, .width = 80, .height = 24 };
     container.calculateLayout(area);
+}
+
+const FocusChildWidget = struct {
+    widget: Widget,
+    allocator: std.mem.Allocator,
+    focusable: bool = true,
+    focused: bool = false,
+    handled_keys: usize = 0,
+
+    const vtable = Widget.WidgetVTable{
+        .render = render,
+        .deinit = deinit,
+        .handleEvent = handleEvent,
+        .resize = null,
+        .getConstraints = null,
+        .canFocus = canFocus,
+        .focus = focus,
+        .blur = blur,
+    };
+
+    fn init(allocator: std.mem.Allocator, focusable: bool) !*FocusChildWidget {
+        const self = try allocator.create(FocusChildWidget);
+        self.* = .{
+            .widget = .{ .vtable = &vtable },
+            .allocator = allocator,
+            .focusable = focusable,
+        };
+        return self;
+    }
+
+    fn render(widget: *Widget, buffer: *Buffer, area: Rect) void {
+        _ = widget;
+        _ = buffer;
+        _ = area;
+    }
+
+    fn deinit(widget: *Widget) void {
+        const self: *FocusChildWidget = @fieldParentPtr("widget", widget);
+        self.allocator.destroy(self);
+    }
+
+    fn handleEvent(widget: *Widget, event: Event) bool {
+        const self: *FocusChildWidget = @fieldParentPtr("widget", widget);
+        switch (event) {
+            .key => {
+                self.handled_keys += 1;
+                return true;
+            },
+            else => return false,
+        }
+    }
+
+    fn canFocus(widget: *Widget) bool {
+        const self: *FocusChildWidget = @fieldParentPtr("widget", widget);
+        return self.focusable;
+    }
+
+    fn focus(widget: *Widget) void {
+        const self: *FocusChildWidget = @fieldParentPtr("widget", widget);
+        self.focused = true;
+    }
+
+    fn blur(widget: *Widget) void {
+        const self: *FocusChildWidget = @fieldParentPtr("widget", widget);
+        self.focused = false;
+    }
+};
+
+test "Container focus traversal skips unfocusable children" {
+    const allocator = std.testing.allocator;
+    const container = try Container.init(allocator, .vertical);
+    defer container.widget.deinit();
+
+    const first = try FocusChildWidget.init(allocator, true);
+    const second = try FocusChildWidget.init(allocator, false);
+    const third = try FocusChildWidget.init(allocator, true);
+
+    try container.addChild(&first.widget);
+    try container.addChild(&second.widget);
+    try container.addChild(&third.widget);
+
+    container.widget.focus();
+    try std.testing.expectEqual(@as(?usize, 0), container.focused_child_index);
+    try std.testing.expect(first.focused);
+
+    _ = container.widget.handleEvent(Event.fromKey(.tab));
+    try std.testing.expectEqual(@as(?usize, 2), container.focused_child_index);
+    try std.testing.expect(!first.focused);
+    try std.testing.expect(third.focused);
+}
+
+test "Container routes events to focused child first" {
+    const allocator = std.testing.allocator;
+    const container = try Container.init(allocator, .vertical);
+    defer container.widget.deinit();
+
+    const first = try FocusChildWidget.init(allocator, true);
+    const second = try FocusChildWidget.init(allocator, true);
+
+    try container.addChild(&first.widget);
+    try container.addChild(&second.widget);
+
+    container.focusChild(&second.widget);
+    try std.testing.expectEqual(@as(?usize, 1), container.focused_child_index);
+
+    try std.testing.expect(container.widget.handleEvent(Event.fromKey(.down)));
+    try std.testing.expectEqual(@as(usize, 0), first.handled_keys);
+    try std.testing.expectEqual(@as(usize, 1), second.handled_keys);
 }

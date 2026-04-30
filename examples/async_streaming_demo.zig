@@ -3,7 +3,7 @@
 
 const std = @import("std");
 const phantom = @import("phantom");
-const async = phantom.async_runtime;
+const async_mod = phantom.async_runtime;
 
 const AsyncStreamConsumer = phantom.async_streaming.AsyncStreamConsumer;
 const AsyncStreamProducer = phantom.async_streaming.AsyncStreamProducer;
@@ -18,7 +18,7 @@ pub fn main() !void {
     std.debug.print("═══════════════════════════════════════\n\n", .{});
 
     // Initialize Phantom async runtime (zsync-backed)
-    const runtime = try async.AsyncRuntime.init(allocator, .{ .worker_threads = 2 });
+    const runtime = try async_mod.AsyncRuntime.init(allocator, .{ .worker_threads = 2 });
     defer runtime.deinit();
     try runtime.start();
     defer runtime.shutdown();
@@ -106,9 +106,9 @@ pub fn main() !void {
                 for (messages) |msg| {
                     try producer.streamText(msg, 2);
                     {
-            const ts = std.c.timespec{ .sec = 0, .nsec = 100 * std.time.ns_per_ms };
-            _ = std.c.nanosleep(&ts, null);
-        } // Pause between messages
+                        const ts = std.c.timespec{ .sec = 0, .nsec = 100 * std.time.ns_per_ms };
+                        _ = std.c.nanosleep(&ts, null);
+                    } // Pause between messages
                 }
 
                 cons.close();
@@ -120,12 +120,12 @@ pub fn main() !void {
 
         while (!producer_handle.isDone()) {
             {
-            const ts = std.c.timespec{ .sec = 0, .nsec = 100 * std.time.ns_per_ms };
-            _ = std.c.nanosleep(&ts, null);
-        }
+                const ts = std.c.timespec{ .sec = 0, .nsec = 100 * std.time.ns_per_ms };
+                _ = std.c.nanosleep(&ts, null);
+            }
         }
 
-        producer_handle.await() catch |err| {
+        producer_handle.wait() catch |err| {
             std.log.err("producer task failed: {s}", .{@errorName(err)});
         };
 
@@ -180,12 +180,12 @@ pub fn main() !void {
 
         while (!log_handle.isDone()) {
             {
-            const ts = std.c.timespec{ .sec = 0, .nsec = 100 * std.time.ns_per_ms };
-            _ = std.c.nanosleep(&ts, null);
-        }
+                const ts = std.c.timespec{ .sec = 0, .nsec = 100 * std.time.ns_per_ms };
+                _ = std.c.nanosleep(&ts, null);
+            }
         }
 
-        log_handle.await() catch |err| {
+        log_handle.wait() catch |err| {
             std.log.err("log streaming task failed: {s}", .{@errorName(err)});
         };
 

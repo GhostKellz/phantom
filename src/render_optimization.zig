@@ -552,7 +552,7 @@ test "Render cache" {
     var cache = RenderCache.init(allocator, 10);
     defer cache.deinit();
 
-    const test_buffer = [_]Cell{Cell{}} ** 10;
+    const test_buffer: [10]Cell = @splat(Cell{});
     try cache.put(123, &test_buffer, geometry.Size.init(10, 1));
 
     const cached_entry = cache.get(123);

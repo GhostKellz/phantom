@@ -232,17 +232,20 @@ pub const TextAlign = struct {
         }
         
         const padding = width - text_width;
-        
+        const pad_buf = try allocator.alloc(u8, padding);
+        defer allocator.free(pad_buf);
+        @memset(pad_buf, ' ');
+
         return switch (alignment) {
-            .left => try std.fmt.allocPrint(allocator, "{s}{s}", .{ text, " " ** padding }),
-            .right => try std.fmt.allocPrint(allocator, "{s}{s}", .{ " " ** padding, text }),
+            .left => try std.fmt.allocPrint(allocator, "{s}{s}", .{ text, pad_buf }),
+            .right => try std.fmt.allocPrint(allocator, "{s}{s}", .{ pad_buf, text }),
             .center => blk: {
                 const left_padding = padding / 2;
                 const right_padding = padding - left_padding;
-                break :blk try std.fmt.allocPrint(allocator, "{s}{s}{s}", .{ 
-                    " " ** left_padding, 
-                    text, 
-                    " " ** right_padding 
+                break :blk try std.fmt.allocPrint(allocator, "{s}{s}{s}", .{
+                    pad_buf[0..left_padding],
+                    text,
+                    pad_buf[0..right_padding]
                 });
             },
         };

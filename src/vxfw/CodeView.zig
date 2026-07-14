@@ -238,7 +238,7 @@ fn tokenizeZig(self: *const CodeView, allocator: Allocator, tokens: *std.array_l
         // Numbers
         if (std.ascii.isDigit(line[i])) {
             const start = i;
-            while (i < line.len and (std.ascii.isAlphaNumeric(line[i]) or line[i] == '.' or line[i] == '_')) i += 1;
+            while (i < line.len and (std.ascii.isAlphanumeric(line[i]) or line[i] == '.' or line[i] == '_')) i += 1;
             try tokens.append(Token{
                 .text = line[start..i],
                 .style = self.theme.number,
@@ -251,7 +251,8 @@ fn tokenizeZig(self: *const CodeView, allocator: Allocator, tokens: *std.array_l
         // Identifiers and keywords
         if (std.ascii.isAlphabetic(line[i]) or line[i] == '_' or line[i] == '@') {
             const start = i;
-            while (i < line.len and (std.ascii.isAlphaNumeric(line[i]) or line[i] == '_')) i += 1;
+            if (line[i] == '@') i += 1; // consume builtin sigil so the loop advances
+            while (i < line.len and (std.ascii.isAlphanumeric(line[i]) or line[i] == '_')) i += 1;
 
             const word = line[start..i];
             var word_style = self.theme.default;

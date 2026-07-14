@@ -17,7 +17,7 @@ pub const Orientation = enum {
 
 pub const Dataset = struct {
     label: []const u8,
-    values: []f64,
+    values: []const f64,
     color: Color,
 };
 
@@ -98,7 +98,7 @@ pub const BarChart = struct {
             return .{
                 .allocator = allocator,
                 .config = BarChartConfig.default(),
-                .datasets_list = .{},
+                .datasets_list = .empty,
             };
         }
 
@@ -142,7 +142,7 @@ pub const BarChart = struct {
             return self;
         }
 
-        pub fn addDataset(self: *Builder, label: []const u8, values: []f64, color: Color) Error!*Builder {
+        pub fn addDataset(self: *Builder, label: []const u8, values: []const f64, color: Color) Error!*Builder {
             try self.datasets_list.append(self.allocator, Dataset{
                 .label = label,
                 .values = values,
@@ -154,7 +154,7 @@ pub const BarChart = struct {
         pub fn build(self: *Builder) Error!BarChart {
             var chart = try BarChart.init(self.allocator, self.config);
             chart.datasets = self.datasets_list;
-            self.datasets_list = .{}; // Clear to avoid double-free
+            self.datasets_list = .empty; // Clear to avoid double-free
             return chart;
         }
 
@@ -173,7 +173,7 @@ pub const BarChart = struct {
     }
 
     /// Add a dataset to the chart
-    pub fn addDataset(self: *BarChart, label: []const u8, values: []f64, color: Color) !void {
+    pub fn addDataset(self: *BarChart, label: []const u8, values: []const f64, color: Color) !void {
         try self.datasets.append(self.allocator, Dataset{
             .label = label,
             .values = values,

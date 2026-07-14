@@ -3,6 +3,7 @@
 //! Used by Grim (:Files, :Buffers) and Zeke (command palette)
 
 const std = @import("std");
+const ArrayList = std.array_list.Managed;
 
 /// Fuzzy match result
 pub const FuzzyMatch = struct {
@@ -37,7 +38,7 @@ pub const FuzzyMatcher = struct {
 
         if (text.len == 0) return null;
 
-        var positions = std.ArrayList(usize).init(self.allocator);
+        var positions = ArrayList(usize).init(self.allocator);
         errdefer positions.deinit();
 
         var score: i32 = 0;
@@ -123,7 +124,7 @@ pub fn fuzzyFilter(
     items: []const []const u8,
 ) ![]FuzzyFilterResult {
     var matcher = FuzzyMatcher.init(allocator);
-    var results = std.ArrayList(FuzzyFilterResult).init(allocator);
+    var results = ArrayList(FuzzyFilterResult).init(allocator);
     defer results.deinit();
 
     for (items, 0..) |item, i| {

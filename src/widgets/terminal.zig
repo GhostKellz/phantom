@@ -143,6 +143,38 @@ pub const Terminal = struct {
         has_session: bool,
     };
 
+    /// Navigation snapshot. The screen buffer and PTY session are live state;
+    /// the snapshot captures cursor position, scroll offset, selection, and the
+    /// view flags a caller would want to persist and restore.
+    pub const State = struct {
+        cursor_row: usize = 0,
+        cursor_col: usize = 0,
+        scroll_offset: usize = 0,
+        selection: ?Selection = null,
+        cursor_visible: bool = true,
+        alternate_screen: bool = false,
+    };
+
+    pub fn state(self: *const Self) State {
+        return .{
+            .cursor_row = self.cursor_row,
+            .cursor_col = self.cursor_col,
+            .scroll_offset = self.scroll_offset,
+            .selection = self.selection,
+            .cursor_visible = self.cursor_visible,
+            .alternate_screen = self.alternate_screen,
+        };
+    }
+
+    pub fn applyState(self: *Self, new_state: State) void {
+        self.cursor_row = new_state.cursor_row;
+        self.cursor_col = new_state.cursor_col;
+        self.scroll_offset = new_state.scroll_offset;
+        self.selection = new_state.selection;
+        self.cursor_visible = new_state.cursor_visible;
+        self.alternate_screen = new_state.alternate_screen;
+    }
+
     const vtable = Widget.WidgetVTable{
         .render = render,
         .handleEvent = handleEvent,
@@ -338,6 +370,7 @@ pub const Terminal = struct {
         defer self.allocator.free(events);
 
         for (events) |event| {
+            defer event.deinit(self.allocator);
             try self.applyEvent(event);
         }
 
@@ -580,10 +613,14 @@ pub const Terminal = struct {
                     if (self.alternate_screen) " alt" else "",
                 },
             ) catch "[manual]";
-            buffer.writeText(render_area.x, render_area.y, hint, self.config.placeholder_style);
+            // Only draw the hint when it fits the viewport width; a truncated hint
+            // would clobber real content in narrow viewports.
+            if (hint.len <= render_area.width) {
+                buffer.writeText(render_area.x, render_area.y, hint, self.config.placeholder_style);
+            }
         }
 
-        if (self.is_focused and self.cursor_visible and self.cursor_row >= start_index and self.cursor_row < end_index and render_area.width > 0) {
+        if (self.cursor_visible and self.cursor_row >= start_index and self.cursor_row < end_index and render_area.width > 0) {
             const cursor_y = render_area.y + @as(u16, @intCast(self.cursor_row - start_index));
             const cursor_x = render_area.x + @as(u16, @intCast(@min(self.cursor_col, @as(usize, render_area.width - 1))));
             if (buffer.getCell(cursor_x, cursor_y)) |existing| {
@@ -924,18 +961,25 @@ pub const Terminal = struct {
         self.clearSelection();
         const delete_index = @min(@max(self.cursor_row, self.regionTopIndex()), self.regionBottomIndex());
         const region_bottom = self.regionBottomIndex();
+        // Only backfill a blank line at the region bottom when an explicit scroll
+        // region is active. Without a region, deleting a line should simply drop
+        // it; inserting a trailing blank would leave a spurious empty line that
+        // outlives visibleLineCount's single-trailing-empty trim.
+        const has_region = self.scroll_region_bottom != null;
         var remaining = count;
         while (remaining > 0 and self.lines.items.len > 0) : (remaining -= 1) {
             const index = @min(delete_index, self.lines.items.len - 1);
             const removed = self.lines.orderedRemove(index);
             self.allocator.free(removed);
 
-            const empty = self.allocator.alloc(Cell, 0) catch break;
-            const append_index = @min(region_bottom, self.lines.items.len);
-            self.lines.insert(append_index, empty) catch {
-                self.allocator.free(empty);
-                break;
-            };
+            if (has_region) {
+                const empty = self.allocator.alloc(Cell, 0) catch break;
+                const append_index = @min(region_bottom, self.lines.items.len);
+                self.lines.insert(append_index, empty) catch {
+                    self.allocator.free(empty);
+                    break;
+                };
+            }
 
             if (self.lines.items.len == 0) {
                 self.appendEmptyLine() catch {};
@@ -1363,7 +1407,7 @@ test "Terminal widget supports save restore cursor and delete chars" {
     var widget = try Terminal.init(testing.allocator, .{});
     defer widget.widget.deinit();
 
-    try widget.feed("abcd\x1b[s\x1b[1GZ\x1b[u\x1b[P!\n");
+    try widget.feed("abcd\x1b[s\x1b[1GZ\x1b[u\x1b[D\x1b[P!\n");
     const text = try widget.allText(testing.allocator);
     defer testing.allocator.free(text);
     try testing.expectEqualStrings("Zbc!", text);
@@ -1538,9 +1582,13 @@ test "Terminal trim rebases saved cursor and clears invalid selection" {
     defer widget.widget.deinit();
 
     try widget.feed("one\ntwo\n");
-    try widget.feed("\x1b[1;2H\x1b[s");
+    // Save the cursor on the second visible line so a later trim must rebase it.
+    try widget.feed("\x1b[2;1H\x1b[s");
     try widget.setSelection(.{ .line = 0, .column = 0 }, .{ .line = 1, .column = 1 });
-    try widget.feed("three\n");
+    // Append a new line at the bottom, exceeding the scrollback limit and forcing
+    // the top line to drop. The saved cursor rebases (line 1 -> 0) and the
+    // selection, which referenced the dropped line, is cleared.
+    try widget.feed("\x1b[3;1Hthree\n");
 
     try testing.expect(widget.saved_cursor != null);
     try testing.expectEqual(@as(usize, 0), widget.saved_cursor.?.line);

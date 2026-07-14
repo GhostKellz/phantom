@@ -245,7 +245,7 @@ test "Border creation and rendering" {
         vxfw.DrawContext.CellSize.default()
     );
 
-    const surface = try border.draw(ctx);
+    var surface = try border.draw(ctx);
 
     // Test basic surface creation
     try std.testing.expectEqual(Size.init(10, 5), surface.size);

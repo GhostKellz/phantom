@@ -526,17 +526,17 @@ test "EventQueue priority ordering" {
     try queue.pushEvent(Event.fromSystem(SystemEvent.resize), .critical);
 
     // Should pop in priority order (critical first)
-    const first = queue.popEvent().?;
+    var first = queue.popEvent().?;
     try std.testing.expect(first.event == .system);
     try std.testing.expectEqual(SystemEvent.resize, first.event.system);
     first.deinit(arena.allocator());
 
-    const second = queue.popEvent().?;
+    var second = queue.popEvent().?;
     try std.testing.expect(second.event == .system);
     try std.testing.expectEqual(SystemEvent.focus_gained, second.event.system);
     second.deinit(arena.allocator());
 
-    const third = queue.popEvent().?;
+    var third = queue.popEvent().?;
     try std.testing.expect(third.event == .tick);
     third.deinit(arena.allocator());
 }
@@ -551,11 +551,11 @@ test "EventQueue pushAuto infers priority" {
     try queue.pushEvent(Event.fromTick(), .normal);
     try queue.pushAuto(Event.fromSystem(SystemEvent.focus_gained));
 
-    const first = queue.popEvent().?;
+    var first = queue.popEvent().?;
     try std.testing.expectEqual(EventPriority.high, first.priority);
     first.deinit(arena.allocator());
 
-    const second = queue.popEvent().?;
+    var second = queue.popEvent().?;
     try std.testing.expect(second.event == .tick);
     second.deinit(arena.allocator());
 }
@@ -585,7 +585,7 @@ test "EventFilter functionality" {
     try queue.pushEvent(Event.fromTick(), .normal);
 
     // Should only get key event
-    const filtered_event = filtered.popFilteredEvent().?;
+    var filtered_event = filtered.popFilteredEvent().?;
     try std.testing.expect(filtered_event.event == .key);
     filtered_event.deinit(arena.allocator());
 

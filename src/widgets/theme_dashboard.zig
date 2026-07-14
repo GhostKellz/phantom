@@ -500,14 +500,14 @@ fn computeContrast(a: Color, b: Color) ?f32 {
 }
 
 /// Build a default list of theme tokens derived from the provided theme.
-pub fn buildThemeTokenEntries(allocator: std.mem.Allocator, theme: *const Theme) !std.ArrayList(ThemeToken) {
-    var list = std.ArrayList(ThemeToken).init(allocator);
+pub fn buildThemeTokenEntries(allocator: std.mem.Allocator, theme: *const Theme) !std.array_list.Managed(ThemeToken) {
+    var list = std.array_list.Managed(ThemeToken).init(allocator);
     errdefer list.deinit();
 
     const background = theme.colors.background;
 
     const addToken = struct {
-        fn call(tokens: *std.ArrayList(ThemeToken), token: ThemeToken) !void {
+        fn call(tokens: *std.array_list.Managed(ThemeToken), token: ThemeToken) !void {
             try tokens.append(token);
         }
     };
@@ -718,7 +718,7 @@ test "buildThemeTokenEntries captures palette and semantic tokens" {
         if (!entry.found_existing) {
             entry.key_ptr.* = try allocator.dupe(u8, "brandPurple");
         }
-        entry.value_ptr.* = Color.rgb(128, 64, 255);
+        entry.value_ptr.* = Color.fromRgb(128, 64, 255);
     }
 
     var tokens = try buildThemeTokenEntries(allocator, &theme);

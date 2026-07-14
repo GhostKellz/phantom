@@ -31,10 +31,10 @@ pub const ConnectionStatus = enum {
 
     pub fn getStyle(self: ConnectionStatus) Style {
         return switch (self) {
-            .connected => Style.withFg(style.Color.bright_green),
-            .connecting => Style.withFg(style.Color.bright_yellow),
-            .disconnected => Style.withFg(style.Color.white),
-            .err => Style.withFg(style.Color.bright_red),
+            .connected => Style.default().withFg(style.Color.bright_green),
+            .connecting => Style.default().withFg(style.Color.bright_yellow),
+            .disconnected => Style.default().withFg(style.Color.white),
+            .err => Style.default().withFg(style.Color.bright_red),
         };
     }
 };
@@ -144,13 +144,13 @@ pub const NetworkTopology = struct {
         topology.* = NetworkTopology{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .nodes = try ArrayList(NetworkNode).init(allocator),
-            .connections = try ArrayList(Connection).init(allocator),
+            .nodes = ArrayList(NetworkNode).init(allocator),
+            .connections = ArrayList(Connection).init(allocator),
             .node_map = std.HashMap([]const u8, usize, std.hash_map.StringContext, std.hash_map.default_max_load_percentage).init(allocator),
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
-            .node_style = Style.withFg(style.Color.bright_white),
-            .connection_style = Style.withFg(style.Color.bright_blue),
-            .info_style = Style.withFg(style.Color.white),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
+            .node_style = Style.default().withFg(style.Color.bright_white),
+            .connection_style = Style.default().withFg(style.Color.bright_blue),
+            .info_style = Style.default().withFg(style.Color.white),
         };
 
         return topology;
@@ -187,7 +187,7 @@ pub const NetworkTopology = struct {
             if (index < self.nodes.items.len) {
                 self.nodes.items[index].status = status;
                 self.nodes.items[index].latency_ms = latency_ms;
-                self.nodes.items[index].last_seen = time_utils.unixTimestampSeconds();
+                self.nodes.items[index].last_seen = @intCast(time_utils.unixTimestampSeconds());
             }
         }
     }
@@ -199,7 +199,7 @@ pub const NetworkTopology = struct {
             if (std.mem.eql(u8, conn.from_id, from_id) and std.mem.eql(u8, conn.to_id, to_id)) {
                 conn.status = status;
                 conn.latency_ms = latency_ms;
-                conn.last_activity = time_utils.unixTimestampSeconds();
+                conn.last_activity = @intCast(time_utils.unixTimestampSeconds());
                 return;
             }
         }
@@ -210,7 +210,7 @@ pub const NetworkTopology = struct {
             .to_id = try self.allocator.dupe(u8, to_id),
             .status = status,
             .latency_ms = latency_ms,
-            .last_activity = time_utils.unixTimestampSeconds(),
+            .last_activity = @intCast(time_utils.unixTimestampSeconds()),
         };
         try self.connections.append(connection);
     }
@@ -375,7 +375,7 @@ pub const NetworkTopology = struct {
             const latency_text = std.fmt.allocPrint(self.allocator, "{d:.0}ms", .{conn.latency_ms}) catch return;
             defer self.allocator.free(latency_text);
 
-            buffer.writeText(mid_x, mid_y, latency_text, Style.withFg(style.Color.bright_yellow));
+            buffer.writeText(mid_x, mid_y, latency_text, Style.default().withFg(style.Color.bright_yellow));
         }
     }
 
@@ -389,7 +389,7 @@ pub const NetworkTopology = struct {
             }
 
             // Determine node style
-            const node_style = if (self.selected_node == i) Style.withFg(style.Color.bright_cyan).withBold() else if (self.hover_node == i) Style.withFg(style.Color.bright_white).withBold() else node.status.getStyle();
+            const node_style = if (self.selected_node == i) Style.default().withFg(style.Color.bright_cyan).withBold() else if (self.hover_node == i) Style.default().withFg(style.Color.bright_white).withBold() else node.status.getStyle();
 
             // Draw node icon
             const icon = node.getIcon();
@@ -454,7 +454,7 @@ pub const NetworkTopology = struct {
             .mouse => |mouse_event| {
                 // Find node under cursor
                 for (self.nodes.items, 0..) |*node, i| {
-                    if (mouse_event.x == node.position.x and mouse_event.y == node.position.y) {
+                    if (mouse_event.position.x == node.position.x and mouse_event.position.y == node.position.y) {
                         switch (mouse_event.button) {
                             .left => {
                                 if (mouse_event.pressed) {
@@ -471,7 +471,7 @@ pub const NetworkTopology = struct {
                 self.hover_node = null;
             },
             .key => |key_event| {
-                switch (key_event.key) {
+                switch (key_event) {
                     .escape => {
                         self.selected_node = null;
                         return true;

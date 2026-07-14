@@ -51,6 +51,20 @@ pub const CodeEditor = struct {
     syntax_name: ?[]const u8 = null,
     show_status_gutter: bool = true,
 
+    /// Navigation snapshot. CodeEditor delegates cursor/selection/scroll state
+    /// to its embedded TextArea, so the snapshot simply wraps TextArea.State.
+    pub const State = struct {
+        textarea: textarea_mod.TextArea.State = .{},
+    };
+
+    pub fn state(self: *const CodeEditor) State {
+        return .{ .textarea = self.textarea.state() };
+    }
+
+    pub fn applyState(self: *CodeEditor, new_state: State) void {
+        self.textarea.applyState(new_state.textarea);
+    }
+
     const vtable = Widget.WidgetVTable{
         .render = render,
         .handleEvent = handleEvent,
@@ -333,7 +347,10 @@ pub const CodeEditor = struct {
             line_number_width += 1;
             digits /= 10;
         }
-        const gutter_x = area.x + 1 + line_number_width;
+        // Align the marker with the TextArea's text-start column so it overlays
+        // the first content cell. TextArea offsets text by border (+1) plus the
+        // line-number field (getLineNumberWidth + 1 separator).
+        const gutter_x = area.x + 1 + line_number_width + 1;
         const visible_lines = @min(@as(usize, area.height - 2), self.textarea.lines.items.len -| self.textarea.scroll_offset_line);
 
         var row: usize = 0;

@@ -29,7 +29,7 @@ pub const DiffHunk = struct {
             .old_count = old_count,
             .new_start = new_start,
             .new_count = new_count,
-            .lines = std.ArrayList(DiffLine).init(allocator),
+            .lines = .empty,
         };
     }
 
@@ -37,7 +37,7 @@ pub const DiffHunk = struct {
         for (self.lines.items) |*line| {
             self.allocator.free(line.content);
         }
-        self.lines.deinit();
+        self.lines.deinit(self.allocator);
     }
 
     pub fn addLine(self: *DiffHunk, line: DiffLine) !void {
@@ -47,16 +47,16 @@ pub const DiffHunk = struct {
             .old_line_no = line.old_line_no,
             .new_line_no = line.new_line_no,
         };
-        try self.lines.append(owned_line);
+        try self.lines.append(self.allocator, owned_line);
     }
 };
 
 /// Diff line type
 pub const DiffLineKind = enum {
-    context,  // Unchanged line (white)
-    added,    // Added line (green)
-    removed,  // Removed line (red)
-    header,   // Hunk header (cyan)
+    context, // Unchanged line (white)
+    added, // Added line (green)
+    removed, // Removed line (red)
+    header, // Hunk header (cyan)
 };
 
 /// Single line in a diff
@@ -69,7 +69,7 @@ pub const DiffLine = struct {
 
 /// Diff display mode
 pub const DiffMode = enum {
-    unified,      // Traditional unified diff
+    unified, // Traditional unified diff
     side_by_side, // Split view
 };
 
@@ -131,7 +131,7 @@ pub const Diff = struct {
         diff.* = .{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .hunks = .{},
+            .hunks = .empty,
             .current_hunk = 0,
             .scroll_offset = 0,
             .viewport_height = 10,
@@ -170,13 +170,13 @@ pub const Diff = struct {
             // File headers
             if (std.mem.startsWith(u8, line, "---")) {
                 // Old file
-                const filename = std.mem.trimLeft(u8, line[3..], " \t");
+                const filename = std.mem.trimStart(u8, line[3..], " \t");
                 try self.setFiles(filename, self.new_file orelse "");
                 continue;
             }
             if (std.mem.startsWith(u8, line, "+++")) {
                 // New file
-                const filename = std.mem.trimLeft(u8, line[3..], " \t");
+                const filename = std.mem.trimStart(u8, line[3..], " \t");
                 if (self.old_file) |old| {
                     try self.setFiles(old, filename);
                 }
@@ -190,9 +190,10 @@ pub const Diff = struct {
                     try self.addHunk(hunk.*);
                 }
 
-                // Parse hunk header
+                // Parse hunk header. tokenizeAny collapses the leading "@@" and
+                // delimiters, so the tokens are exactly: old_start, old_count,
+                // new_start, new_count.
                 var parts = std.mem.tokenizeAny(u8, line, " @,-+");
-                _ = parts.next(); // Skip "@@"
 
                 const old_start_str = parts.next() orelse return Error.ParseError;
                 const old_count_str = parts.next() orelse return Error.ParseError;
@@ -376,13 +377,11 @@ pub const Diff = struct {
         switch (event) {
             .key => |key| {
                 switch (key) {
-                    .up, .char => |c| {
-                        if (key == .up or (key == .char and c == 'k')) {
-                            if (self.scroll_offset > 0) {
-                                self.scroll_offset -= 1;
-                            }
-                            return true;
+                    .up => {
+                        if (self.scroll_offset > 0) {
+                            self.scroll_offset -= 1;
                         }
+                        return true;
                     },
                     .down => {
                         const total = self.getTotalLines();
@@ -403,7 +402,12 @@ pub const Diff = struct {
                     else => {
                         if (key == .char) {
                             const c = key.char;
-                            if (c == 'j') {
+                            if (c == 'k') {
+                                if (self.scroll_offset > 0) {
+                                    self.scroll_offset -= 1;
+                                }
+                                return true;
+                            } else if (c == 'j') {
                                 const total = self.getTotalLines();
                                 if (self.scroll_offset + self.viewport_height < total) {
                                     self.scroll_offset += 1;
@@ -450,7 +454,7 @@ pub const Diff = struct {
         for (self.hunks.items) |*hunk| {
             hunk.deinit();
         }
-        self.hunks.deinit();
+        self.hunks.deinit(self.allocator);
 
         if (self.old_file) |old| self.allocator.free(old);
         if (self.new_file) |new| self.allocator.free(new);

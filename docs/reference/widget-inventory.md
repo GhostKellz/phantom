@@ -4,7 +4,7 @@ This catalogue groups Phantom widgets by how they should be presented to users t
 
 ## Canonical Surface
 
-- Core text and input: `Text`, `Block`, `List`, `Button`, `Input`, `TextArea`, `Border`, `Spinner`, `Scrollbar`
+- Core text and input: `Text`, `Paragraph`, `Block`, `List`, `Button`, `Input`, `TextArea`, `Border`, `Spinner`, `Scrollbar`
 - Data and status: `ProgressBar`, `Table`, `TaskMonitor`, `ThemeTokenDashboard`, `DataListView`, `DataStateIndicator`, `DataBadge`, `DataEventOverlay`
 - Composition: `Container`, `ScrollView`, `ListView`, `layout.engine`
 

@@ -644,7 +644,7 @@ fn exampleDialogCallback(dialog: *Dialog, action: DialogButton.DialogAction) voi
             std.debug.print("Dialog OK pressed\n", .{});
             if (dialog.dialog_type == .input) {
                 const input_value = dialog.getInputValue();
-                std.debug.print("Input value: '{}'\n", .{input_value});
+                std.debug.print("Input value: '{s}'\n", .{input_value});
             }
             dialog.hide();
         },

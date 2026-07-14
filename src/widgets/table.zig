@@ -262,8 +262,8 @@ pub const Table = struct {
         if (self.columns.items.len == 0) return;
 
         const available_width = if (self.area.width > 2) self.area.width - 2 else 0;
-        var total_spacing = if (self.columns.items.len > 1)
-            (self.columns.items.len - 1) * self.column_spacing
+        var total_spacing: u16 = if (self.columns.items.len > 1)
+            @as(u16, @intCast(self.columns.items.len - 1)) * self.column_spacing
         else
             0;
 
@@ -318,7 +318,7 @@ pub const Table = struct {
 
             for (self.calculated_widths.items, 0..) |*width, col_idx| {
                 const column = self.columns.items[col_idx];
-                const additional = if (col_idx < self.columns.items.len - 1) per_column else remaining - per_column * col_idx;
+                const additional = if (col_idx < self.columns.items.len - 1) per_column else remaining - per_column * @as(u16, @intCast(col_idx));
 
                 if (column.max_width) |max_width| {
                     width.* = @min(width.* + additional, max_width);

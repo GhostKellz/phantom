@@ -455,7 +455,7 @@ test "InMemoryListSource emits event payloads" {
     const EventLog = struct {
         const Self = @This();
         allocator: std.mem.Allocator,
-        entries: ArrayListUnmanaged(EventType) = .{},
+        entries: ArrayListUnmanaged(EventType) = .empty,
 
         fn append(self: *Self, event: EventType) void {
             self.entries.append(self.allocator, event) catch unreachable;

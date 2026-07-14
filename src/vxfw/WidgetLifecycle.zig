@@ -129,7 +129,7 @@ pub const LifecycleManager = struct {
             .bounds = initial_bounds,
             .can_focus = can_focus,
         };
-        try self.widgets.append(self.allocator, managed);
+        try self.widgets.append(managed);
     }
 
     /// Initialize a widget (sends init lifecycle event)
@@ -214,7 +214,7 @@ pub const LifecycleManager = struct {
             .last_fire_ms = @as(i64, @intCast(self.timer.read() / std.time.ns_per_ms)),
         };
 
-        try self.tick_timers.append(self.allocator, timer);
+        try self.tick_timers.append(timer);
 
         // Update managed widget tick interval
         if (self.findManagedWidget(widget)) |managed| {
@@ -333,7 +333,7 @@ pub const LifecycleManager = struct {
         self: *LifecycleManager,
         widget: vxfw.Widget,
         event: LifecycleEvent
-    ) !void {
+    ) Allocator.Error!void {
         // Convert lifecycle event to vxfw.Event and send to widget
         const vxfw_event = switch (event) {
             .init => vxfw.Event.init,

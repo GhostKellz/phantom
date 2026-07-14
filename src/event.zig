@@ -205,7 +205,13 @@ pub const EventLoop = struct {
                 }
             }
 
-            if (exit_requested or !self.running) break;
+            if (exit_requested or !self.running) {
+                // Refresh metrics before exiting so callers can observe the
+                // queue high-water mark even when the loop stops early.
+                const exit_ns = timer.read();
+                self.refreshMetrics(exit_ns - frame_start_ns, self.backendQueueStats());
+                break;
+            }
 
             const after_processing_ns = timer.read();
             const queue_stats = self.backendQueueStats();
@@ -515,7 +521,7 @@ fn echoHandler(event: Event) !bool {
     switch (event) {
         .key => |key| {
             switch (key) {
-                .char => |c| std.debug.print("Key: {c}\n", .{c}),
+                .char => |c| std.debug.print("Key: {u}\n", .{c}),
                 .ctrl_c => {
                     std.debug.print("Ctrl+C pressed, exiting\n", .{});
                     return true;
@@ -525,7 +531,7 @@ fn echoHandler(event: Event) !bool {
         },
         .mouse => |mouse| {
             std.debug.print(
-                "Mouse {} at ({}, {})\n",
+                "Mouse {s} at ({}, {})\n",
                 .{ if (mouse.pressed) "press" else "release", mouse.position.x, mouse.position.y },
             );
         },

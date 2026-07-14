@@ -94,6 +94,34 @@ pub const TaskMonitor = struct {
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
 
+    /// View-config snapshot. The task list itself is owned live data; the
+    /// snapshot captures the display toggles and visible-window size.
+    pub const State = struct {
+        max_visible_tasks: u16 = 10,
+        show_progress: bool = true,
+        show_time: bool = true,
+        show_emoji: bool = true,
+        compact_mode: bool = false,
+    };
+
+    pub fn state(self: *const TaskMonitor) State {
+        return .{
+            .max_visible_tasks = self.max_visible_tasks,
+            .show_progress = self.show_progress,
+            .show_time = self.show_time,
+            .show_emoji = self.show_emoji,
+            .compact_mode = self.compact_mode,
+        };
+    }
+
+    pub fn applyState(self: *TaskMonitor, new_state: State) void {
+        self.max_visible_tasks = new_state.max_visible_tasks;
+        self.show_progress = new_state.show_progress;
+        self.show_time = new_state.show_time;
+        self.show_emoji = new_state.show_emoji;
+        self.compact_mode = new_state.compact_mode;
+    }
+
     const vtable = Widget.WidgetVTable{
         .render = render,
         .handleEvent = handleEvent,

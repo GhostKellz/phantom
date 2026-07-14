@@ -36,18 +36,23 @@ pub const Config = struct {
 /// Async runtime for non-blocking operations
 pub const AsyncRuntime = struct {
     allocator: std.mem.Allocator,
-    runtime: *zsync.Runtime,
+    /// zsync's runtime is a value wrapper over `std.Io.Threaded`; it must be
+    /// held by stable address, which is why `AsyncRuntime` is heap-allocated.
+    runtime: zsync.Runtime,
+    io: Io,
     config: Config,
     running: bool = false,
     name: []const u8,
     hooks: LifecycleHooks,
     start_timestamp_ns: ?i128 = null,
+    tasks_spawned: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
 
     pub fn init(allocator: std.mem.Allocator, config: Config) !*AsyncRuntime {
         const self = try allocator.create(AsyncRuntime);
         errdefer allocator.destroy(self);
 
-        // Initialize zsync runtime
+        // Worker count is informational only now: scheduling is owned by
+        // `std.Io.Threaded` inside zsync. We still resolve it for diagnostics.
         const worker_count = if (config.worker_threads == 0)
             @as(u32, @intCast(try std.Thread.getCpuCount()))
         else
@@ -56,23 +61,17 @@ pub const AsyncRuntime = struct {
         var effective_config = config;
         effective_config.worker_threads = worker_count;
 
-        const runtime_config = zsync.Config{
-            .execution_model = .auto,
-            .thread_pool_threads = worker_count,
-            .max_green_threads = config.max_tasks,
-            .enable_debugging = config.debug_logging,
-        };
-
-        const runtime = try zsync.Runtime.init(allocator, runtime_config);
-        errdefer runtime.deinit();
-
         self.* = AsyncRuntime{
             .allocator = allocator,
-            .runtime = runtime,
+            .runtime = zsync.Runtime.init(allocator, .{}),
+            .io = undefined,
             .config = effective_config,
             .name = effective_config.name,
             .hooks = effective_config.hooks,
         };
+        // `io()` captures a pointer to `self.runtime`, so it must run after the
+        // runtime is stored at its final, stable address.
+        self.io = self.runtime.io();
 
         return self;
     }
@@ -88,7 +87,7 @@ pub const AsyncRuntime = struct {
     /// Start the async runtime
     pub fn start(self: *AsyncRuntime) !void {
         if (self.running) return error.AlreadyRunning;
-        self.runtime.setGlobal();
+        zsync.setGlobalIo(self.io);
         self.running = true;
         self.start_timestamp_ns = @intCast(time_utils.monotonicTimestampNs());
 
@@ -107,7 +106,7 @@ pub const AsyncRuntime = struct {
     /// Shutdown the async runtime gracefully
     pub fn shutdown(self: *AsyncRuntime) void {
         if (!self.running) return;
-        self.runtime.shutdown();
+        zsync.clearGlobalIo();
         self.running = false;
         if (self.hooks.on_shutdown) |hook| {
             hook(self, self.hooks.context);
@@ -138,9 +137,10 @@ pub const AsyncRuntime = struct {
         args: anytype,
     ) !TaskHandle(Func) {
         if (!self.running) return error.RuntimeNotRunning;
-        const future = try self.runtime.spawn(Func, args);
+        const future = self.runtime.spawn(Func, args);
+        _ = self.tasks_spawned.fetchAdd(1, .monotonic);
         return TaskHandle(Func){
-            .runtime = self.runtime,
+            .io = self.io,
             .future = future,
         };
     }
@@ -165,18 +165,21 @@ pub const AsyncRuntime = struct {
     /// Sleep for a specified duration (milliseconds)
     pub fn sleep(self: *AsyncRuntime, ms: u64) !void {
         _ = self;
-        try zsync.sleepMs(ms);
+        zsync.sleepMs(ms);
     }
 
     /// Get runtime statistics
+    ///
+    /// zsync no longer exposes scheduler metrics after the std.Io rebase, so
+    /// only the spawn counter and runtime metadata are reported here.
     pub fn getStats(self: *AsyncRuntime) RuntimeStats {
-        const metrics = self.runtime.getMetrics();
+        const spawned = self.tasks_spawned.load(.monotonic);
         return RuntimeStats{
-            .tasks_spawned = metrics.tasks_spawned.load(.monotonic),
-            .tasks_completed = metrics.tasks_completed.load(.monotonic),
-            .futures_created = metrics.futures_created.load(.monotonic),
-            .futures_cancelled = metrics.futures_cancelled.load(.monotonic),
-            .io_operations = metrics.total_io_operations.load(.monotonic),
+            .tasks_spawned = spawned,
+            .tasks_completed = 0,
+            .futures_created = spawned,
+            .futures_cancelled = 0,
+            .io_operations = 0,
             .worker_threads = self.config.worker_threads,
             .runtime_name = self.name,
             .uptime_ms = self.uptimeMs(),
@@ -212,33 +215,50 @@ pub fn TaskHandle(comptime Func: anytype) type {
     };
     const fn_info = @typeInfo(FuncType);
     if (fn_info != .@"fn") @compileError("AsyncRuntime.spawn requires a function");
-    const FutureState = zsync.Future.State;
+    const Result = fn_info.@"fn".return_type.?;
 
     return struct {
-        runtime: *zsync.Runtime,
-        future: zsync.Future,
+        io: Io,
+        future: Io.Future(Result),
+        /// std.Io futures release their task resources on `await`/`cancel`, so we
+        /// track completion ourselves to keep those calls idempotent.
+        finished: bool = false,
 
         const Self = @This();
 
         /// Wait for the task to complete
         pub fn wait(self: *Self) !void {
-            try @field(zsync.Future, "await")(&self.future);
+            if (self.finished) return;
+            self.finished = true;
+            return self.future.await(self.io);
         }
 
-        /// Check if the task has completed
+        /// Check if the task has completed (best-effort; true once awaited or
+        /// canceled through this handle)
         pub fn isDone(self: *const Self) bool {
-            return self.future.state.load(.acquire) != FutureState.pending;
+            return self.finished;
         }
 
         /// Cancel the task
         pub fn cancel(self: *Self) void {
-            self.future.cancel();
+            if (self.finished) return;
+            self.finished = true;
+            dropResult(self.future.cancel(self.io));
         }
 
         /// Release runtime resources associated with this task
         pub fn deinit(self: *Self) void {
-            _ = self.runtime;
-            self.future.destroy();
+            if (!self.finished) {
+                self.finished = true;
+                dropResult(self.future.cancel(self.io));
+            }
+        }
+
+        /// Discard a future result, swallowing any error for fire-and-forget paths.
+        fn dropResult(result: Result) void {
+            if (comptime @typeInfo(Result) == .error_union) {
+                result catch {};
+            }
         }
     };
 }
@@ -434,7 +454,7 @@ const ExampleState = struct {
 };
 
 fn exampleAsyncTask(state: *ExampleState, x: i32, y: i32) !void {
-    try zsync.sleepMs(10);
+    zsync.sleepMs(10);
     state.result.store(x + y, .release);
 }
 
@@ -462,7 +482,7 @@ test "AsyncRuntime spawn task" {
 test "global runtime manager provides singleton" {
     const testing = std.testing;
 
-    try startGlobal(testing.allocator, .{});
+    _ = try startGlobal(testing.allocator, .{});
     defer shutdownGlobal();
 
     const runtime_opt = globalRuntime();
@@ -471,6 +491,6 @@ test "global runtime manager provides singleton" {
     try testing.expect(runtime.isRunning());
 
     // Subsequent start should be idempotent
-    try startGlobal(testing.allocator, .{});
+    _ = try startGlobal(testing.allocator, .{});
     try testing.expectEqual(runtime, (globalRuntime() orelse unreachable));
 }

@@ -88,49 +88,55 @@ pub fn draw(self: *const TextView, ctx: vxfw.DrawContext) Allocator.Error!vxfw.S
 }
 
 pub fn handleEvent(self: *TextView, ctx: vxfw.EventContext) Allocator.Error!vxfw.CommandList {
-    _ = self; // TODO: Re-enable when we have proper mutable widget state
     var commands = ctx.createCommandList();
 
-    // Handle scrolling with mouse wheel or arrow keys
+    // The viewport size comes from the bounds assigned during layout; it lets us
+    // clamp scrolling so the last line can't be scrolled above the viewport.
+    const view_width = ctx.bounds.width;
+    const view_height = ctx.bounds.height;
+
     switch (ctx.event) {
         .mouse => |mouse| {
             if (ctx.isMouseEvent() != null) {
-                switch (mouse.button) {
-                    .wheel_up => {
-                        // TODO: Make TextView properly mutable for scroll state
-                        // For now, just signal redraw
-                        try commands.append(.redraw);
-                    },
-                    .wheel_down => {
-                        // TODO: Calculate max scroll based on content height
-                        // TODO: Make TextView properly mutable for scroll state
-                        try commands.append(.redraw);
-                    },
-                    else => {},
+                const delta: ?i32 = switch (mouse.button) {
+                    .wheel_up => -3,
+                    .wheel_down => 3,
+                    else => null,
+                };
+                if (delta) |d| {
+                    const max = try self.maxScroll(ctx.arena, view_width, view_height);
+                    self.applyScroll(d, max);
+                    try commands.append(.redraw);
                 }
             }
         },
         .key_press => |key| {
             if (ctx.has_focus) {
+                const page: i32 = @max(1, @as(i32, view_height) - 1);
+                const max = try self.maxScroll(ctx.arena, view_width, view_height);
                 switch (key.key) {
                     .up => {
-                        // TODO: Make TextView properly mutable for scroll state
+                        self.applyScroll(-1, max);
                         try commands.append(.redraw);
                     },
                     .down => {
-                        // TODO: Make TextView properly mutable for scroll state
+                        self.applyScroll(1, max);
                         try commands.append(.redraw);
                     },
                     .page_up => {
-                        // TODO: Make TextView properly mutable for scroll state
+                        self.applyScroll(-page, max);
                         try commands.append(.redraw);
                     },
                     .page_down => {
-                        // TODO: Make TextView properly mutable for scroll state
+                        self.applyScroll(page, max);
                         try commands.append(.redraw);
                     },
                     .home => {
-                        // TODO: Make TextView properly mutable for scroll state
+                        self.scroll_offset = 0;
+                        try commands.append(.redraw);
+                    },
+                    .end => {
+                        self.scroll_offset = max;
                         try commands.append(.redraw);
                     },
                     else => {},
@@ -141,6 +147,22 @@ pub fn handleEvent(self: *TextView, ctx: vxfw.EventContext) Allocator.Error!vxfw
     }
 
     return commands;
+}
+
+/// Maximum first-line index that still fills the viewport, i.e. the largest
+/// value `scroll_offset` may take without scrolling past the content.
+fn maxScroll(self: *const TextView, arena: Allocator, width: u16, height: u16) Allocator.Error!u16 {
+    if (width == 0 or height == 0) return 0;
+    const lines = try self.wrapText(arena, width);
+    defer arena.free(lines);
+    if (lines.len <= height) return 0;
+    return @intCast(lines.len - height);
+}
+
+/// Apply a signed scroll delta, clamped to `[0, max]`.
+fn applyScroll(self: *TextView, delta: i32, max: u16) void {
+    const next = std.math.clamp(@as(i32, self.scroll_offset) + delta, 0, @as(i32, max));
+    self.scroll_offset = @intCast(next);
 }
 
 /// Split text into lines based on the wrap mode and available width
@@ -242,6 +264,46 @@ fn wrapAtCharacters(self: *const TextView, allocator: Allocator, lines: *std.arr
             start = end;
         }
     }
+}
+
+test "TextView scrolls on key events and clamps to content" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    // 10 single-char lines, no wrapping; viewport is 5 wide x 4 tall.
+    var tv = TextView.init("0\n1\n2\n3\n4\n5\n6\n7\n8\n9", Style.default(), .none);
+    const view = geometry.Rect.init(0, 0, 5, 4);
+    // max scroll = 10 lines - 4 rows = 6.
+
+    const sendKey = struct {
+        fn call(t: *TextView, alloc: Allocator, bounds: geometry.Rect, k: vxfw.Key.KeyType) !void {
+            const ev = vxfw.Event{ .key_press = .{ .key = k } };
+            const ctx = vxfw.EventContext.withFocus(ev, alloc, bounds, true, true);
+            _ = try t.handleEvent(ctx);
+        }
+    }.call;
+
+    try sendKey(&tv, a, view, .down);
+    try std.testing.expectEqual(@as(u16, 1), tv.scroll_offset);
+
+    try sendKey(&tv, a, view, .end);
+    try std.testing.expectEqual(@as(u16, 6), tv.scroll_offset);
+
+    // Already at the bottom: further down is clamped.
+    try sendKey(&tv, a, view, .down);
+    try std.testing.expectEqual(@as(u16, 6), tv.scroll_offset);
+
+    // page_up moves by (height - 1) = 3.
+    try sendKey(&tv, a, view, .page_up);
+    try std.testing.expectEqual(@as(u16, 3), tv.scroll_offset);
+
+    try sendKey(&tv, a, view, .home);
+    try std.testing.expectEqual(@as(u16, 0), tv.scroll_offset);
+
+    // Already at the top: further up is clamped.
+    try sendKey(&tv, a, view, .up);
+    try std.testing.expectEqual(@as(u16, 0), tv.scroll_offset);
 }
 
 test "TextView creation and basic functionality" {

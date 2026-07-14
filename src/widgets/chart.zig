@@ -16,6 +16,8 @@ pub const ChartType = enum {
     line,
     scatter,
     both,
+    /// Line plot with the region between the line and the X axis filled.
+    area,
 };
 
 const ChartPoint = struct {
@@ -24,9 +26,12 @@ const ChartPoint = struct {
 };
 pub const Point = ChartPoint;
 
+/// A data point mapped to integer buffer coordinates.
+const ScreenPoint = struct { x: u16, y: u16 };
+
 const ChartDataset = struct {
     label: []const u8,
-    points: []Point,
+    points: []const Point,
     color: Color,
     marker: u21, // Unicode character for scatter points
 };
@@ -149,7 +154,7 @@ pub const Chart = struct {
             return self;
         }
 
-        pub fn addDataset(self: *Builder, label: []const u8, points: []ChartPoint, color: Color, marker: u21) Error!*Builder {
+        pub fn addDataset(self: *Builder, label: []const u8, points: []const ChartPoint, color: Color, marker: u21) Error!*Builder {
             try self.datasets_list.append(ChartDataset{
                 .label = label,
                 .points = points,
@@ -189,7 +194,7 @@ pub const Chart = struct {
     }
 
     /// Add a dataset to the chart
-    pub fn addDataset(self: *Chart, label: []const u8, points: []ChartPoint, color: Color, marker: u21) !void {
+    pub fn addDataset(self: *Chart, label: []const u8, points: []const ChartPoint, color: Color, marker: u21) !void {
         try self.datasets.append(ChartDataset{
             .label = label,
             .points = points,
@@ -408,13 +413,19 @@ pub const Chart = struct {
         const style = Style.default().withFg(dataset.color);
 
         // Convert data points to screen coordinates
-        var screen_points = ArrayList(struct { x: u16, y: u16 }).init(self.allocator);
+        var screen_points = ArrayList(ScreenPoint).init(self.allocator);
         defer screen_points.deinit();
 
         for (dataset.points) |point| {
             const screen_x = self.mapToScreenX(point.x, area);
             const screen_y = self.mapToScreenY(point.y, area);
             screen_points.append(.{ .x = screen_x, .y = screen_y }) catch continue;
+        }
+
+        // Fill the region under the line for area charts. Do this first so the
+        // line and markers draw on top of the fill.
+        if (self.chart_type == .area) {
+            self.fillArea(buffer, area, screen_points.items, dataset.color);
         }
 
         // Draw scatter points
@@ -425,12 +436,58 @@ pub const Chart = struct {
         }
 
         // Draw lines connecting points
-        if (self.chart_type == .line or self.chart_type == .both) {
+        if (self.chart_type == .line or self.chart_type == .both or self.chart_type == .area) {
             for (0..screen_points.items.len - 1) |i| {
                 const p1 = screen_points.items[i];
                 const p2 = screen_points.items[i + 1];
                 self.drawLine(buffer, p1.x, p1.y, p2.x, p2.y, style);
             }
+        }
+    }
+
+    /// Fill the region between the plotted line and the X axis (bottom of the
+    /// chart area) with a shaded block. Columns between adjacent points get their
+    /// height from a linear interpolation of the two endpoints.
+    fn fillArea(self: *const Chart, buffer: *Buffer, area: Rect, points: []const ScreenPoint, color: Color) void {
+        if (points.len == 0) return;
+
+        const fill_style = Style.default().withFg(color);
+        const bottom = area.y + area.height - 1;
+
+        if (points.len == 1) {
+            self.fillColumn(buffer, points[0].x, points[0].y, bottom, fill_style);
+            return;
+        }
+
+        for (0..points.len - 1) |i| {
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const x_start = @min(p1.x, p2.x);
+            const x_end = @max(p1.x, p2.x);
+            const span = x_end - x_start;
+
+            var x = x_start;
+            while (x <= x_end) : (x += 1) {
+                // Linear interpolation of the top edge across the column span.
+                const top: u16 = if (span == 0)
+                    @min(p1.y, p2.y)
+                else blk: {
+                    const t = @as(f64, @floatFromInt(x - x_start)) / @as(f64, @floatFromInt(span));
+                    const y1: f64 = @floatFromInt(p1.y);
+                    const y2: f64 = @floatFromInt(p2.y);
+                    break :blk @intFromFloat(y1 + (y2 - y1) * t);
+                };
+                self.fillColumn(buffer, x, top, bottom, fill_style);
+            }
+        }
+    }
+
+    /// Fill a single column from `top` down to `bottom` (inclusive) with a shade.
+    fn fillColumn(self: *const Chart, buffer: *Buffer, x: u16, top: u16, bottom: u16, style: Style) void {
+        _ = self;
+        var y = top;
+        while (y <= bottom) : (y += 1) {
+            buffer.setCell(x, y, Cell.init('░', style));
         }
     }
 
@@ -566,6 +623,38 @@ test "Chart add dataset with auto-scale" {
     try testing.expect(chart.x_axis.max >= 2.0);
     try testing.expect(chart.y_axis.min <= 0.0);
     try testing.expect(chart.y_axis.max >= 10.0);
+}
+
+test "Chart area fill renders shading below the line" {
+    const testing = std.testing;
+
+    var chart = try Chart.init(testing.allocator, .{ .chart_type = .area, .show_grid = false, .show_legend = false });
+    defer chart.deinit();
+
+    const points = [_]Point{
+        .{ .x = 0.0, .y = 0.0 },
+        .{ .x = 1.0, .y = 10.0 },
+        .{ .x = 2.0, .y = 5.0 },
+    };
+    try chart.addDataset("Series", &points, Color.green, '*');
+
+    var buffer = try Buffer.init(testing.allocator, phantom.Size.init(40, 20));
+    defer buffer.deinit();
+
+    chart.render(&buffer, .{ .x = 0, .y = 0, .width = 40, .height = 20 });
+
+    // Count shaded cells; an area fill must produce at least some.
+    var shaded: usize = 0;
+    var y: u16 = 0;
+    while (y < 20) : (y += 1) {
+        var x: u16 = 0;
+        while (x < 40) : (x += 1) {
+            if (buffer.getCell(x, y)) |cell| {
+                if (cell.char == '░') shaded += 1;
+            }
+        }
+    }
+    try testing.expect(shaded > 0);
 }
 
 test "Chart coordinate mapping" {

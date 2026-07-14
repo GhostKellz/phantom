@@ -12,13 +12,16 @@ This directory is organized around the current supported Phantom surface on Zig 
 
 - `getting-started/`
   - `integration.md`: recommended way to adopt Phantom
+  - `quickstart.md`: hello world through async data refresh
 - `reference/`
   - `api.md`: current public API summary
+  - `api-stability.md`: stable/advanced/experimental/migration-only tiers
   - `features.md`: feature/status overview
   - `widget-inventory.md`: widget catalogue
   - `roadmap.md`: planning notes
 - `guides/`
   - `async-streaming.md`
+  - `ratatui-migration.md`
   - `grove-integration.md`
   - `search.md`
   - `terminal-sessions.md`

@@ -92,8 +92,8 @@ const testing = std.testing;
 
 test "absolute percent positioning" {
     const items = [_]Item{
-        .{ .x = .percent(50), .y = .percent(50), .width = .percent(50), .height = .percent(50) },
-        .{ .x = .px(5), .y = .px(2), .width = .px(10), .height = .px(3) },
+        .{ .x = .{ .percent = 50 }, .y = .{ .percent = 50 }, .width = .{ .percent = 50 }, .height = .{ .percent = 50 } },
+        .{ .x = .{ .px = 5 }, .y = .{ .px = 2 }, .width = .{ .px = 10 }, .height = .{ .px = 3 } },
     };
 
     const area = Rect{ .x = 0, .y = 0, .width = 100, .height = 40 };
@@ -102,17 +102,17 @@ test "absolute percent positioning" {
 
     try testing.expectEqual(@as(usize, 2), rects.len);
     try testing.expectEqual(@as(u16, 50), rects[0].rect.x);
-    try testing.expectEqual(@as(u16, 50), rects[0].rect.y);
+    try testing.expectEqual(@as(u16, 20), rects[0].rect.y);
     try testing.expectEqual(@as(u16, 50), rects[0].rect.width);
-    try testing.expectEqual(@as(u16, 50), rects[0].rect.height);
+    try testing.expectEqual(@as(u16, 20), rects[0].rect.height);
     try testing.expectEqual(@as(u16, 5), rects[1].rect.x);
     try testing.expectEqual(@as(u16, 2), rects[1].rect.y);
 }
 
 test "absolute fraction sizing shares width" {
     const items = [_]Item{
-        .{ .width = .fraction(1) },
-        .{ .x = .fraction(1), .width = .fraction(2) },
+        .{ .width = .{ .fraction = 1 } },
+        .{ .x = .{ .fraction = 1 }, .width = .{ .fraction = 2 } },
     };
 
     const area = Rect{ .x = 0, .y = 0, .width = 30, .height = 10 };
@@ -123,4 +123,33 @@ test "absolute fraction sizing shares width" {
     try testing.expectEqual(@as(u16, 0), rects[0].rect.x);
     try testing.expect(rects[0].rect.width <= 30);
     try testing.expect(rects[1].rect.x >= rects[0].rect.width);
+}
+
+test "absolute item larger than area is clamped to bounds" {
+    const items = [_]Item{
+        .{ .x = .{ .px = 90 }, .y = .{ .px = 0 }, .width = .{ .px = 50 }, .height = .{ .px = 5 } },
+    };
+
+    const area = Rect{ .x = 0, .y = 0, .width = 100, .height = 10 };
+    const rects = try compute(testing.allocator, &items, area);
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 1), rects.len);
+    try testing.expectEqual(@as(u16, 90), rects[0].rect.x);
+    // Requested width 50 from x=90 would reach 140; clamped to the right edge.
+    try testing.expect(rects[0].rect.x + rects[0].rect.width <= area.width);
+}
+
+test "absolute zero-size area yields zero-size rects" {
+    const items = [_]Item{
+        .{ .width = .{ .percent = 50 }, .height = .{ .percent = 50 } },
+    };
+
+    const area = Rect{ .x = 0, .y = 0, .width = 0, .height = 0 };
+    const rects = try compute(testing.allocator, &items, area);
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 1), rects.len);
+    try testing.expectEqual(@as(u16, 0), rects[0].rect.width);
+    try testing.expectEqual(@as(u16, 0), rects[0].rect.height);
 }

@@ -149,9 +149,9 @@ pub fn handleEvent(self: *const SizedBox, ctx: vxfw.EventContext) Allocator.Erro
     if (self.child) |child_widget| {
         // Check if event is within our fixed size bounds
         const within_bounds = switch (ctx.event) {
-            .mouse => |mouse| {
+            .mouse => |mouse| blk: {
                 const local_bounds = Rect.init(0, 0, self.fixed_size.width, self.fixed_size.height);
-                local_bounds.containsPoint(mouse.position);
+                break :blk local_bounds.containsPoint(mouse.position);
             },
             else => true, // Non-mouse events are always forwarded
         };

@@ -707,14 +707,14 @@ test "Theme JSON parsing" {
 
     // Check color resolution
     const teal = theme.defs.get("teal").?;
-    try testing.expectEqual(@as(u8, 0x4f), teal.r);
-    try testing.expectEqual(@as(u8, 0xd6), teal.g);
-    try testing.expectEqual(@as(u8, 0xbe), teal.b);
+    try testing.expectEqual(@as(u8, 0x4f), teal.rgb.r);
+    try testing.expectEqual(@as(u8, 0xd6), teal.rgb.g);
+    try testing.expectEqual(@as(u8, 0xbe), teal.rgb.b);
 
     // Check theme colors use references
-    try testing.expectEqual(teal.r, theme.colors.primary.r);
-    try testing.expectEqual(teal.g, theme.colors.primary.g);
-    try testing.expectEqual(teal.b, theme.colors.primary.b);
+    try testing.expectEqual(teal.rgb.r, theme.colors.primary.rgb.r);
+    try testing.expectEqual(teal.rgb.g, theme.colors.primary.rgb.g);
+    try testing.expectEqual(teal.rgb.b, theme.colors.primary.rgb.b);
 
     try testing.expect(theme.variant == .light);
 

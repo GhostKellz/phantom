@@ -131,13 +131,13 @@ pub fn compute(allocator: std.mem.Allocator, spec: Spec, area: Rect) ![]ItemRect
         };
     }
 
-    var remaining: i64 = @as(i64, main_extent) - @as(i64, used);
+    var remaining: i64 = @as(i64, main_extent) - @as(i64, @intCast(used));
 
     if (remaining > 0 and total_fraction > 0) {
         var distributed: i64 = 0;
         for (spec.items, 0..) |_, idx| {
             if (fraction_weights[idx] == 0) continue;
-            const share = (@as(i64, fraction_weights[idx]) * remaining) / @as(i64, total_fraction);
+            const share = @divTrunc(@as(i64, fraction_weights[idx]) * remaining, @as(i64, @intCast(total_fraction)));
             if (share > 0) {
                 base_sizes[idx] += @intCast(share);
                 distributed += share;
@@ -156,7 +156,7 @@ pub fn compute(allocator: std.mem.Allocator, spec: Spec, area: Rect) ![]ItemRect
                 if (grow_weights[idx] <= 0.0) continue;
                 const proportion = grow_weights[idx] / weight_sum;
                 const share_f = proportion * @as(f64, @floatFromInt(remaining));
-                const share = @as(i64, @intFromFloat(std.math.max(0.0, share_f)));
+                const share = @as(i64, @intFromFloat(@max(0.0, share_f)));
                 if (share > 0) {
                     base_sizes[idx] += @intCast(share);
                     distributed_total += share;
@@ -191,7 +191,7 @@ pub fn compute(allocator: std.mem.Allocator, spec: Spec, area: Rect) ![]ItemRect
                 if (base_sizes[idx] == 0 or shrink_weights[idx] == 0) continue;
                 const proportion = shrink_weights[idx] / shrink_sum;
                 const shrink_f = proportion * @as(f64, @floatFromInt(deficit));
-                var shrink_amt = @as(i64, @intFromFloat(std.math.max(0.0, shrink_f)));
+                var shrink_amt = @as(i64, @intFromFloat(@max(0.0, shrink_f)));
                 if (shrink_amt > @as(i64, base_sizes[idx])) {
                     shrink_amt = @intCast(base_sizes[idx]);
                 }
@@ -265,7 +265,7 @@ pub fn compute(allocator: std.mem.Allocator, spec: Spec, area: Rect) ![]ItemRect
         entry_idx += 1;
 
         if (gap_entries > 0 and idx + 1 < count and gap_value > 0.0) {
-            const gap_weight = std.math.max(gap_value, epsilon_weight);
+            const gap_weight = @max(gap_value, epsilon_weight);
             weights[entry_idx] = .{ .weight = gap_weight };
             entry_map[entry_idx] = null;
             total_weight += gap_weight;
@@ -393,8 +393,8 @@ test "flex horizontal equal distribution" {
 test "flex vertical gap and alignment" {
     const area = Rect{ .x = 0, .y = 0, .width = 40, .height = 40 };
     const items = [_]Item{
-        .{ .basis = .px(10) },
-        .{ .basis = .px(10) },
+        .{ .basis = .{ .px = 10 }, .grow = 0 },
+        .{ .basis = .{ .px = 10 }, .grow = 0 },
     };
 
     const spec = Spec{
@@ -412,4 +412,67 @@ test "flex vertical gap and alignment" {
     try testing.expect(rects[0].rect.y > 0);
     try testing.expectEqual(@as(u16, 40), rects[0].rect.width);
     try testing.expectEqual(@as(u16, 40), rects[1].rect.width);
+}
+
+test "flex shrinks items when content overflows" {
+    const area = Rect{ .x = 0, .y = 0, .width = 30, .height = 5 };
+    const items = [_]Item{
+        .{ .basis = .{ .px = 30 }, .grow = 0, .shrink = 1 },
+        .{ .basis = .{ .px = 30 }, .grow = 0, .shrink = 1 },
+    };
+
+    const spec = Spec{
+        .direction = .horizontal,
+        .items = &items,
+    };
+
+    const rects = try compute(testing.allocator, spec, area);
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 2), rects.len);
+    // Requested 30 + 30 = 60 > 30; equal shrink weights halve both items.
+    try testing.expect(rects[0].rect.width > 0);
+    try testing.expect(rects[1].rect.width > 0);
+    try testing.expect(rects[0].rect.width + rects[1].rect.width <= area.width);
+}
+
+test "flex zero-width area yields zero-width items" {
+    const area = Rect{ .x = 0, .y = 0, .width = 0, .height = 10 };
+    const items = [_]Item{
+        .{},
+        .{},
+    };
+
+    const spec = Spec{
+        .direction = .horizontal,
+        .items = &items,
+    };
+
+    const rects = try compute(testing.allocator, spec, area);
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 2), rects.len);
+    try testing.expectEqual(@as(u16, 0), rects[0].rect.width);
+    try testing.expectEqual(@as(u16, 0), rects[1].rect.width);
+}
+
+test "flex fraction basis distributes proportionally" {
+    const area = Rect{ .x = 0, .y = 0, .width = 90, .height = 4 };
+    const items = [_]Item{
+        .{ .basis = .{ .fraction = 1 } },
+        .{ .basis = .{ .fraction = 2 } },
+    };
+
+    const spec = Spec{
+        .direction = .horizontal,
+        .items = &items,
+    };
+
+    const rects = try compute(testing.allocator, spec, area);
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 2), rects.len);
+    // 1:2 split of 90 => roughly 30 and 60.
+    try testing.expect(rects[1].rect.width > rects[0].rect.width);
+    try testing.expect(rects[0].rect.width + rects[1].rect.width <= area.width);
 }

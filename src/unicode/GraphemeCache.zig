@@ -79,7 +79,8 @@ pub fn reverseGraphemeIterator(text: []const u8) gcode.ReverseGraphemeIterator {
 
 // Grapheme boundary detection using gcode
 pub fn isGraphemeBoundary(before: u21, after: u21) bool {
-    return gcode.graphemeBreak(before, after);
+    var state: gcode.GraphemeBreakState = .{};
+    return gcode.graphemeBreak(before, after, &state);
 }
 
 // Cursor movement helpers using gcode
@@ -149,8 +150,8 @@ test "gcode reverse grapheme iteration" {
 }
 
 test "grapheme boundary detection" {
-    // Test that letter to letter is not a boundary
-    try std.testing.expect(!isGraphemeBoundary('a', 'b'));
+    // Test that letter to letter is a boundary (separate graphemes)
+    try std.testing.expect(isGraphemeBoundary('a', 'b'));
 
     // Test that letter to combining mark is not a boundary
     try std.testing.expect(!isGraphemeBoundary('a', 0x0300)); // Combining grave accent

@@ -5,6 +5,7 @@ const std = @import("std");
 const phantom = @import("../root.zig");
 const BarChart = @import("bar_chart.zig").BarChart;
 const Chart = @import("chart.zig").Chart;
+const ChartType = @import("chart.zig").ChartType;
 const Gauge = @import("gauge.zig").Gauge;
 const Sparkline = @import("sparkline.zig").Sparkline;
 const Color = phantom.Color;
@@ -224,10 +225,10 @@ test "Presets CPU gauge" {
 test "Presets time series chart" {
     const testing = std.testing;
 
-    var chart = Presets.timeSeriesChart(testing.allocator, "Test");
+    var chart = try Presets.timeSeriesChart(testing.allocator, "Test");
     defer chart.deinit();
 
-    try testing.expectEqual(Chart.ChartType.line, chart.chart_type);
+    try testing.expectEqual(ChartType.line, chart.chart_type);
     try testing.expect(chart.show_grid);
     try testing.expect(chart.show_legend);
 }

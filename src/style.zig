@@ -168,6 +168,25 @@ pub const Style = struct {
         return new_style;
     }
 
+    /// Overlay `other`'s explicitly-set fields onto `self`.
+    /// Colors set in `other` win; unset (`null`) colors fall through to `self`.
+    /// Attributes are unioned so a span can add emphasis on top of a base style.
+    pub fn patch(self: Style, other: Style) Style {
+        return Style{
+            .fg = other.fg orelse self.fg,
+            .bg = other.bg orelse self.bg,
+            .attributes = .{
+                .bold = self.attributes.bold or other.attributes.bold,
+                .italic = self.attributes.italic or other.attributes.italic,
+                .underline = self.attributes.underline or other.attributes.underline,
+                .strikethrough = self.attributes.strikethrough or other.attributes.strikethrough,
+                .dim = self.attributes.dim or other.attributes.dim,
+                .reverse = self.attributes.reverse or other.attributes.reverse,
+                .blink = self.attributes.blink or other.attributes.blink,
+            },
+        };
+    }
+
     /// Check if two styles are equal
     pub fn eq(self: Style, other: Style) bool {
         return std.meta.eql(self.fg, other.fg) and
@@ -203,13 +222,13 @@ pub const Style = struct {
 };
 
 test "Color ANSI codes" {
-    try std.testing.expectEqualStrings("\x1b[31m", Color.red.ansiCode(false));
-    try std.testing.expectEqualStrings("\x1b[41m", Color.red.ansiCode(true));
-    try std.testing.expectEqualStrings("\x1b[94m", Color.bright_blue.ansiCode(false));
+    try std.testing.expectEqualStrings("\x1b[31m", @as(Color, .red).ansiCode(false));
+    try std.testing.expectEqualStrings("\x1b[41m", @as(Color, .red).ansiCode(true));
+    try std.testing.expectEqualStrings("\x1b[94m", @as(Color, .bright_blue).ansiCode(false));
 }
 
 test "Style creation and modification" {
-    const style = Style.default().withFg(Color.red).withBold();
-    try std.testing.expect(style.fg.? == Color.red);
+    const style = Style.default().withFg(.red).withBold();
+    try std.testing.expect(std.meta.activeTag(style.fg.?) == .red);
     try std.testing.expect(style.attributes.bold);
 }

@@ -11,10 +11,6 @@ pub fn main() !void {
 
     std.debug.print("\n=== Phantom Rendering Performance Benchmarks ===\n\n", .{});
 
-    // Initialize Phantom runtime
-    try phantom.runtime.initRuntime(allocator);
-    defer phantom.runtime.deinitRuntime();
-
     // Font rendering benchmarks
     std.debug.print("--- Font Rendering ---\n", .{});
     try benchmarkFontRendering(allocator);
@@ -74,9 +70,50 @@ fn benchmarkFontRendering(allocator: std.mem.Allocator) !void {
 }
 
 fn benchmarkWidgetRendering(allocator: std.mem.Allocator) !void {
-    _ = allocator;
-    // TODO: Re-enable when ArrayList API is clarified for Zig 0.16
-    std.debug.print("  Widget rendering benchmark: Skipped (TODO)\n", .{});
+    const width: u16 = 80;
+    const height: u16 = 24;
+    const iterations = 1000;
+
+    var output = std.array_list.Managed(u8).init(allocator);
+    defer output.deinit();
+
+    var renderer = try phantom.render.Renderer.init(allocator, .{
+        .size = phantom.Size.init(width, height),
+        .target = .{ .buffer = &output },
+        .backend = .cpu,
+    });
+    defer renderer.deinit();
+
+    const line = "The quick brown fox jumps over the lazy dog 0123456789";
+
+    // Repaint every cell each frame and flush through the real CPU render path
+    // (dirty-region merge + escape-sequence emission) to measure widget-style
+    // full-screen text throughput.
+    var timer = try phantom.time_utils.Timer.start();
+    var i: usize = 0;
+    while (i < iterations) : (i += 1) {
+        output.clearRetainingCapacity();
+        var frame = renderer.beginFrame();
+        var row: u16 = 0;
+        while (row < height) : (row += 1) {
+            _ = try frame.writeText(0, row, line, phantom.Style.default());
+        }
+        try renderer.flush();
+    }
+    const elapsed = timer.read();
+
+    const avg_ns = @as(f64, @floatFromInt(elapsed)) / @as(f64, @floatFromInt(iterations));
+    const fps = 1_000_000_000.0 / avg_ns;
+    const stats = renderer.getStats();
+    const diag = renderer.lastFrameDiagnostics();
+
+    std.debug.print("  {d}x{d} full-screen text: {d:.2}us/frame ({d:.0} FPS)\n", .{
+        width, height, avg_ns / 1000.0, fps,
+    });
+    std.debug.print("  Last frame: regions {d}->{d}, cells {d}\n", .{
+        diag.input_regions, diag.merged_regions, diag.cells_covered,
+    });
+    std.debug.print("  Avg cells/frame: {d:.0}\n", .{stats.averageCellsPerFrame()});
 }
 
 fn benchmarkFullFrame(allocator: std.mem.Allocator) !void {

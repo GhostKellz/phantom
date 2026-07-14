@@ -866,7 +866,7 @@ test "splitRow convenience helper" {
 
 test "splitColumn convenience helper" {
     const allocator = testing.allocator;
-    const area = Rect{ .x = 0, .y = 0, .width = 40, .height = 90 };
+    const area = Rect{ .x = 0, .y = 0, .width = 40, .height = 120 };
 
     var weights = [_]WeightSpec{
         .{ .weight = 1.0 },
@@ -884,4 +884,68 @@ test "splitColumn convenience helper" {
     try testing.expectEqual(@as(u16, 0), rects[0].y);
     try testing.expectEqual(@as(u16, 30), rects[1].y);
     try testing.expectEqual(@as(u16, 60), rects[2].y);
+}
+
+test "splitRow single child fills the whole area" {
+    const allocator = testing.allocator;
+    const area = Rect{ .x = 3, .y = 4, .width = 50, .height = 10 };
+
+    var weights = [_]WeightSpec{
+        .{ .weight = 1.0 },
+    };
+
+    const rects = try splitRow(allocator, area, &weights);
+    defer allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 1), rects.len);
+    try testing.expectEqual(@as(u16, 3), rects[0].x);
+    try testing.expectEqual(@as(u16, 50), rects[0].width);
+    try testing.expectEqual(@as(u16, 10), rects[0].height);
+}
+
+test "splitRow with empty weights returns empty" {
+    const allocator = testing.allocator;
+    const area = Rect{ .x = 0, .y = 0, .width = 40, .height = 10 };
+
+    const rects = try splitRow(allocator, area, &[_]WeightSpec{});
+    defer allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 0), rects.len);
+}
+
+test "splitRow rejects non-positive weight" {
+    const allocator = testing.allocator;
+    const area = Rect{ .x = 0, .y = 0, .width = 40, .height = 10 };
+
+    var weights = [_]WeightSpec{
+        .{ .weight = 1.0 },
+        .{ .weight = 0.0 },
+    };
+
+    const err = splitRow(allocator, area, &weights) catch |e| e;
+    try testing.expectEqual(SolveError.InvalidWeight, err);
+}
+
+test "splitColumn three equal weights split contiguously" {
+    const allocator = testing.allocator;
+    const area = Rect{ .x = 0, .y = 0, .width = 20, .height = 99 };
+
+    var weights = [_]WeightSpec{
+        .{ .weight = 1.0 },
+        .{ .weight = 1.0 },
+        .{ .weight = 1.0 },
+    };
+
+    const rects = try splitColumn(allocator, area, &weights);
+    defer allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 3), rects.len);
+    // Segments stay contiguous and cover the full height with no gap/overlap.
+    try testing.expectEqual(@as(u16, 0), rects[0].y);
+    try testing.expectEqual(@as(u16, 33), rects[0].height);
+    try testing.expectEqual(@as(u16, 33), rects[1].y);
+    try testing.expectEqual(@as(u16, 33), rects[1].height);
+    try testing.expectEqual(@as(u16, 66), rects[2].y);
+    try testing.expectEqual(@as(u16, 33), rects[2].height);
+    try testing.expectEqual(@as(u16, 99), rects[2].y + rects[2].height);
 }

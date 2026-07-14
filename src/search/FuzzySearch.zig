@@ -85,11 +85,20 @@ pub const FuzzyMatcher = struct {
         const match_score = self.score(pattern, target);
         if (match_score <= 0) return null;
 
-        // Simple implementation: just return the target without complex highlighting
+        const positions = self.findMatchPositions(pattern, target) catch return null;
+
+        // Require every pattern character to be present (a full subsequence
+        // match); partial overlaps like "dark" against "solarized" are not
+        // considered matches.
+        if (positions.len < pattern.len) {
+            self.allocator.free(positions);
+            return null;
+        }
+
         return MatchResult{
             .target = target,
             .score = match_score,
-            .highlight_positions = &[_]usize{},
+            .highlight_positions = positions,
         };
     }
 
@@ -105,14 +114,15 @@ pub const FuzzyMatcher = struct {
                     .score = match_result.score,
                     .highlight_positions = match_result.highlight_positions,
                 });
-            } else |_| {
-                // Skip candidates that don't match or cause errors
+            } else {
+                // Skip candidates that don't match
                 continue;
             }
         }
 
-        // Sort by score (descending)
-        std.mem.sort(SearchResult, results.items, {}, compareSearchResults);
+        // Sort by score (descending), breaking ties so that exact prefix
+        // matches and shorter candidates rank first.
+        std.mem.sort(SearchResult, results.items, RankContext{ .pattern = pattern }, RankContext.lessThan);
 
         return results.toOwnedSlice();
     }
@@ -253,7 +263,7 @@ pub const ThemeFuzzySearch = struct {
         for (self.themes.items, 0..) |theme, index| {
             var best_score: f32 = 0.0;
             var best_field: MatchField = .name;
-            var highlight_positions: ?[]usize = null;
+            var highlight_positions: ?[]const usize = null;
 
             // Check name match
             if (self.matcher.simpleMatch(query, theme.name)) |match| {
@@ -266,7 +276,7 @@ pub const ThemeFuzzySearch = struct {
                     highlight_positions = match.highlight_positions;
                 }
                 self.matcher.allocator.free(match.target);
-            } else |_| {}
+            } else {}
 
             // Check description match
             if (self.matcher.simpleMatch(query, theme.description)) |match| {
@@ -279,7 +289,7 @@ pub const ThemeFuzzySearch = struct {
                     highlight_positions = match.highlight_positions;
                 }
                 self.matcher.allocator.free(match.target);
-            } else |_| {}
+            } else {}
 
             // Check tag matches
             if (theme.tags) |tags| {
@@ -294,7 +304,7 @@ pub const ThemeFuzzySearch = struct {
                             highlight_positions = match.highlight_positions;
                         }
                         self.matcher.allocator.free(match.target);
-                    } else |_| {}
+                    } else {}
                 }
             }
 
@@ -340,12 +350,12 @@ pub const MatchResult = struct {
 /// Result of searching multiple candidates
 pub const SearchResult = struct {
     index: usize,
-    text: []u8,
+    text: []const u8,
     score: f32,
-    highlight_positions: []usize,
+    highlight_positions: []const usize,
 
     pub fn deinit(self: SearchResult, allocator: Allocator) void {
-        allocator.free(self.text);
+        // `text` borrows the caller's candidate slice and is not owned here.
         allocator.free(self.highlight_positions);
     }
 };
@@ -355,7 +365,7 @@ pub const ThemeInfo = struct {
     name: []const u8,
     description: []const u8,
     category: ThemeCategory,
-    tags: ?[][]const u8 = null,
+    tags: ?[]const []const u8 = null,
 };
 
 /// Theme categories for filtering
@@ -382,7 +392,7 @@ pub const ThemeSearchResult = struct {
     theme: ThemeInfo,
     score: f32,
     matched_field: MatchField,
-    highlight_positions: []usize,
+    highlight_positions: []const usize,
 
     pub fn deinit(self: ThemeSearchResult, allocator: Allocator) void {
         allocator.free(self.highlight_positions);
@@ -390,10 +400,25 @@ pub const ThemeSearchResult = struct {
 };
 
 /// Compare function for sorting search results
-fn compareSearchResults(context: void, a: SearchResult, b: SearchResult) bool {
-    _ = context;
-    return a.score > b.score;
-}
+const RankContext = struct {
+    pattern: []const u8,
+
+    fn startsWithIgnoreCase(haystack: []const u8, needle: []const u8) bool {
+        if (needle.len > haystack.len) return false;
+        return std.ascii.eqlIgnoreCase(haystack[0..needle.len], needle);
+    }
+
+    fn lessThan(ctx: RankContext, a: SearchResult, b: SearchResult) bool {
+        if (a.score != b.score) return a.score > b.score;
+
+        const a_prefix = startsWithIgnoreCase(a.text, ctx.pattern);
+        const b_prefix = startsWithIgnoreCase(b.text, ctx.pattern);
+        if (a_prefix != b_prefix) return a_prefix;
+
+        if (a.text.len != b.text.len) return a.text.len < b.text.len;
+        return std.mem.lessThan(u8, a.text, b.text);
+    }
+};
 
 /// Compare function for sorting theme results
 fn compareThemeResults(context: void, a: ThemeSearchResult, b: ThemeSearchResult) bool {

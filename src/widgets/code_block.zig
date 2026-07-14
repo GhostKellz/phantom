@@ -27,9 +27,11 @@ pub const Language = enum {
     yaml,
     toml,
     markdown,
-    
+
     pub fn fromString(lang: []const u8) Language {
-        const lower = std.ascii.lowerString(lang);
+        var buf: [64]u8 = undefined;
+        if (lang.len > buf.len) return .none;
+        const lower = std.ascii.lowerString(buf[0..lang.len], lang);
         if (std.mem.eql(u8, lower, "zig")) return .zig;
         if (std.mem.eql(u8, lower, "rust") or std.mem.eql(u8, lower, "rs")) return .rust;
         if (std.mem.eql(u8, lower, "c")) return .c;
@@ -91,7 +93,7 @@ pub const Theme = struct {
     variable: Style = Style.default().withFg(style.Color.white),
     attribute: Style = Style.default().withFg(style.Color.bright_yellow),
     error_token: Style = Style.default().withFg(style.Color.red).withBold(),
-    
+
     pub fn getStyle(self: *const Theme, token_type: TokenType) Style {
         return switch (token_type) {
             .text => self.text,
@@ -117,22 +119,22 @@ pub const Theme = struct {
 pub const CodeBlock = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
-    
+
     // Content
     code: []const u8,
     language: Language,
     lines: std.ArrayList([]const u8),
     tokens: std.ArrayList(Token),
-    
+
     // Configuration
     show_line_numbers: bool = false,
     line_number_style: Style,
     theme: Theme,
-    
+
     // Scrolling
     scroll_offset_line: usize = 0,
     scroll_offset_col: usize = 0,
-    
+
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
 
@@ -150,22 +152,22 @@ pub const CodeBlock = struct {
             .allocator = allocator,
             .code = try allocator.dupe(u8, code),
             .language = language,
-            .lines = std.ArrayList([]const u8).init(allocator),
-            .tokens = std.ArrayList(Token).init(allocator),
+            .lines = .empty,
+            .tokens = .empty,
             .line_number_style = Style.default().withFg(style.Color.yellow),
             .theme = Theme{},
         };
-        
+
         try code_block.updateLines();
         try code_block.tokenize();
-        
+
         return code_block;
     }
 
     pub fn setCode(self: *CodeBlock, code: []const u8) !void {
         self.allocator.free(self.code);
         self.code = try self.allocator.dupe(u8, code);
-        
+
         try self.updateLines();
         try self.tokenize();
     }
@@ -196,9 +198,11 @@ pub const CodeBlock = struct {
     pub fn scrollDown(self: *CodeBlock) void {
         if (self.lines.items.len > 0) {
             const visible_lines = if (self.area.height > 0) self.area.height else 1;
-            const max_scroll = if (self.lines.items.len > visible_lines) 
-                self.lines.items.len - visible_lines else 0;
-            
+            const max_scroll = if (self.lines.items.len > visible_lines)
+                self.lines.items.len - visible_lines
+            else
+                0;
+
             if (self.scroll_offset_line < max_scroll) {
                 self.scroll_offset_line += 1;
             }
@@ -221,14 +225,14 @@ pub const CodeBlock = struct {
             self.allocator.free(line);
         }
         self.lines.clearAndFree(self.allocator);
-        
+
         // Split code into lines
         var lines_iter = std.mem.splitSequence(u8, self.code, "\n");
         while (lines_iter.next()) |line| {
             const owned_line = try self.allocator.dupe(u8, line);
             try self.lines.append(self.allocator, owned_line);
         }
-        
+
         // Ensure at least one line exists
         if (self.lines.items.len == 0) {
             const empty_line = try self.allocator.dupe(u8, "");
@@ -238,7 +242,7 @@ pub const CodeBlock = struct {
 
     fn tokenize(self: *CodeBlock) !void {
         self.tokens.clearAndFree(self.allocator);
-        
+
         // Simple tokenization based on language
         switch (self.language) {
             .none => try self.tokenizeNone(),
@@ -267,130 +271,125 @@ pub const CodeBlock = struct {
 
     fn tokenizeZig(self: *CodeBlock) !void {
         const keywords = [_][]const u8{
-            "const", "var", "fn", "pub", "struct", "enum", "union", "if", "else",
-            "switch", "while", "for", "break", "continue", "return", "defer",
-            "errdefer", "test", "try", "catch", "async", "await", "suspend",
-            "resume", "export", "extern", "packed", "align", "comptime",
-            "inline", "noinline", "volatile", "allowzero", "noalias",
+            "const",  "var",      "fn",     "pub",      "struct",   "enum",      "union",   "if",       "else",
+            "switch", "while",    "for",    "break",    "continue", "return",    "defer",   "errdefer", "test",
+            "try",    "catch",    "async",  "await",    "suspend",  "resume",    "export",  "extern",   "packed",
+            "align",  "comptime", "inline", "noinline", "volatile", "allowzero", "noalias",
         };
-        
+
         const types = [_][]const u8{
-            "bool", "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16",
-            "u32", "u64", "u128", "usize", "f16", "f32", "f64", "f128",
-            "c_short", "c_int", "c_long", "c_longlong", "c_uint", "c_ulong",
-            "c_ulonglong", "c_char", "void", "noreturn", "type", "anytype",
-            "anyerror", "comptime_int", "comptime_float",
+            "bool",  "i8",      "i16",        "i32",          "i64",            "i128",        "isize",  "u8",   "u16",
+            "u32",   "u64",     "u128",       "usize",        "f16",            "f32",         "f64",    "f128", "c_short",
+            "c_int", "c_long",  "c_longlong", "c_uint",       "c_ulong",        "c_ulonglong", "c_char", "void", "noreturn",
+            "type",  "anytype", "anyerror",   "comptime_int", "comptime_float",
         };
-        
+
         try self.tokenizeGeneric(keywords[0..], types[0..], "//", null);
     }
 
     fn tokenizeRust(self: *CodeBlock) !void {
         const keywords = [_][]const u8{
-            "fn", "let", "mut", "const", "static", "struct", "enum", "impl",
-            "trait", "mod", "pub", "use", "crate", "super", "self", "Self",
-            "if", "else", "match", "while", "for", "loop", "break", "continue",
-            "return", "async", "await", "unsafe", "extern", "type", "where",
-            "as", "ref", "move", "box", "dyn", "in",
+            "fn",     "let",   "mut",   "const",  "static", "struct", "enum",  "impl",
+            "trait",  "mod",   "pub",   "use",    "crate",  "super",  "self",  "Self",
+            "if",     "else",  "match", "while",  "for",    "loop",   "break", "continue",
+            "return", "async", "await", "unsafe", "extern", "type",   "where", "as",
+            "ref",    "move",  "box",   "dyn",    "in",
         };
-        
+
         const types = [_][]const u8{
-            "bool", "i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16",
-            "u32", "u64", "u128", "usize", "f32", "f64", "char", "str",
-            "String", "Vec", "Option", "Result", "Box", "Rc", "Arc",
+            "bool", "i8",     "i16",    "i32",   "i64", "i128", "isize", "u8",  "u16",
+            "u32",  "u64",    "u128",   "usize", "f32", "f64",  "char",  "str", "String",
+            "Vec",  "Option", "Result", "Box",   "Rc",  "Arc",
         };
-        
+
         try self.tokenizeGeneric(keywords[0..], types[0..], "//", null);
     }
 
     fn tokenizeC(self: *CodeBlock) !void {
         const keywords = [_][]const u8{
-            "auto", "break", "case", "char", "const", "continue", "default",
-            "do", "double", "else", "enum", "extern", "float", "for", "goto",
-            "if", "int", "long", "register", "return", "short", "signed",
-            "sizeof", "static", "struct", "switch", "typedef", "union",
-            "unsigned", "void", "volatile", "while", "inline", "restrict",
-            "_Bool", "_Complex", "_Imaginary", "_Alignas", "_Alignof",
-            "_Atomic", "_Static_assert", "_Noreturn", "_Thread_local",
-            "_Generic", "_Pragma",
+            "auto",          "break",      "case",     "char",     "const",    "continue",       "default",
+            "do",            "double",     "else",     "enum",     "extern",   "float",          "for",
+            "goto",          "if",         "int",      "long",     "register", "return",         "short",
+            "signed",        "sizeof",     "static",   "struct",   "switch",   "typedef",        "union",
+            "unsigned",      "void",       "volatile", "while",    "inline",   "restrict",       "_Bool",
+            "_Complex",      "_Imaginary", "_Alignas", "_Alignof", "_Atomic",  "_Static_assert", "_Noreturn",
+            "_Thread_local", "_Generic",   "_Pragma",
         };
-        
+
         try self.tokenizeGeneric(keywords[0..], &[_][]const u8{}, "//", "/*");
     }
 
     fn tokenizePython(self: *CodeBlock) !void {
         const keywords = [_][]const u8{
-            "and", "as", "assert", "break", "class", "continue", "def", "del",
-            "elif", "else", "except", "finally", "for", "from", "global",
-            "if", "import", "in", "is", "lambda", "nonlocal", "not", "or",
-            "pass", "raise", "return", "try", "while", "with", "yield",
-            "async", "await", "True", "False", "None",
+            "and",    "as",     "assert", "break",   "class",    "continue", "def",    "del",
+            "elif",   "else",   "except", "finally", "for",      "from",     "global", "if",
+            "import", "in",     "is",     "lambda",  "nonlocal", "not",      "or",     "pass",
+            "raise",  "return", "try",    "while",   "with",     "yield",    "async",  "await",
+            "True",   "False",  "None",
         };
-        
+
         try self.tokenizeGeneric(keywords[0..], &[_][]const u8{}, "#", null);
     }
 
     fn tokenizeJavaScript(self: *CodeBlock) !void {
         const keywords = [_][]const u8{
-            "break", "case", "catch", "class", "const", "continue", "debugger",
-            "default", "delete", "do", "else", "export", "extends", "finally",
-            "for", "function", "if", "import", "in", "instanceof", "new",
-            "return", "super", "switch", "this", "throw", "try", "typeof",
-            "var", "void", "while", "with", "yield", "let", "static", "enum",
-            "implements", "package", "protected", "interface", "private",
-            "public", "async", "await", "of", "null", "undefined", "true",
-            "false",
+            "break",   "case",       "catch",   "class",     "const",     "continue",   "debugger",
+            "default", "delete",     "do",      "else",      "export",    "extends",    "finally",
+            "for",     "function",   "if",      "import",    "in",        "instanceof", "new",
+            "return",  "super",      "switch",  "this",      "throw",     "try",        "typeof",
+            "var",     "void",       "while",   "with",      "yield",     "let",        "static",
+            "enum",    "implements", "package", "protected", "interface", "private",    "public",
+            "async",   "await",      "of",      "null",      "undefined", "true",       "false",
         };
-        
+
         try self.tokenizeGeneric(keywords[0..], &[_][]const u8{}, "//", "/*");
     }
 
     fn tokenizeGo(self: *CodeBlock) !void {
         const keywords = [_][]const u8{
-            "break", "case", "chan", "const", "continue", "default", "defer",
-            "else", "fallthrough", "for", "func", "go", "goto", "if", "import",
-            "interface", "map", "package", "range", "return", "select",
-            "struct", "switch", "type", "var", "nil", "true", "false",
-            "iota", "append", "cap", "close", "complex", "copy", "delete",
-            "imag", "len", "make", "new", "panic", "print", "println",
-            "real", "recover",
+            "break",  "case",        "chan", "const",   "continue", "default", "defer",
+            "else",   "fallthrough", "for",  "func",    "go",       "goto",    "if",
+            "import", "interface",   "map",  "package", "range",    "return",  "select",
+            "struct", "switch",      "type", "var",     "nil",      "true",    "false",
+            "iota",   "append",      "cap",  "close",   "complex",  "copy",    "delete",
+            "imag",   "len",         "make", "new",     "panic",    "print",   "println",
+            "real",   "recover",
         };
-        
+
         const types = [_][]const u8{
-            "bool", "byte", "complex64", "complex128", "error", "float32",
-            "float64", "int", "int8", "int16", "int32", "int64", "rune",
-            "string", "uint", "uint8", "uint16", "uint32", "uint64", "uintptr",
+            "bool",    "byte",    "complex64", "complex128", "error",  "float32",
+            "float64", "int",     "int8",      "int16",      "int32",  "int64",
+            "rune",    "string",  "uint",      "uint8",      "uint16", "uint32",
+            "uint64",  "uintptr",
         };
-        
+
         try self.tokenizeGeneric(keywords[0..], types[0..], "//", "/*");
     }
 
     fn tokenizeJava(self: *CodeBlock) !void {
         const keywords = [_][]const u8{
-            "abstract", "assert", "boolean", "break", "byte", "case", "catch",
-            "char", "class", "const", "continue", "default", "do", "double",
-            "else", "enum", "extends", "final", "finally", "float", "for",
-            "goto", "if", "implements", "import", "instanceof", "int",
-            "interface", "long", "native", "new", "package", "private",
-            "protected", "public", "return", "short", "static", "strictfp",
-            "super", "switch", "synchronized", "this", "throw", "throws",
-            "transient", "try", "void", "volatile", "while", "true", "false",
-            "null",
+            "abstract", "assert", "boolean",    "break",     "byte",       "case",      "catch",
+            "char",     "class",  "const",      "continue",  "default",    "do",        "double",
+            "else",     "enum",   "extends",    "final",     "finally",    "float",     "for",
+            "goto",     "if",     "implements", "import",    "instanceof", "int",       "interface",
+            "long",     "native", "new",        "package",   "private",    "protected", "public",
+            "return",   "short",  "static",     "strictfp",  "super",      "switch",    "synchronized",
+            "this",     "throw",  "throws",     "transient", "try",        "void",      "volatile",
+            "while",    "true",   "false",      "null",
         };
-        
+
         try self.tokenizeGeneric(keywords[0..], &[_][]const u8{}, "//", "/*");
     }
 
     fn tokenizeBash(self: *CodeBlock) !void {
         const keywords = [_][]const u8{
-            "if", "then", "else", "elif", "fi", "case", "esac", "for", "while",
-            "until", "do", "done", "function", "return", "local", "export",
-            "readonly", "declare", "typeset", "unset", "shift", "break",
-            "continue", "exit", "source", "eval", "exec", "trap", "wait",
-            "jobs", "bg", "fg", "disown", "suspend", "nohup", "time",
-            "echo", "printf", "read", "test", "true", "false",
+            "if",      "then",   "else",  "elif",     "fi",       "case",   "esac",    "for",      "while",
+            "until",   "do",     "done",  "function", "return",   "local",  "export",  "readonly", "declare",
+            "typeset", "unset",  "shift", "break",    "continue", "exit",   "source",  "eval",     "exec",
+            "trap",    "wait",   "jobs",  "bg",       "fg",       "disown", "suspend", "nohup",    "time",
+            "echo",    "printf", "read",  "test",     "true",     "false",
         };
-        
+
         try self.tokenizeGeneric(keywords[0..], &[_][]const u8{}, "#", null);
     }
 
@@ -421,45 +420,47 @@ pub const CodeBlock = struct {
     fn tokenizeGeneric(self: *CodeBlock, keywords: []const []const u8, types: []const []const u8, line_comment: []const u8, block_comment: ?[]const u8) !void {
         var i: usize = 0;
         var token_start: usize = 0;
-        
+
         while (i < self.code.len) {
             const c = self.code[i];
-            
+
             // Handle line comments
-            if (line_comment.len > 0 and i + line_comment.len <= self.code.len and 
-                std.mem.eql(u8, self.code[i..i + line_comment.len], line_comment)) {
-                
+            if (line_comment.len > 0 and i + line_comment.len <= self.code.len and
+                std.mem.eql(u8, self.code[i .. i + line_comment.len], line_comment))
+            {
+
                 // Add previous token if any
                 if (i > token_start) {
                     try self.addGenericToken(self.code[token_start..i], keywords, types);
                 }
-                
+
                 // Find end of line comment
                 var comment_end = i;
                 while (comment_end < self.code.len and self.code[comment_end] != '\n') {
                     comment_end += 1;
                 }
-                
+
                 try self.tokens.append(self.allocator, Token{
                     .text = self.code[i..comment_end],
                     .type = .comment,
                     .style = self.theme.getStyle(.comment),
                 });
-                
+
                 i = comment_end;
                 token_start = i;
                 continue;
             }
-            
+
             // Handle block comments
-            if (block_comment != null and i + block_comment.?.len <= self.code.len and 
-                std.mem.eql(u8, self.code[i..i + block_comment.?.len], block_comment.?)) {
-                
+            if (block_comment != null and i + block_comment.?.len <= self.code.len and
+                std.mem.eql(u8, self.code[i .. i + block_comment.?.len], block_comment.?))
+            {
+
                 // Add previous token if any
                 if (i > token_start) {
                     try self.addGenericToken(self.code[token_start..i], keywords, types);
                 }
-                
+
                 // Find end of block comment
                 var comment_end = i + block_comment.?.len;
                 while (comment_end + 1 < self.code.len) {
@@ -469,25 +470,25 @@ pub const CodeBlock = struct {
                     }
                     comment_end += 1;
                 }
-                
+
                 try self.tokens.append(self.allocator, Token{
                     .text = self.code[i..comment_end],
                     .type = .comment,
                     .style = self.theme.getStyle(.comment),
                 });
-                
+
                 i = comment_end;
                 token_start = i;
                 continue;
             }
-            
+
             // Handle string literals
             if (c == '"' or c == '\'' or c == '`') {
                 // Add previous token if any
                 if (i > token_start) {
                     try self.addGenericToken(self.code[token_start..i], keywords, types);
                 }
-                
+
                 // Find end of string
                 var string_end = i + 1;
                 while (string_end < self.code.len and self.code[string_end] != c) {
@@ -497,72 +498,73 @@ pub const CodeBlock = struct {
                         string_end += 1;
                     }
                 }
-                
+
                 if (string_end < self.code.len) {
                     string_end += 1; // Include closing quote
                 }
-                
+
                 try self.tokens.append(self.allocator, Token{
                     .text = self.code[i..string_end],
                     .type = .string,
                     .style = self.theme.getStyle(.string),
                 });
-                
+
                 i = string_end;
                 token_start = i;
                 continue;
             }
-            
+
             // Handle numbers
             if (std.ascii.isDigit(c)) {
                 // Add previous token if any
                 if (i > token_start) {
                     try self.addGenericToken(self.code[token_start..i], keywords, types);
                 }
-                
+
                 // Find end of number
                 var number_end = i;
-                while (number_end < self.code.len and 
-                       (std.ascii.isDigit(self.code[number_end]) or 
-                        self.code[number_end] == '.' or 
-                        self.code[number_end] == 'e' or 
-                        self.code[number_end] == 'E' or 
-                        (number_end > i and (self.code[number_end] == '+' or self.code[number_end] == '-')))) {
+                while (number_end < self.code.len and
+                    (std.ascii.isDigit(self.code[number_end]) or
+                        self.code[number_end] == '.' or
+                        self.code[number_end] == 'e' or
+                        self.code[number_end] == 'E' or
+                        (number_end > i and (self.code[number_end] == '+' or self.code[number_end] == '-'))))
+                {
                     number_end += 1;
                 }
-                
+
                 try self.tokens.append(self.allocator, Token{
                     .text = self.code[i..number_end],
                     .type = .number,
                     .style = self.theme.getStyle(.number),
                 });
-                
+
                 i = number_end;
                 token_start = i;
                 continue;
             }
-            
+
             // Handle operators and delimiters
             if (std.mem.indexOfScalar(u8, "+-*/%=<>!&|^~?:;,.(){}[]", c) != null) {
                 // Add previous token if any
                 if (i > token_start) {
                     try self.addGenericToken(self.code[token_start..i], keywords, types);
                 }
-                
+
                 try self.tokens.append(self.allocator, Token{
-                    .text = self.code[i..i + 1],
+                    .text = self.code[i .. i + 1],
                     .type = if (std.mem.indexOfScalar(u8, "+-*/%=<>!&|^~?:", c) != null) .operator else .delimiter,
                     .style = self.theme.getStyle(if (std.mem.indexOfScalar(u8, "+-*/%=<>!&|^~?:", c) != null) .operator else .delimiter),
                 });
-                
+
                 i += 1;
                 token_start = i;
                 continue;
             }
-            
+
             i += 1;
         }
-        
+
         // Add final token if any
         if (token_start < self.code.len) {
             try self.addGenericToken(self.code[token_start..], keywords, types);
@@ -572,15 +574,15 @@ pub const CodeBlock = struct {
     fn addGenericToken(self: *CodeBlock, text: []const u8, keywords: []const []const u8, types: []const []const u8) !void {
         var i: usize = 0;
         var token_start: usize = 0;
-        
+
         while (i <= text.len) {
             const is_end = i == text.len;
-            const is_word_boundary = is_end or !std.ascii.isAlphaNumeric(text[i]) and text[i] != '_';
-            
+            const is_word_boundary = is_end or !std.ascii.isAlphanumeric(text[i]) and text[i] != '_';
+
             if (is_word_boundary and i > token_start) {
                 const word = text[token_start..i];
                 var token_type: TokenType = .identifier;
-                
+
                 // Check if it's a keyword
                 for (keywords) |keyword| {
                     if (std.mem.eql(u8, word, keyword)) {
@@ -588,7 +590,7 @@ pub const CodeBlock = struct {
                         break;
                     }
                 }
-                
+
                 // Check if it's a type
                 if (token_type == .identifier) {
                     for (types) |type_name| {
@@ -598,21 +600,21 @@ pub const CodeBlock = struct {
                         }
                     }
                 }
-                
+
                 try self.tokens.append(self.allocator, Token{
                     .text = word,
                     .type = token_type,
                     .style = self.theme.getStyle(token_type),
                 });
             }
-            
+
             // Add non-word characters as text
             if (!is_end and is_word_boundary) {
                 const start = i;
-                while (i < text.len and !std.ascii.isAlphaNumeric(text[i]) and text[i] != '_') {
+                while (i < text.len and !std.ascii.isAlphanumeric(text[i]) and text[i] != '_') {
                     i += 1;
                 }
-                
+
                 if (i > start) {
                     try self.tokens.append(self.allocator, Token{
                         .text = text[start..i],
@@ -620,7 +622,7 @@ pub const CodeBlock = struct {
                         .style = self.theme.getStyle(.text),
                     });
                 }
-                
+
                 token_start = i;
             } else {
                 i += 1;
@@ -648,49 +650,49 @@ pub const CodeBlock = struct {
         // Calculate text area
         var text_area = area;
         var line_number_width: u16 = 0;
-        
+
         if (self.show_line_numbers) {
             line_number_width = self.getLineNumberWidth() + 1;
             text_area.x += line_number_width;
             text_area.width -= line_number_width;
         }
-        
+
         // Render visible lines
         const visible_lines = @min(area.height, self.lines.items.len);
         var y: u16 = 0;
-        
+
         while (y < visible_lines) {
             const line_index = self.scroll_offset_line + y;
             if (line_index >= self.lines.items.len) break;
-            
+
             const line = self.lines.items[line_index];
             const render_y = area.y + y;
-            
+
             // Render line number
             if (self.show_line_numbers) {
                 const line_num_str = std.fmt.allocPrint(self.allocator, "{d}", .{line_index + 1}) catch "";
                 defer self.allocator.free(line_num_str);
-                
+
                 const line_num_x = area.x + line_number_width - line_num_str.len - 1;
                 buffer.writeText(@as(u16, @intCast(line_num_x)), render_y, line_num_str, self.line_number_style);
             }
-            
+
             // Clear line background
             buffer.fill(Rect.init(text_area.x, render_y, text_area.width, 1), Cell.withStyle(self.theme.text));
-            
+
             // Render line content with basic syntax highlighting
             const line_width = @min(line.len, text_area.width);
             if (line_width > 0 and line.len > self.scroll_offset_col) {
                 const visible_start = self.scroll_offset_col;
                 const visible_end = @min(visible_start + line_width, line.len);
-                
+
                 if (visible_start < visible_end) {
                     const visible_text = line[visible_start..visible_end];
                     // For now, just render as text - could be enhanced with per-token rendering
                     buffer.writeText(text_area.x, render_y, visible_text, self.theme.text);
                 }
             }
-            
+
             y += 1;
         }
     }
@@ -740,8 +742,10 @@ pub const CodeBlock = struct {
                     },
                     .end => {
                         const visible_lines = if (self.area.height > 0) self.area.height else 1;
-                        self.scroll_offset_line = if (self.lines.items.len > visible_lines) 
-                            self.lines.items.len - visible_lines else 0;
+                        self.scroll_offset_line = if (self.lines.items.len > visible_lines)
+                            self.lines.items.len - visible_lines
+                        else
+                            0;
                         return true;
                     },
                     .char => |c| {
@@ -769,8 +773,10 @@ pub const CodeBlock = struct {
                             },
                             'G' => {
                                 const visible_lines = if (self.area.height > 0) self.area.height else 1;
-                                self.scroll_offset_line = if (self.lines.items.len > visible_lines) 
-                                    self.lines.items.len - visible_lines else 0;
+                                self.scroll_offset_line = if (self.lines.items.len > visible_lines)
+                                    self.lines.items.len - visible_lines
+                                else
+                                    0;
                                 return true;
                             },
                             else => {},
@@ -792,12 +798,12 @@ pub const CodeBlock = struct {
 
     fn deinit(widget: *Widget) void {
         const self: *CodeBlock = @fieldParentPtr("widget", widget);
-        
+
         for (self.lines.items) |line| {
             self.allocator.free(line);
         }
         self.lines.deinit(self.allocator);
-        
+
         self.tokens.deinit(self.allocator);
         self.allocator.free(self.code);
         self.allocator.destroy(self);

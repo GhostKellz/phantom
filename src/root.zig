@@ -2,7 +2,7 @@
 const std = @import("std");
 
 /// Phantom version
-pub const version = "0.8.7";
+pub const version = "0.8.9";
 
 const phantom_config = @import("phantom_config");
 
@@ -30,6 +30,9 @@ pub const vxfw = @import("vxfw.zig");
 pub const layout = @import("layout/mod.zig");
 pub const render = @import("render/mod.zig");
 
+// Timing utilities (monotonic Timer replacement for the removed std.time.Timer)
+pub const time_utils = @import("time/utils.zig");
+
 // Input and events - always available
 pub const input = @import("input/mod.zig");
 
@@ -45,6 +48,7 @@ pub const style_theme = @import("style/theme.zig");
 // Widget system
 pub const Widget = @import("widget.zig").Widget;
 pub const SizeConstraints = @import("widget.zig").SizeConstraints;
+pub const StatefulWidget = @import("widget.zig").StatefulWidget;
 pub const Buffer = @import("terminal.zig").Buffer; // Required for Widget.render signature
 pub const Cell = @import("terminal.zig").Cell; // Required for Buffer.setCell
 
@@ -84,6 +88,14 @@ pub const theme = @import("theme/mod.zig");
 // Text processing
 pub const fuzzy = @import("text/fuzzy.zig");
 
+// Rich-text composition primitives (Span, Line, Text)
+pub const text = @import("text/mod.zig");
+pub const Span = text.Span;
+pub const Line = text.Line;
+
+// Snapshot test harness (render a widget to a string for golden assertions)
+pub const snapshot = @import("testing/snapshot.zig");
+
 // Constraint-based layout system
 pub const Constraint = @import("layout/constraint.zig").Constraint;
 pub const ConstraintLayout = @import("layout/constraint.zig").Layout;
@@ -93,5 +105,5 @@ pub const LayoutDirection = @import("layout/constraint.zig").Direction;
 pub const grove = if (phantom_config.enable_advanced) @import("grove") else struct {};
 
 test {
-    _ = std;
+    std.testing.refAllDecls(@This());
 }

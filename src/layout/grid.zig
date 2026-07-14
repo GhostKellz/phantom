@@ -64,19 +64,19 @@ pub fn compute(allocator: std.mem.Allocator, spec: Spec, area: Rect) ![]ItemRect
     var total_column_span: u32 = 0;
     for (column_sizes) |size| total_column_span += size;
     const total_column_gap: u32 = if (column_sizes.len > 1)
-        @as(u32, spec.gap_column) * @as(u32, column_sizes.len - 1)
+        @as(u32, spec.gap_column) * @as(u32, @intCast(column_sizes.len - 1))
     else
         0;
 
     var total_row_span: u32 = 0;
     for (row_sizes) |size| total_row_span += size;
     const total_row_gap: u32 = if (row_sizes.len > 1)
-        @as(u32, spec.gap_row) * @as(u32, row_sizes.len - 1)
+        @as(u32, spec.gap_row) * @as(u32, @intCast(row_sizes.len - 1))
     else
         0;
 
-    const grid_width_u32 = std.math.min(total_column_span + total_column_gap, @as(u32, area.width));
-    const grid_height_u32 = std.math.min(total_row_span + total_row_gap, @as(u32, area.height));
+    const grid_width_u32 = @min(total_column_span + total_column_gap, @as(u32, area.width));
+    const grid_height_u32 = @min(total_row_span + total_row_gap, @as(u32, area.height));
 
     const grid_area = Rect{
         .x = area.x,
@@ -103,8 +103,8 @@ pub fn compute(allocator: std.mem.Allocator, spec: Spec, area: Rect) ![]ItemRect
         const span_cols_u16 = if (item.placement.column_span == 0) 1 else item.placement.column_span;
         const span_rows_u16 = if (item.placement.row_span == 0) 1 else item.placement.row_span;
 
-        const span_cols_end = std.math.min(column_sizes.len, item.placement.column + @as(usize, span_cols_u16));
-        const span_rows_end = std.math.min(row_sizes.len, item.placement.row + @as(usize, span_rows_u16));
+        const span_cols_end = @min(column_sizes.len, item.placement.column + @as(usize, span_cols_u16));
+        const span_rows_end = @min(row_sizes.len, item.placement.row + @as(usize, span_rows_u16));
 
         const span_col_count = span_cols_end - item.placement.column;
         const span_row_count = span_rows_end - item.placement.row;
@@ -161,10 +161,10 @@ fn distributeTracks(allocator: std.mem.Allocator, tracks: []const Dimension, spa
     var weights = try allocator.alloc(u32, tracks.len);
     defer allocator.free(weights);
 
-    const total_gap: u32 = if (tracks.len > 1) @as(u32, gap) * @as(u32, tracks.len - 1) else 0;
+    const total_gap: u32 = if (tracks.len > 1) @as(u32, gap) * @as(u32, @intCast(tracks.len - 1)) else 0;
 
     var remaining: i64 = @as(i64, span);
-    remaining -= @as(i64, std.math.min(total_gap, @as(u32, span)));
+    remaining -= @as(i64, @min(total_gap, @as(u32, span)));
     if (remaining < 0) remaining = 0;
 
     var total_weight: u64 = 0;
@@ -194,8 +194,8 @@ fn distributeTracks(allocator: std.mem.Allocator, tracks: []const Dimension, spa
         var distributed: i64 = 0;
         for (tracks, 0..) |_, idx| {
             if (weights[idx] == 0) continue;
-            const share_f = (@as(f64, remaining) * @as(f64, weights[idx])) / @as(f64, total_weight);
-            const share: i64 = @as(i64, @intFromFloat(std.math.max(0.0, share_f)));
+            const share_f = (@as(f64, @floatFromInt(remaining)) * @as(f64, @floatFromInt(weights[idx]))) / @as(f64, @floatFromInt(total_weight));
+            const share: i64 = @as(i64, @intFromFloat(@max(0.0, share_f)));
             if (share > 0) {
                 const bounded_share: i64 = if (share > @as(i64, std.math.maxInt(i32))) @as(i64, std.math.maxInt(i32)) else share;
                 const share_i32: i32 = @intCast(bounded_share);
@@ -267,7 +267,7 @@ fn computeColumnRects(allocator: std.mem.Allocator, area: Rect, sizes: []const u
         entry_idx += 1;
 
         if (gap_entries > 0 and idx + 1 < sizes.len and gap > 0) {
-            const gap_weight = std.math.max(@as(f64, @floatFromInt(gap)), epsilon);
+            const gap_weight = @max(@as(f64, @floatFromInt(gap)), epsilon);
             weights[entry_idx] = .{ .weight = gap_weight };
             entry_map[entry_idx] = null;
             entry_idx += 1;
@@ -311,7 +311,7 @@ fn computeRowRects(allocator: std.mem.Allocator, area: Rect, sizes: []const u16,
         entry_idx += 1;
 
         if (gap_entries > 0 and idx + 1 < sizes.len and gap > 0) {
-            const gap_weight = std.math.max(@as(f64, @floatFromInt(gap)), epsilon);
+            const gap_weight = @max(@as(f64, @floatFromInt(gap)), epsilon);
             weights[entry_idx] = .{ .weight = gap_weight };
             entry_map[entry_idx] = null;
             entry_idx += 1;
@@ -336,8 +336,8 @@ fn computeRowRects(allocator: std.mem.Allocator, area: Rect, sizes: []const u16,
 const testing = std.testing;
 
 test "grid basic placement" {
-    const columns = [_]Dimension{ .px(10), .px(10) };
-    const rows = [_]Dimension{ .px(5), .px(5) };
+    const columns = [_]Dimension{ .{ .px = 10 }, .{ .px = 10 } };
+    const rows = [_]Dimension{ .{ .px = 5 }, .{ .px = 5 } };
 
     const items = [_]Item{
         .{ .placement = .{ .column = 0, .row = 0 } },
@@ -360,12 +360,12 @@ test "grid basic placement" {
 }
 
 test "grid span with fractions and gaps" {
-    const columns = [_]Dimension{ .fraction(1), .fraction(2) };
-    const rows = [_]Dimension{ .px(4), .fraction(1) };
+    const columns = [_]Dimension{ .{ .fraction = 1 }, .{ .fraction = 2 } };
+    const rows = [_]Dimension{ .{ .px = 4 }, .{ .fraction = 1 } };
 
     const items = [_]Item{
         .{ .placement = .{ .column = 0, .column_span = 2, .row = 0 } },
-        .{ .placement = .{ .column = 1, .row = 1 }, .align_self = .{ .horizontal = .end, .vertical = .start }, .width = .percent(50), .height = .percent(50) },
+        .{ .placement = .{ .column = 1, .row = 1 }, .align_self = .{ .horizontal = .end, .vertical = .start }, .width = .{ .percent = 50 }, .height = .{ .percent = 50 } },
     };
 
     const spec = Spec{
@@ -384,5 +384,117 @@ test "grid span with fractions and gaps" {
     try testing.expectEqual(@as(u16, 0), rects[0].rect.x);
     try testing.expectEqual(@as(u16, 0), rects[0].rect.y);
     try testing.expect(rects[0].rect.width >= 28);
-    try testing.expectEqual(@as(u16, 15), rects[1].rect.x); // Should land in second column region
+    try testing.expectEqual(@as(u16, 21), rects[1].rect.x); // End-aligned (width 50%) within the second column region
+}
+
+test "grid out-of-range placement yields zero-size rect" {
+    const columns = [_]Dimension{.{ .px = 10 }};
+    const rows = [_]Dimension{.{ .px = 5 }};
+
+    const items = [_]Item{
+        .{ .placement = .{ .column = 3, .row = 3 } },
+    };
+
+    const spec = Spec{
+        .columns = &columns,
+        .rows = &rows,
+        .items = &items,
+    };
+
+    const rects = try compute(testing.allocator, spec, Rect{ .x = 0, .y = 0, .width = 20, .height = 10 });
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 1), rects.len);
+    try testing.expectEqual(@as(u16, 0), rects[0].rect.width);
+    try testing.expectEqual(@as(u16, 0), rects[0].rect.height);
+}
+
+test "grid zero-size area clamps items to zero" {
+    const columns = [_]Dimension{.{ .px = 10 }};
+    const rows = [_]Dimension{.{ .px = 5 }};
+
+    const items = [_]Item{
+        .{ .placement = .{ .column = 0, .row = 0 } },
+    };
+
+    const spec = Spec{
+        .columns = &columns,
+        .rows = &rows,
+        .items = &items,
+    };
+
+    const rects = try compute(testing.allocator, spec, Rect{ .x = 0, .y = 0, .width = 0, .height = 0 });
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 1), rects.len);
+    try testing.expectEqual(@as(u16, 0), rects[0].rect.width);
+    try testing.expectEqual(@as(u16, 0), rects[0].rect.height);
+}
+
+test "grid column span overflow is bounded by track count" {
+    // A span reaching past the last column must clamp to the available tracks.
+    const columns = [_]Dimension{ .{ .px = 10 }, .{ .px = 10 } };
+    const rows = [_]Dimension{.{ .px = 5 }};
+
+    const items = [_]Item{
+        .{ .placement = .{ .column = 0, .column_span = 5, .row = 0 } },
+    };
+
+    const spec = Spec{
+        .columns = &columns,
+        .rows = &rows,
+        .items = &items,
+    };
+
+    const area = Rect{ .x = 0, .y = 0, .width = 20, .height = 5 };
+    const rects = try compute(testing.allocator, spec, area);
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 1), rects.len);
+    // Item spans both columns but cannot exceed the 20-wide grid area.
+    try testing.expectEqual(@as(u16, 0), rects[0].rect.x);
+    try testing.expect(rects[0].rect.x + rects[0].rect.width <= area.width);
+}
+
+test "grid nested within a parent cell stays inside cell bounds" {
+    // Outer grid: two equal columns across a 40x10 area.
+    const outer_columns = [_]Dimension{ .{ .fraction = 1 }, .{ .fraction = 1 } };
+    const outer_rows = [_]Dimension{.{ .fraction = 1 }};
+    const outer_items = [_]Item{
+        .{ .id = 1, .placement = .{ .column = 0, .row = 0 } },
+        .{ .id = 2, .placement = .{ .column = 1, .row = 0 } },
+    };
+
+    const outer = try compute(testing.allocator, .{
+        .columns = &outer_columns,
+        .rows = &outer_rows,
+        .items = &outer_items,
+    }, Rect{ .x = 0, .y = 0, .width = 40, .height = 10 });
+    defer testing.allocator.free(outer);
+
+    // Use the right-hand cell as the parent area for an inner grid.
+    const parent_cell = outer[1].rect;
+
+    const inner_columns = [_]Dimension{.{ .fraction = 1 }};
+    const inner_rows = [_]Dimension{ .{ .fraction = 1 }, .{ .fraction = 1 } };
+    const inner_items = [_]Item{
+        .{ .placement = .{ .column = 0, .row = 0 } },
+        .{ .placement = .{ .column = 0, .row = 1 } },
+    };
+
+    const inner = try compute(testing.allocator, .{
+        .columns = &inner_columns,
+        .rows = &inner_rows,
+        .items = &inner_items,
+    }, parent_cell);
+    defer testing.allocator.free(inner);
+
+    try testing.expectEqual(@as(usize, 2), inner.len);
+    // Inner items start at the cell origin and stack vertically.
+    try testing.expect(inner[0].rect.x >= parent_cell.x);
+    try testing.expectEqual(parent_cell.y, inner[0].rect.y);
+    try testing.expect(inner[1].rect.y > inner[0].rect.y);
+    // Neither inner item overflows the parent cell.
+    try testing.expect(inner[0].rect.x + inner[0].rect.width <= parent_cell.x + parent_cell.width);
+    try testing.expect(inner[1].rect.y + inner[1].rect.height <= parent_cell.y + parent_cell.height);
 }

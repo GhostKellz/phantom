@@ -208,12 +208,12 @@ pub const BlockchainPackageBrowser = struct {
             .packages = ArrayList(BlockchainPackage).init(allocator),
             .filtered_packages = ArrayList(usize).init(allocator),
             .search_query = ArrayList(u8).init(allocator),
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
-            .package_style = Style.withFg(style.Color.white),
-            .selected_style = Style.withFg(style.Color.bright_yellow).withBold(),
-            .category_style = Style.withFg(style.Color.bright_green),
-            .security_style = Style.withFg(style.Color.bright_red),
-            .network_style = Style.withFg(style.Color.bright_blue),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
+            .package_style = Style.default().withFg(style.Color.white),
+            .selected_style = Style.default().withFg(style.Color.bright_yellow).withBold(),
+            .category_style = Style.default().withFg(style.Color.bright_green),
+            .security_style = Style.default().withFg(style.Color.bright_red),
+            .network_style = Style.default().withFg(style.Color.bright_blue),
         };
 
         // Load blockchain packages
@@ -597,7 +597,7 @@ pub const BlockchainPackageBrowser = struct {
             const filter_text = std.fmt.allocPrint(self.allocator, "{s} {s}", .{ filter.getIcon(), filter.getDisplayName() }) catch return;
             defer self.allocator.free(filter_text);
 
-            buffer.writeText(current_x, y, filter_text, Style.withFg(filter.getColor()));
+            buffer.writeText(current_x, y, filter_text, Style.default().withFg(filter.getColor()));
             current_x += @as(u16, @intCast(filter_text.len)) + 2;
         }
 
@@ -620,7 +620,7 @@ pub const BlockchainPackageBrowser = struct {
         const help_text = "F1: Categories | F2: Networks | F3: Audited | /: Search";
         const help_x = x + width - @as(u16, @intCast(help_text.len));
         if (help_x > current_x) {
-            buffer.writeText(help_x, y, help_text, Style.withFg(style.Color.bright_black));
+            buffer.writeText(help_x, y, help_text, Style.default().withFg(style.Color.bright_black));
         }
     }
 
@@ -649,10 +649,10 @@ pub const BlockchainPackageBrowser = struct {
         // Help text at bottom
         if (area.height > 2) {
             const help_y = area.y + area.height - 1;
-            buffer.fill(Rect.init(area.x, help_y, area.width, 1), Cell.withStyle(Style.withFg(style.Color.bright_black)));
+            buffer.fill(Rect.init(area.x, help_y, area.width, 1), Cell.withStyle(Style.default().withFg(style.Color.bright_black)));
             const help_text = "Enter: details | Space: install | /: search | F1-F3: filters | q: quit";
             const help_len = @min(help_text.len, area.width);
-            buffer.writeText(area.x, help_y, help_text[0..help_len], Style.withFg(style.Color.bright_black));
+            buffer.writeText(area.x, help_y, help_text[0..help_len], Style.default().withFg(style.Color.bright_black));
         }
     }
 
@@ -660,23 +660,23 @@ pub const BlockchainPackageBrowser = struct {
         buffer.fill(Rect.init(x, y, width, 1), Cell.withStyle(self.package_style));
 
         const line_style = if (is_selected) self.selected_style else self.package_style;
-        const bg_style = if (is_selected) Style.withBg(style.Color.bright_black) else self.package_style;
+        const bg_style = if (is_selected) Style.default().withBg(style.Color.bright_black) else self.package_style;
 
         var current_x = x;
 
         // Category icon
-        buffer.writeText(current_x, y, pkg.category.getIcon(), Style.withFg(pkg.category.getColor()));
+        buffer.writeText(current_x, y, pkg.category.getIcon(), Style.default().withFg(pkg.category.getColor()));
         current_x += 5;
 
         // Security rating
         const security_text = if (pkg.is_audited) "🛡️" else "⚠️";
-        const security_color = if (pkg.security_score >= 80) style.Color.bright_green else if (pkg.security_score >= 60) style.Color.bright_yellow else style.Color.bright_red;
+        const security_color: style.Color = if (pkg.security_score >= 80) .bright_green else if (pkg.security_score >= 60) .bright_yellow else .bright_red;
 
-        buffer.writeText(current_x, y, security_text, Style.withFg(security_color));
+        buffer.writeText(current_x, y, security_text, Style.default().withFg(security_color));
 
         const score_text = std.fmt.allocPrint(self.allocator, "{d}", .{pkg.security_score}) catch return;
         defer self.allocator.free(score_text);
-        buffer.writeText(current_x + 2, y, score_text, Style.withFg(security_color));
+        buffer.writeText(current_x + 2, y, score_text, Style.default().withFg(security_color));
         current_x += 9;
 
         // Package name
@@ -687,7 +687,7 @@ pub const BlockchainPackageBrowser = struct {
         // Version
         if (pkg.version) |version| {
             const ver_len = @min(version.len, 8);
-            buffer.writeText(current_x, y, version[0..ver_len], Style.withFg(style.Color.bright_black));
+            buffer.writeText(current_x, y, version[0..ver_len], Style.default().withFg(style.Color.bright_black));
         }
         current_x += 11;
 
@@ -718,8 +718,9 @@ pub const BlockchainPackageBrowser = struct {
         // Highlight selected row
         if (is_selected) {
             for (x..x + width) |col| {
-                const cell = buffer.getCell(@as(u16, @intCast(col)), y);
-                buffer.setCell(@as(u16, @intCast(col)), y, Cell.init(cell.char, bg_style.withFg(cell.style.fg)));
+                const cell = buffer.getCell(@as(u16, @intCast(col)), y) orelse continue;
+                const fg_style = if (cell.style.fg) |fg| bg_style.withFg(fg) else bg_style;
+                buffer.setCell(@as(u16, @intCast(col)), y, Cell.init(cell.char, fg_style));
             }
         }
     }
@@ -743,9 +744,9 @@ pub const BlockchainPackageBrowser = struct {
             y += 1;
 
             if (pkg.is_audited) {
-                buffer.writeText(area.x, y, "🛡️ Audited - Security review completed", Style.withFg(style.Color.bright_green));
+                buffer.writeText(area.x, y, "🛡️ Audited - Security review completed", Style.default().withFg(style.Color.bright_green));
             } else {
-                buffer.writeText(area.x, y, "⚠️ Not audited - Use with caution", Style.withFg(style.Color.bright_yellow));
+                buffer.writeText(area.x, y, "⚠️ Not audited - Use with caution", Style.default().withFg(style.Color.bright_yellow));
             }
             y += 2;
 
@@ -779,7 +780,7 @@ pub const BlockchainPackageBrowser = struct {
 
             for (info_lines) |line| {
                 if (y < area.y + area.height) {
-                    buffer.writeText(area.x, y, line, Style.withFg(style.Color.bright_black));
+                    buffer.writeText(area.x, y, line, Style.default().withFg(style.Color.bright_black));
                     self.allocator.free(line);
                     y += 1;
                 }
@@ -791,12 +792,12 @@ pub const BlockchainPackageBrowser = struct {
                 defer self.allocator.free(repo_line);
 
                 if (y < area.y + area.height) {
-                    buffer.writeText(area.x, y, repo_line, Style.withFg(style.Color.bright_cyan));
+                    buffer.writeText(area.x, y, repo_line, Style.default().withFg(style.Color.bright_cyan));
                     y += 1;
                 }
             }
         } else {
-            buffer.writeText(area.x, area.y, "No package selected", Style.withFg(style.Color.bright_black));
+            buffer.writeText(area.x, area.y, "No package selected", Style.default().withFg(style.Color.bright_black));
         }
     }
 
@@ -812,7 +813,7 @@ pub const BlockchainPackageBrowser = struct {
             if (y >= area.y + area.height) break;
 
             const is_selected = (self.category_filter == category);
-            const line_style = if (is_selected) self.selected_style else Style.withFg(category.getColor());
+            const line_style = if (is_selected) self.selected_style else Style.default().withFg(category.getColor());
 
             const line = std.fmt.allocPrint(self.allocator, "{s} {s}", .{ category.getIcon(), category.getDisplayName() }) catch continue;
             defer self.allocator.free(line);
@@ -849,9 +850,7 @@ pub const BlockchainPackageBrowser = struct {
 
         switch (event) {
             .key => |key_event| {
-                if (!key_event.pressed) return false;
-
-                switch (key_event.key) {
+                switch (key_event) {
                     .up => {
                         if (self.selected_package > 0) {
                             self.selected_package -= 1;
@@ -916,11 +915,8 @@ pub const BlockchainPackageBrowser = struct {
         const self: *BlockchainPackageBrowser = @fieldParentPtr("widget", widget);
 
         for (self.packages.items) |*pkg| {
-            self.allocator.free(pkg.name);
-            if (pkg.version) |v| self.allocator.free(v);
-            if (pkg.description) |d| self.allocator.free(d);
-            if (pkg.repository_url) |u| self.allocator.free(u);
-            if (pkg.documentation_url) |u| self.allocator.free(u);
+            // name/version/description/url fields are static string literals
+            // (see loadBlockchainPackages); only the ArrayList fields are heap-owned.
             pkg.networks.deinit();
             pkg.dependencies.deinit();
         }

@@ -93,8 +93,28 @@ pub fn draw(self: *const ScrollView, ctx: vxfw.DrawContext) Allocator.Error!vxfw
     );
     const child_surface = try self.child.draw(child_ctx);
 
-    // Create clipped child surface based on scroll position
-    const clipped_child = try self.clipChildSurface(ctx.arena, child_surface);
+    // Clamp scroll to the child's extent so the visible window never runs past
+    // the content (the stored scroll offsets are advanced unbounded by events).
+    const max_scroll_x = if (child_surface.size.width > content_width)
+        child_surface.size.width - content_width
+    else
+        0;
+    const max_scroll_y = if (child_surface.size.height > content_height)
+        child_surface.size.height - content_height
+    else
+        0;
+    const eff_scroll_x = @min(self.scroll_x, max_scroll_x);
+    const eff_scroll_y = @min(self.scroll_y, max_scroll_y);
+
+    // Create clipped child surface: the visible content window at the current
+    // scroll offset, sized to the content area (excludes scrollbar gutter).
+    const clipped_child = try self.clipChildSurface(
+        ctx.arena,
+        child_surface,
+        Size.init(content_width, content_height),
+        eff_scroll_x,
+        eff_scroll_y,
+    );
 
     // Add clipped child to our surface
     const child_subsurface = vxfw.SubSurface.init(Point{ .x = 0, .y = 0 }, clipped_child);
@@ -102,7 +122,7 @@ pub fn draw(self: *const ScrollView, ctx: vxfw.DrawContext) Allocator.Error!vxfw
 
     // Draw scrollbars if enabled
     if (self.show_scrollbars) {
-        try self.drawScrollbars(&surface, content_width, content_height, child_surface.size);
+        try self.drawScrollbars(&surface, content_width, content_height, child_surface.size, eff_scroll_x, eff_scroll_y);
     }
 
     return surface;
@@ -200,13 +220,39 @@ pub fn handleEvent(self: *ScrollView, ctx: vxfw.EventContext) Allocator.Error!vx
     return commands;
 }
 
-/// Create a clipped version of the child surface based on scroll position
-fn clipChildSurface(self: *const ScrollView, allocator: Allocator, child_surface: vxfw.Surface) !vxfw.Surface {
-    // For now, return the original child surface
-    // TODO: Implement proper clipping based on scroll position
-    _ = self;
-    _ = allocator;
-    return child_surface;
+/// Create a clipped version of the child surface based on scroll position.
+///
+/// Produces a fresh surface of `view_size` whose top-left corresponds to
+/// `(scroll_x, scroll_y)` in the child. Cells outside the child's bounds are
+/// left blank, so scrolling near the bottom/right edge simply shows empty space.
+fn clipChildSurface(
+    self: *const ScrollView,
+    allocator: Allocator,
+    child_surface: vxfw.Surface,
+    view_size: Size,
+    scroll_x: u16,
+    scroll_y: u16,
+) !vxfw.Surface {
+    var clipped = try vxfw.Surface.initArena(allocator, self.widget(), view_size);
+
+    // getCell requires a mutable receiver but does not mutate; use a local copy
+    // of the (by-value) child surface so we can read its cells.
+    var src = child_surface;
+
+    var y: u16 = 0;
+    while (y < view_size.height) : (y += 1) {
+        var x: u16 = 0;
+        while (x < view_size.width) : (x += 1) {
+            const src_x = @as(u32, x) + scroll_x;
+            const src_y = @as(u32, y) + scroll_y;
+            if (src_x >= src.size.width or src_y >= src.size.height) continue;
+            if (src.getCell(@intCast(src_x), @intCast(src_y))) |cell| {
+                _ = clipped.setCell(x, y, cell.char, cell.style);
+            }
+        }
+    }
+
+    return clipped;
 }
 
 /// Draw vertical and horizontal scrollbars
@@ -215,13 +261,15 @@ fn drawScrollbars(
     surface: *vxfw.Surface,
     content_width: u16,
     content_height: u16,
-    child_size: Size
+    child_size: Size,
+    scroll_x: u16,
+    scroll_y: u16,
 ) !void {
     // Draw vertical scrollbar
     if (child_size.height > content_height) {
         const scrollbar_height = content_height;
         const thumb_size = @max(1, (content_height * content_height) / child_size.height);
-        const thumb_position = (self.scroll_y * (scrollbar_height - thumb_size)) /
+        const thumb_position = (scroll_y * (scrollbar_height - thumb_size)) /
                                @max(1, child_size.height - content_height);
 
         // Draw scrollbar track
@@ -241,7 +289,7 @@ fn drawScrollbars(
     if (child_size.width > content_width) {
         const scrollbar_width = content_width;
         const thumb_size = @max(1, (content_width * content_width) / child_size.width);
-        const thumb_position = (self.scroll_x * (scrollbar_width - thumb_size)) /
+        const thumb_position = (scroll_x * (scrollbar_width - thumb_size)) /
                                @max(1, child_size.width - content_width);
 
         // Draw scrollbar track
@@ -269,14 +317,14 @@ pub fn scrollTo(self: *ScrollView, point: Point, viewport_size: Size) void {
     if (point.x < self.scroll_x) {
         self.scroll_x = @intCast(point.x);
     } else if (point.x >= self.scroll_x + viewport_size.width) {
-        self.scroll_x = @intCast(point.x - viewport_size.width + 1);
+        self.scroll_x = @intCast(@as(i32, point.x) - @as(i32, viewport_size.width) + 1);
     }
 
     // Scroll vertically if needed
     if (point.y < self.scroll_y) {
         self.scroll_y = @intCast(point.y);
     } else if (point.y >= self.scroll_y + viewport_size.height) {
-        self.scroll_y = @intCast(point.y - viewport_size.height + 1);
+        self.scroll_y = @intCast(@as(i32, point.y) - @as(i32, viewport_size.height) + 1);
     }
 }
 
@@ -328,6 +376,66 @@ test "ScrollView creation" {
     // Test basic surface creation
     try std.testing.expectEqual(Size.init(20, 15), surface.size);
     try std.testing.expect(surface.children.items.len == 1);
+}
+
+test "ScrollView clips child content to the scroll offset" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    // Child fills each row with a distinct letter: row y -> ('A' + y % 26).
+    const FillWidget = struct {
+        size: Size,
+
+        const Self = @This();
+
+        pub fn widget(self: *const Self) vxfw.Widget {
+            return .{ .userdata = @constCast(self), .drawFn = drawFn };
+        }
+
+        fn drawFn(ptr: *anyopaque, ctx: vxfw.DrawContext) Allocator.Error!vxfw.Surface {
+            const self_ptr: *const Self = @ptrCast(@alignCast(ptr));
+            var s = try vxfw.Surface.initArena(ctx.arena, self_ptr.widget(), self_ptr.size);
+            var y: u16 = 0;
+            while (y < self_ptr.size.height) : (y += 1) {
+                const ch: u21 = @intCast(@as(u32, 'A') + (@as(u32, y) % 26));
+                var x: u16 = 0;
+                while (x < self_ptr.size.width) : (x += 1) {
+                    _ = s.setCell(x, y, ch, Style.default());
+                }
+            }
+            return s;
+        }
+    };
+
+    const child = FillWidget{ .size = Size.init(50, 30) };
+    const ctx = vxfw.DrawContext.init(
+        arena.allocator(),
+        Size.init(20, 15),
+        vxfw.DrawContext.SizeConstraints.fixed(20, 15),
+        vxfw.DrawContext.CellSize.default(),
+    );
+
+    // Scroll down by 5: the clipped top-left row must come from child row 5.
+    {
+        var sv = ScrollView.init(child.widget());
+        sv.scroll_y = 5;
+        const surface = try sv.draw(ctx);
+        try std.testing.expectEqual(@as(usize, 1), surface.children.items.len);
+        var clipped = surface.children.items[0].surface;
+        // Content area excludes the 1-column/row scrollbar gutter.
+        try std.testing.expectEqual(Size.init(19, 14), clipped.size);
+        try std.testing.expectEqual(@as(u21, 'A' + 5), clipped.getCell(0, 0).?.char);
+        try std.testing.expectEqual(@as(u21, 'A' + 6), clipped.getCell(0, 1).?.char);
+    }
+
+    // Over-scroll is clamped to max (child_h 30 - content_h 14 = 16).
+    {
+        var sv = ScrollView.init(child.widget());
+        sv.scroll_y = 1000;
+        const surface = try sv.draw(ctx);
+        var clipped = surface.children.items[0].surface;
+        try std.testing.expectEqual(@as(u21, 'A' + 16), clipped.getCell(0, 0).?.char);
+    }
 }
 
 test "ScrollView position management" {

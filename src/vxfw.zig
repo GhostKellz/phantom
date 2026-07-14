@@ -307,6 +307,34 @@ pub const FlexItem = struct {
     flex: u16 = 0, // 0 = fixed size, >0 = flexible size weight
 };
 
+// Collect tests from vxfw submodules. `refAllDecls` does not recurse into
+// imported files' test blocks, so reference them explicitly here.
+test {
+    _ = Surface;
+    _ = SubSurface;
+    _ = DrawContext;
+    _ = EventContext;
+    _ = WidgetLifecycle;
+    _ = FlexRow;
+    _ = FlexColumn;
+    _ = Center;
+    _ = Padding;
+    _ = ScrollView;
+    _ = TextView;
+    _ = View;
+    _ = SizedBox;
+    _ = Border;
+    _ = LineNumbers;
+    _ = TextField;
+    _ = Scrollbar;
+    _ = CodeView;
+    _ = SplitView;
+    _ = ListView;
+    _ = RichText;
+    _ = Spinner;
+    _ = ScrollBars;
+}
+
 test "Widget interface" {
     const TestWidget = struct {
         value: u32,

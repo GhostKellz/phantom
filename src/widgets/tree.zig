@@ -29,7 +29,7 @@ pub const TreeNode = struct {
         node.* = .{
             .id = try allocator.dupe(u8, id),
             .label = try allocator.dupe(u8, label),
-            .children = .{},
+            .children = .empty,
         };
         return node;
     }
@@ -143,7 +143,7 @@ pub const Tree = struct {
             .root = null,
             .selected_node = null,
             .hovered_node = null,
-            .visible_nodes = .{},
+            .visible_nodes = .empty,
             .scroll_offset = 0,
             .viewport_height = 10,
             .config = config,
@@ -331,11 +331,9 @@ pub const Tree = struct {
         switch (event) {
             .key => |key| {
                 switch (key) {
-                    .up, .char => |c| {
-                        if (key == .up or (key == .char and c == 'k')) {
-                            self.selectPrevious();
-                            return true;
-                        }
+                    .up => {
+                        self.selectPrevious();
+                        return true;
                     },
                     .down => {
                         self.selectNext();
@@ -356,7 +354,10 @@ pub const Tree = struct {
                     else => {
                         if (key == .char) {
                             const c = key.char;
-                            if (c == 'j') {
+                            if (c == 'k') {
+                                self.selectPrevious();
+                                return true;
+                            } else if (c == 'j') {
                                 self.selectNext();
                                 return true;
                             } else if (c == 'h') {

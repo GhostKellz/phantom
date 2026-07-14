@@ -147,10 +147,12 @@ fn parseMarkdown(allocator: Allocator, text: []const u8, markdown_style: Markdow
             }
         }
 
-        // Regular text - find next formatting marker
+        // Regular text - consume at least one char, then stop at the next
+        // formatting marker or a '#' that begins a line (so headers re-trigger).
         const start = i;
-        while (i < text.len and text[i] != '*' and text[i] != '`' and
-               !(i == 0 or text[i - 1] == '\n') and text[i] != '#') {
+        i += 1;
+        while (i < text.len and text[i] != '*' and text[i] != '`') {
+            if (text[i] == '#' and text[i - 1] == '\n') break;
             i += 1;
         }
 

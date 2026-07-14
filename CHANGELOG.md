@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.8.9] - 2026-07-13
+
+### Added
+- Validated the Windows ConPTY (pseudoconsole) backend on a real Windows host (Zig `0.17.0-dev.1397`): `Session.spawn` attaches the child to the pseudoconsole via `CreatePseudoConsole` + `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE`, its rendered output reaches the read pipe, and the child exit code propagates
+- Added `src/conpty_smoke_test.zig` and a Windows-only `zig build test-conpty` step that spawns `cmd.exe` through the pseudoconsole, captures the marker written to `CONOUT$`, and asserts the exit code propagates
+
+### Changed
+- Ported the build script to the Zig `0.17.0-dev.857+2b2b85c5f` declarative configurer/maker build system
+- Raised `minimum_zig_version` to `0.17.0-dev.857+2b2b85c5f`
+- Rewrote `src/async/runtime.zig` for the `zsync` `0.8.3` `std.Io` rebase
+- Updated `zsync` to `v0.8.3`
+- Updated `gcode` to `v0.1.5`
+- Updated `zfont` to `v0.1.7`
+- Updated `zigzag` to `v0.1.8`
+- Updated `grove` to `v0.2.11`
+- Migrated `std.ArrayList` usage to the unmanaged API (explicit allocator on `append`/`deinit`) across widgets, layout, rendering, and unicode modules
+- Updated `std.Io`, allocator, and formatting call sites throughout the widget, event, theme, and rendering code for the current standard library
+- Wired `std.testing.refAllDecls(@This())` into the root test block so every module is type-checked and tested
+
+### Fixed
+- Fixed a crash in fuzzy search: `SearchResult.deinit` freed `self.text`, which only borrows the caller's candidate slice (often a read-only string literal), causing an invalid free / ABRT; it now frees only the heap-owned `highlight_positions`
+- Fixed the Windows ConPTY child stdio not binding to the pseudoconsole: `src/terminal/pty/windows.zig` set `STARTF_USESTDHANDLES` with zeroed (NULL) standard handles, which overrode the pseudoconsole's automatic stdio binding and detached the child's output so it never reached the render pipe; removed the flag so the `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` binding takes effect
+
+### Removed
+- Deleted the obsolete `src/layout/migration.zig` shim and its export
+
+### Verification
+- Verified `zig build`
+- Verified `zig build test` (all tests pass, 0 failures)
+- Verified `zig build test -Dterminal-widget=true` (all tests pass, 0 failures)
+- Verified the Windows ConPTY smoke test on a real Windows host (`zig build test-conpty` — spawn, capture, exit-code propagation all pass)
+
+---
+
 ## [0.8.7] - 2026-04-30
 
 ### Added

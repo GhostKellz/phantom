@@ -203,7 +203,9 @@ pub const TerminalParser = struct {
                 return null;
             },
             '?' => {
-                // Private parameter
+                // Private parameter marker (DEC private modes). Record it so the
+                // final-byte handler can flag the sequence as private.
+                try self.intermediate_bytes.append(byte);
                 return null;
             },
             0x20...0x2F => {
@@ -815,6 +817,26 @@ pub const ParsedEvent = union(enum) {
     unknown_csi: UnknownCSI,
     unknown_osc: UnknownOSC,
     unknown_control: UnknownControl,
+
+    /// Free any heap allocations owned by this event. Variants that only carry
+    /// scalar payloads are no-ops. The allocator must match the one the parser
+    /// used to produce the event.
+    pub fn deinit(self: ParsedEvent, allocator: Allocator) void {
+        switch (self) {
+            .attributes => |seq| allocator.free(seq.changes),
+            .set_title, .set_icon_title, .set_window_title => |t| allocator.free(t.title),
+            .set_color => |c| allocator.free(c.data),
+            .color_query_fg, .color_query_bg, .color_query_cursor => |q| allocator.free(q.response),
+            .clipboard => |c| allocator.free(c.data),
+            .device_control => |d| allocator.free(d.data),
+            .string_command => |s| allocator.free(s.data),
+            .application_command => |a| allocator.free(a.data),
+            .privacy_message => |p| allocator.free(p.data),
+            .unknown_escape => |u| allocator.free(u.sequence),
+            .unknown_osc => |u| allocator.free(u.data),
+            else => {},
+        }
+    }
 
     // Event data structures
     pub const CharEvent = struct {

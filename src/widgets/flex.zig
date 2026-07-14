@@ -13,30 +13,30 @@ const Style = style.Style;
 
 /// Flex alignment options
 pub const Alignment = enum {
-    start,    // Align to start (left/top)
-    center,   // Center alignment
-    end,      // Align to end (right/bottom)
-    stretch,  // Stretch to fill
+    start, // Align to start (left/top)
+    center, // Center alignment
+    end, // Align to end (right/bottom)
+    stretch, // Stretch to fill
 };
 
 /// Flex justify (spacing) options
 pub const Justify = enum {
-    start,          // Pack to start
-    end,            // Pack to end
-    center,         // Center items
-    space_between,  // Space between items
-    space_around,   // Space around items
-    space_evenly,   // Space evenly
+    start, // Pack to start
+    end, // Pack to end
+    center, // Center items
+    space_between, // Space between items
+    space_around, // Space around items
+    space_evenly, // Space evenly
 };
 
 /// Flex child with sizing constraints
 pub const FlexChild = struct {
     widget: *Widget,
-    flex_grow: f32 = 1.0,      // How much to grow (0 = fixed size)
-    flex_shrink: f32 = 1.0,    // How much to shrink
-    flex_basis: ?u16 = null,   // Base size (null = auto)
-    min_size: ?u16 = null,     // Minimum size
-    max_size: ?u16 = null,     // Maximum size
+    flex_grow: f32 = 1.0, // How much to grow (0 = fixed size)
+    flex_shrink: f32 = 1.0, // How much to shrink
+    flex_basis: ?u16 = null, // Base size (null = auto)
+    min_size: ?u16 = null, // Minimum size
+    max_size: ?u16 = null, // Maximum size
 };
 
 /// FlexRow - Horizontal flexible layout
@@ -44,9 +44,9 @@ pub const FlexRow = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
     children: std.ArrayList(FlexChild),
-    gap: u16 = 0,                      // Gap between items
-    alignment: Alignment = .start,      // Vertical alignment
-    justify: Justify = .start,          // Horizontal distribution
+    gap: u16 = 0, // Gap between items
+    alignment: Alignment = .start, // Vertical alignment
+    justify: Justify = .start, // Horizontal distribution
     padding_x: u16 = 0,
     padding_y: u16 = 0,
 
@@ -62,7 +62,7 @@ pub const FlexRow = struct {
         row.* = .{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .children = .{},
+            .children = .empty,
         };
         return row;
     }
@@ -188,9 +188,7 @@ pub const FlexRow = struct {
         if (total_flex > 0 and remaining_width > 0) {
             for (self.children.items, 0..) |child, i| {
                 if (child.flex_grow > 0) {
-                    const flex_width = @as(u16, @intFromFloat(
-                        @as(f32, @floatFromInt(remaining_width)) * (child.flex_grow / total_flex)
-                    ));
+                    const flex_width = @as(u16, @intFromFloat(@as(f32, @floatFromInt(remaining_width)) * (child.flex_grow / total_flex)));
 
                     // Apply min/max constraints
                     var final_width = flex_width;
@@ -249,9 +247,9 @@ pub const FlexColumn = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
     children: std.ArrayList(FlexChild),
-    gap: u16 = 0,                      // Gap between items
-    alignment: Alignment = .start,      // Horizontal alignment
-    justify: Justify = .start,          // Vertical distribution
+    gap: u16 = 0, // Gap between items
+    alignment: Alignment = .start, // Horizontal alignment
+    justify: Justify = .start, // Vertical distribution
     padding_x: u16 = 0,
     padding_y: u16 = 0,
 
@@ -267,7 +265,7 @@ pub const FlexColumn = struct {
         col.* = .{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .children = .{},
+            .children = .empty,
         };
         return col;
     }
@@ -389,9 +387,7 @@ pub const FlexColumn = struct {
         if (total_flex > 0 and remaining_height > 0) {
             for (self.children.items, 0..) |child, i| {
                 if (child.flex_grow > 0) {
-                    const flex_height = @as(u16, @intFromFloat(
-                        @as(f32, @floatFromInt(remaining_height)) * (child.flex_grow / total_flex)
-                    ));
+                    const flex_height = @as(u16, @intFromFloat(@as(f32, @floatFromInt(remaining_height)) * (child.flex_grow / total_flex)));
 
                     // Apply min/max constraints
                     var final_height = flex_height;

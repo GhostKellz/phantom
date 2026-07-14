@@ -424,8 +424,7 @@ test "ThemeManager get color" {
     const primary = manager.getColor("primary");
 
     // Should return a valid color (not checking exact value as it depends on theme)
-    try testing.expect(primary.r > 0 or primary.g > 0 or primary.b > 0 or
-        primary.r == 0 and primary.g == 0 and primary.b == 0);
+    _ = primary;
 }
 
 test "ThemeManager variant sync and dynamic loading" {

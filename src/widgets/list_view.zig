@@ -298,7 +298,7 @@ pub const ListView = struct {
                 self.filter = null;
             }
             if (self.filtered_indices) |*fi| {
-                fi.deinit(self.allocator);
+                fi.deinit();
                 self.filtered_indices = null;
             }
             return;
@@ -605,7 +605,7 @@ test "ListView virtualization maps window indices" {
     const makeItem = struct {
         fn append(lv: *ListView, text: []const u8) !void {
             const copy = try lv.allocator.dupe(u8, text);
-            try lv.items.append(lv.allocator, ListViewItem{ .text = copy });
+            try lv.items.append(ListViewItem{ .text = copy });
         }
     };
 

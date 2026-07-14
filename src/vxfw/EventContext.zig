@@ -85,8 +85,8 @@ pub fn isMouseEvent(self: *const EventContext) ?vxfw.Mouse {
 pub fn getLocalMousePosition(self: *const EventContext) ?Point {
     if (self.isMouseEvent()) |mouse| {
         return Point{
-            .x = mouse.position.x - self.bounds.x,
-            .y = mouse.position.y - self.bounds.y,
+            .x = mouse.position.x - @as(i16, @intCast(self.bounds.x)),
+            .y = mouse.position.y - @as(i16, @intCast(self.bounds.y)),
         };
     }
     return null;

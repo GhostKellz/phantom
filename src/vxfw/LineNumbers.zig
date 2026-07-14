@@ -182,8 +182,8 @@ test "LineNumbers creation and basic functionality" {
 
     const surface = try line_numbers.draw(ctx);
 
-    // Test basic surface creation
-    try std.testing.expectEqual(Size.init(6, 10), surface.size);
+    // Width is content-driven: "50" (2 digits) + padding*2 = 4; height from ctx.
+    try std.testing.expectEqual(Size.init(4, 10), surface.size);
 }
 
 test "LineNumbers with custom start line" {

@@ -127,12 +127,29 @@ pub fn statusSummary(self: *const CodeEditor, allocator: std.mem.Allocator) ![]u
 
 ### Stateful widgets
 
-These widgets now expose lightweight state snapshots so applications can own or restore navigation state explicitly:
+These widgets expose lightweight state snapshots so applications can own or restore navigation, cursor, and scroll state explicitly:
 
 ```zig
 phantom.widgets.List.State
 phantom.widgets.Table.State
 phantom.widgets.Tabs.State
+phantom.widgets.ScrollView.State
+phantom.widgets.Input.State
+phantom.widgets.TextArea.State
+```
+
+Every stateful widget satisfies the `phantom.StatefulWidget` contract: a plain
+`pub const State` snapshot plus `state()`/`applyState()` accessors. The contract
+is enforced at compile time, so a widget that drifts from the shape below fails
+the build:
+
+```zig
+pub fn state(self: *const T) T.State           // capture a snapshot
+pub fn applyState(self: *T, new_state: T.State) void  // restore (clamped to current bounds)
+
+// Compile-time checks:
+comptime phantom.StatefulWidget.assert(T);     // hard-fails with a precise message
+const ok = phantom.StatefulWidget.conforms(T); // boolean probe
 ```
 
 Useful helpers include:
@@ -148,9 +165,21 @@ pub fn scrollbarState(self: *const Table, viewport_length: usize) phantom.widget
 
 pub fn state(self: *const Tabs) Tabs.State
 pub fn applyState(self: *Tabs, new_state: Tabs.State) void
+
+pub fn state(self: *const ScrollView) ScrollView.State  // scroll_x, scroll_y
+pub fn applyState(self: *ScrollView, new_state: ScrollView.State) void
+
+pub fn state(self: *const Input) Input.State            // cursor_pos, selection_start, scroll_offset
+pub fn applyState(self: *Input, new_state: Input.State) void
+
+pub fn state(self: *const TextArea) TextArea.State      // cursor/selection line+col, scroll offsets
+pub fn applyState(self: *TextArea, new_state: TextArea.State) void
 ```
 
-`Tabs.State` now includes both the active tab index and the visible tab-window start used for overflowed tab bars.
+`applyState` clamps restored values to the widget's current bounds (item count,
+text length, content size), so a snapshot taken against larger content restores
+safely. `Tabs.State` includes both the active tab index and the visible
+tab-window start used for overflowed tab bars.
 
 ### `phantom.widgets.Terminal`
 
@@ -168,6 +197,67 @@ pub fn mouseAnyEventEnabled(self: *const Terminal) bool
 ```
 
 Mouse forwarding currently targets xterm SGR sequences and includes modifier and motion bits when the terminal enables those modes.
+
+## Rich Text Composition
+
+Ratatui-style value types for building styled, multi-line text. These live under
+`phantom.text` so the `phantom.widgets.Text` widget name stays free. Content is
+borrowed by default; each type offers an owned-lifetime helper. Widths are
+grapheme-cluster aware (CJK/emoji aware) via `gcode`.
+
+```zig
+// A styled run of text.
+phantom.text.Span   // == phantom.Span
+pub fn raw(content: []const u8) Span
+pub fn styled(content: []const u8, span_style: phantom.Style) Span
+pub fn width(self: Span) usize
+
+// A single visual line: an ordered list of spans with optional alignment.
+phantom.text.Line   // == phantom.Line
+pub fn init(allocator: std.mem.Allocator) Line
+pub fn fromRaw(allocator: std.mem.Allocator, content: []const u8) !Line
+pub fn appendRaw(self: *Line, content: []const u8) !void
+pub fn appendStyled(self: *Line, content: []const u8, span_style: phantom.Style) !void
+pub fn withAlignment(self: *Line, alignment: Line.Alignment) *Line
+pub fn width(self: Line) usize
+
+// Multiple lines with a shared base style and default alignment.
+phantom.text.Text
+pub fn init(allocator: std.mem.Allocator) Text
+pub fn fromRaw(allocator: std.mem.Allocator, content: []const u8) !Text      // borrowed, splits on '\n'
+pub fn fromRawOwned(allocator: std.mem.Allocator, content: []const u8) !Text // owns its backing
+pub fn addLine(self: *Text) !*Line
+pub fn height(self: Text) usize
+pub fn width(self: Text) usize
+```
+
+### `phantom.widgets.Paragraph`
+
+Renders a `phantom.text.Text` with configurable wrapping, alignment, padding,
+scroll offset, and a base style. Mirrors ratatui's `Paragraph`.
+
+```zig
+pub fn init(allocator: std.mem.Allocator) !*Paragraph
+pub fn initText(allocator: std.mem.Allocator, content: phantom.text.Text) !*Paragraph
+pub fn fromRaw(allocator: std.mem.Allocator, raw: []const u8) !*Paragraph
+pub fn setWrap(self: *Paragraph, mode: phantom.widgets.WrapMode) *Paragraph      // .none | .word | .character
+pub fn setAlignment(self: *Paragraph, alignment: Paragraph.Alignment) *Paragraph  // .left | .center | .right
+pub fn setBaseStyle(self: *Paragraph, base_style: phantom.Style) *Paragraph
+pub fn setPadding(self: *Paragraph, padding: phantom.widgets.Padding) *Paragraph
+pub fn setScroll(self: *Paragraph, scroll: Paragraph.Scroll) *Paragraph
+pub fn contentHeight(self: *const Paragraph, inner_width: u16) usize             // wrapped row count, for scroll clamping
+```
+
+### `phantom.snapshot`
+
+Golden-test harness that renders a widget to an off-screen buffer and serializes
+it to a trimmed, newline-joined string.
+
+```zig
+pub fn renderToString(allocator: std.mem.Allocator, widget: *phantom.Widget, width: u16, height: u16) ![]u8
+pub fn bufferToString(allocator: std.mem.Allocator, buffer: *const phantom.Buffer) ![]u8
+pub fn expectRender(allocator: std.mem.Allocator, widget: *phantom.Widget, width: u16, height: u16, expected: []const u8) !void
+```
 
 ## Layout
 

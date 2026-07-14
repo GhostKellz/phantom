@@ -21,11 +21,11 @@ pub const OnCompleteFn = *const fn (streaming_text: *StreamingText) void;
 pub const StreamingText = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
-    
+
     // Text content
     text: std.ArrayList(u8),
     lines: std.ArrayList([]const u8),
-    
+
     // Streaming state
     timer: time_utils.Timer,
     is_streaming: bool = false,
@@ -33,25 +33,25 @@ pub const StreamingText = struct {
     chunk_buffer: std.ArrayList(u8),
     current_chunk_index: usize = 0,
     last_update_time: u64 = 0,
-    
+
     // Scrolling
     scroll_offset: usize = 0,
     auto_scroll: bool = true,
-    
+
     // Styling
     text_style: Style,
     streaming_style: Style,
     cursor_style: Style,
-    
+
     // Configuration
     show_cursor: bool = true,
     cursor_char: u21 = '_',
     word_wrap: bool = true,
-    
+
     // Callbacks
     on_chunk: ?OnChunkFn = null,
     on_complete: ?OnCompleteFn = null,
-    
+
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
 
@@ -67,9 +67,9 @@ pub const StreamingText = struct {
         streaming_text.* = StreamingText{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .text = std.ArrayList(u8){},
-            .lines = std.ArrayList([]const u8){},
-            .chunk_buffer = std.ArrayList(u8){},
+            .text = .empty,
+            .lines = .empty,
+            .chunk_buffer = .empty,
             .timer = try time_utils.Timer.start(),
             .text_style = Style.default(),
             .streaming_style = Style.default().withFg(style.Color.cyan),
@@ -98,7 +98,7 @@ pub const StreamingText = struct {
         self.is_streaming = false;
         self.chunk_buffer.clearAndFree(self.allocator);
         self.current_chunk_index = 0;
-        
+
         if (self.on_complete) |callback| {
             callback(self);
         }
@@ -106,7 +106,7 @@ pub const StreamingText = struct {
 
     pub fn addChunk(self: *StreamingText, chunk: []const u8) !void {
         try self.chunk_buffer.appendSlice(self.allocator, chunk);
-        
+
         if (self.on_chunk) |callback| {
             callback(self, chunk);
         }
@@ -171,9 +171,11 @@ pub const StreamingText = struct {
     pub fn scrollDown(self: *StreamingText) void {
         if (self.lines.items.len > 0) {
             const visible_lines = if (self.area.height > 0) self.area.height else 1;
-            const max_scroll = if (self.lines.items.len > visible_lines) 
-                self.lines.items.len - visible_lines else 0;
-            
+            const max_scroll = if (self.lines.items.len > visible_lines)
+                self.lines.items.len - visible_lines
+            else
+                0;
+
             if (self.scroll_offset < max_scroll) {
                 self.scroll_offset += 1;
             }
@@ -187,8 +189,10 @@ pub const StreamingText = struct {
     pub fn scrollToBottom(self: *StreamingText) void {
         if (self.lines.items.len > 0) {
             const visible_lines = if (self.area.height > 0) self.area.height else 1;
-            self.scroll_offset = if (self.lines.items.len > visible_lines) 
-                self.lines.items.len - visible_lines else 0;
+            self.scroll_offset = if (self.lines.items.len > visible_lines)
+                self.lines.items.len - visible_lines
+            else
+                0;
         }
     }
 
@@ -198,7 +202,7 @@ pub const StreamingText = struct {
             self.allocator.free(line);
         }
         self.lines.clearAndFree(self.allocator);
-        
+
         if (!self.word_wrap) {
             // Simple line splitting by newlines
             var lines_iter = std.mem.splitSequence(u8, self.text.items, "\n");
@@ -210,12 +214,12 @@ pub const StreamingText = struct {
             // Word wrapping
             const wrap_width = if (self.area.width > 0) self.area.width else 80;
             var lines_iter = std.mem.splitSequence(u8, self.text.items, "\n");
-            
+
             while (lines_iter.next()) |line| {
                 try self.wrapLine(line, wrap_width);
             }
         }
-        
+
         // Ensure at least one line exists
         if (self.lines.items.len == 0) {
             const empty_line = try self.allocator.dupe(u8, "");
@@ -225,11 +229,11 @@ pub const StreamingText = struct {
 
     fn wrapLine(self: *StreamingText, line: []const u8, width: u16) !void {
         if (width == 0) return;
-        
+
         var start: usize = 0;
         while (start < line.len) {
             const end = @min(start + width, line.len);
-            
+
             // Try to break at word boundary
             var break_point = end;
             if (end < line.len) {
@@ -242,10 +246,10 @@ pub const StreamingText = struct {
                     break_point = i;
                 }
             }
-            
+
             const wrapped_line = try self.allocator.dupe(u8, line[start..break_point]);
             try self.lines.append(self.allocator, wrapped_line);
-            
+
             start = break_point;
             if (start < line.len and line[start] == ' ') {
                 start += 1; // Skip space
@@ -264,23 +268,23 @@ pub const StreamingText = struct {
 
         const current_time = self.timer.read() / std.time.ns_per_ms;
         const time_diff = current_time - self.last_update_time;
-        
+
         if (time_diff < (1000 / self.typing_speed)) return; // Not enough time passed
-        
+
         // Add characters from chunk buffer
         const chars_to_add = @min(1, self.chunk_buffer.items.len - self.current_chunk_index);
-        
+
         if (chars_to_add > 0) {
             const chunk_end = self.current_chunk_index + chars_to_add;
             try self.text.appendSlice(self.allocator, self.chunk_buffer.items[self.current_chunk_index..chunk_end]);
             self.current_chunk_index = chunk_end;
-            
+
             try self.updateLines();
             self.updateScrollOffset();
-            
+
             self.last_update_time = current_time;
         }
-        
+
         // Check if we've consumed all chunks
         if (self.current_chunk_index >= self.chunk_buffer.items.len) {
             self.stopStreaming();
@@ -295,40 +299,40 @@ pub const StreamingText = struct {
 
         // Update streaming animation
         self.updateStreaming() catch {};
-        
+
         // Render visible lines
         const visible_lines = @min(area.height, self.lines.items.len);
         var y: u16 = 0;
-        
+
         while (y < visible_lines) {
             const line_index = self.scroll_offset + y;
             if (line_index >= self.lines.items.len) break;
-            
+
             const line = self.lines.items[line_index];
             const render_y = area.y + y;
-            
+
             // Clear line background
             buffer.fill(Rect.init(area.x, render_y, area.width, 1), Cell.withStyle(self.text_style));
-            
+
             // Render line text
             const line_width = @min(line.len, area.width);
             if (line_width > 0) {
                 const current_style = if (self.is_streaming) self.streaming_style else self.text_style;
                 buffer.writeText(area.x, render_y, line[0..line_width], current_style);
             }
-            
+
             y += 1;
         }
-        
+
         // Render cursor if streaming and at end of text
         if (self.is_streaming and self.show_cursor) {
             const last_line_index = if (self.lines.items.len > 0) self.lines.items.len - 1 else 0;
             const cursor_line = last_line_index;
-            
+
             if (cursor_line >= self.scroll_offset and cursor_line < self.scroll_offset + visible_lines) {
                 const cursor_y = area.y + @as(u16, @intCast(cursor_line - self.scroll_offset));
                 const cursor_x = area.x + @as(u16, @intCast(@min(self.lines.items[cursor_line].len, area.width)));
-                
+
                 if (cursor_x < area.x + area.width) {
                     buffer.setCell(cursor_x, cursor_y, Cell.init(self.cursor_char, self.cursor_style));
                 }
@@ -413,12 +417,12 @@ pub const StreamingText = struct {
 
     fn deinit(widget: *Widget) void {
         const self: *StreamingText = @fieldParentPtr("widget", widget);
-        
+
         for (self.lines.items) |line| {
             self.allocator.free(line);
         }
         self.lines.deinit(self.allocator);
-        
+
         self.text.deinit(self.allocator);
         self.chunk_buffer.deinit(self.allocator);
         self.allocator.destroy(self);
@@ -428,7 +432,7 @@ pub const StreamingText = struct {
 // Example callback functions
 fn exampleOnChunk(streaming_text: *StreamingText, chunk: []const u8) void {
     _ = streaming_text;
-    std.debug.print("Chunk received: '{}'\n", .{chunk});
+    std.debug.print("Chunk received: '{s}'\n", .{chunk});
 }
 
 fn exampleOnComplete(streaming_text: *StreamingText) void {

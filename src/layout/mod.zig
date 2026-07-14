@@ -5,7 +5,6 @@ pub const grid = @import("grid.zig");
 pub const absolute = @import("absolute.zig");
 pub const types = @import("types.zig");
 pub const engine = @import("engine/mod.zig");
-pub const migration = @import("migration.zig");
 
 pub const Constraint = constraint.Constraint;
 pub const Layout = constraint.Layout;
@@ -19,5 +18,4 @@ test {
     _ = @import("absolute.zig");
     _ = @import("types.zig");
     _ = @import("engine/mod.zig");
-    _ = @import("migration.zig");
 }

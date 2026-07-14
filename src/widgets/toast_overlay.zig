@@ -231,7 +231,7 @@ pub const ToastOverlay = struct {
             },
             .key => |key| {
                 if (self.config.dismiss_key) |dismiss_key| {
-                    if (key == dismiss_key) {
+                    if (std.meta.eql(key, dismiss_key)) {
                         self.dismissLatest();
                         return true;
                     }

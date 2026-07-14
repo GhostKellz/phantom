@@ -172,12 +172,12 @@ pub const UniversalPackageBrowser = struct {
             .repositories = ArrayList(Repository).init(allocator),
             .search_input = ArrayList(u8).init(allocator),
             .search_options = SearchOptions{},
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
-            .package_style = Style.withFg(style.Color.white),
-            .selected_style = Style.withFg(style.Color.bright_yellow).withBold(),
-            .source_style = Style.withFg(style.Color.bright_green),
-            .info_style = Style.withFg(style.Color.bright_black),
-            .loading_style = Style.withFg(style.Color.bright_blue),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
+            .package_style = Style.default().withFg(style.Color.white),
+            .selected_style = Style.default().withFg(style.Color.bright_yellow).withBold(),
+            .source_style = Style.default().withFg(style.Color.bright_green),
+            .info_style = Style.default().withFg(style.Color.bright_black),
+            .loading_style = Style.default().withFg(style.Color.bright_blue),
         };
 
         // Initialize default repositories
@@ -190,17 +190,17 @@ pub const UniversalPackageBrowser = struct {
     fn initializeRepositories(self: *UniversalPackageBrowser) !void {
         // Add standard repositories
         try self.addRepository(Repository{
-            .name = "AUR",
+            .name = try self.allocator.dupe(u8, "AUR"),
             .source = .aur,
-            .url = "https://aur.archlinux.org",
-            .api_endpoint = "https://aur.archlinux.org/rpc/",
+            .url = try self.allocator.dupe(u8, "https://aur.archlinux.org"),
+            .api_endpoint = try self.allocator.dupe(u8, "https://aur.archlinux.org/rpc/"),
         });
 
         try self.addRepository(Repository{
-            .name = "ZigLibs",
+            .name = try self.allocator.dupe(u8, "ZigLibs"),
             .source = .ziglibs,
-            .url = "https://github.com/ziglibs",
-            .api_endpoint = "https://api.github.com/orgs/ziglibs/repos",
+            .url = try self.allocator.dupe(u8, "https://github.com/ziglibs"),
+            .api_endpoint = try self.allocator.dupe(u8, "https://api.github.com/orgs/ziglibs/repos"),
         });
 
         // Parse pacman.conf for additional repositories
@@ -216,14 +216,18 @@ pub const UniversalPackageBrowser = struct {
 
     /// Parse /etc/pacman.conf for repositories like Chaotic AUR
     fn parsePacmanConf(self: *UniversalPackageBrowser) !void {
-        const file = std.fs.openFileAbsolute(self.pacman_conf_path, .{}) catch return;
-        defer file.close();
+        const io = std.Io.Threaded.global_single_threaded.io();
+        const file = std.Io.Dir.openFileAbsolute(io, self.pacman_conf_path, .{}) catch return;
+        defer file.close(io);
 
-        const content = try file.readToEndAlloc(self.allocator, 1024 * 1024); // 1MB max
+        var read_buf: [4096]u8 = undefined;
+        var file_reader = file.reader(io, &read_buf);
+        const content = file_reader.interface.allocRemaining(self.allocator, .limited(1024 * 1024)) catch return; // 1MB max
         defer self.allocator.free(content);
 
-        var lines = std.mem.split(u8, content, "\n");
+        var lines = std.mem.splitScalar(u8, content, '\n');
         var current_repo: ?[]const u8 = null;
+        defer if (current_repo) |repo| self.allocator.free(repo);
 
         while (lines.next()) |line| {
             const trimmed = std.mem.trim(u8, line, " \t\r\n");
@@ -233,6 +237,7 @@ pub const UniversalPackageBrowser = struct {
 
             // Check for repository section [repo-name]
             if (trimmed.len > 2 and trimmed[0] == '[' and trimmed[trimmed.len - 1] == ']') {
+                if (current_repo) |repo| self.allocator.free(repo);
                 current_repo = self.allocator.dupe(u8, trimmed[1 .. trimmed.len - 1]) catch continue;
                 continue;
             }
@@ -601,7 +606,7 @@ pub const UniversalPackageBrowser = struct {
 
                 const filter_x = x + width - @as(u16, @intCast(filter_text.len));
                 if (filter_x > input_x + display_len) {
-                    buffer.writeText(filter_x, y, filter_text, Style.withFg(filter.getColor()));
+                    buffer.writeText(filter_x, y, filter_text, Style.default().withFg(filter.getColor()));
                 }
             }
         }
@@ -662,8 +667,8 @@ pub const UniversalPackageBrowser = struct {
     fn renderPackageLine(self: *UniversalPackageBrowser, buffer: *Buffer, x: u16, y: u16, width: u16, pkg: *const Package, is_selected: bool) void {
         buffer.fill(Rect.init(x, y, width, 1), Cell.withStyle(self.package_style));
 
-        const line_style = if (is_selected) self.selected_style else pkg.source.getColor();
-        const bg_style = if (is_selected) Style.withBg(style.Color.bright_black) else self.package_style;
+        const line_style = if (is_selected) self.selected_style else Style.default().withFg(pkg.source.getColor());
+        const bg_style = if (is_selected) Style.default().withBg(style.Color.bright_black) else self.package_style;
 
         var current_x = x;
 
@@ -674,13 +679,13 @@ pub const UniversalPackageBrowser = struct {
 
         // Source icon
         const source_icon = pkg.source.getIcon();
-        buffer.writeText(current_x, y, source_icon, Style.withFg(pkg.source.getColor()));
+        buffer.writeText(current_x, y, source_icon, Style.default().withFg(pkg.source.getColor()));
         current_x += 3;
 
         // Source name
         const source_name = pkg.source.getDisplayName();
         const source_len = @min(source_name.len, 8);
-        buffer.writeText(current_x, y, source_name[0..source_len], Style.withFg(pkg.source.getColor()));
+        buffer.writeText(current_x, y, source_name[0..source_len], Style.default().withFg(pkg.source.getColor()));
         current_x += 10;
 
         // Package name
@@ -707,8 +712,9 @@ pub const UniversalPackageBrowser = struct {
         // Highlight selected row
         if (is_selected) {
             for (x..x + width) |col| {
-                const cell = buffer.getCell(@as(u16, @intCast(col)), y);
-                buffer.setCell(@as(u16, @intCast(col)), y, Cell.init(cell.char, bg_style.withFg(cell.style.fg)));
+                const cell = buffer.getCell(@as(u16, @intCast(col)), y) orelse continue;
+                const fg_style = if (cell.style.fg) |fg| bg_style.withFg(fg) else bg_style;
+                buffer.setCell(@as(u16, @intCast(col)), y, Cell.init(cell.char, fg_style));
             }
         }
     }
@@ -730,7 +736,7 @@ pub const UniversalPackageBrowser = struct {
                 y += 1;
 
                 // Word wrap description
-                const words = std.mem.split(u8, desc, " ");
+                const words = std.mem.splitScalar(u8, desc, ' ');
                 var line = ArrayList(u8).init(self.allocator);
                 defer line.deinit();
 
@@ -820,9 +826,7 @@ pub const UniversalPackageBrowser = struct {
 
         switch (event) {
             .key => |key_event| {
-                if (!key_event.pressed) return false;
-
-                switch (key_event.key) {
+                switch (key_event) {
                     .up => {
                         switch (self.current_view) {
                             .package_list => {
@@ -890,7 +894,9 @@ pub const UniversalPackageBrowser = struct {
                             },
                             else => {
                                 if (self.current_view == .search_input) {
-                                    self.search_input.append(char) catch {};
+                                    var char_buf: [4]u8 = undefined;
+                                    const char_len = std.unicode.utf8Encode(char, &char_buf) catch return true;
+                                    self.search_input.appendSlice(char_buf[0..char_len]) catch {};
                                     return true;
                                 }
                             },

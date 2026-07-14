@@ -115,13 +115,13 @@ pub const CommandBuilder = struct {
             .available_suggestions = ArrayList(Suggestion).init(allocator),
             .filtered_suggestions = ArrayList(usize).init(allocator),
             .preview_command = ArrayList(u8).init(allocator),
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
-            .input_style = Style.withFg(style.Color.bright_white),
-            .suggestion_style = Style.withFg(style.Color.white),
-            .selected_suggestion_style = Style.withFg(style.Color.bright_yellow).withBold(),
-            .preview_style = Style.withFg(style.Color.bright_green),
-            .error_style = Style.withFg(style.Color.bright_red),
-            .success_style = Style.withFg(style.Color.bright_green),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
+            .input_style = Style.default().withFg(style.Color.bright_white),
+            .suggestion_style = Style.default().withFg(style.Color.white),
+            .selected_suggestion_style = Style.default().withFg(style.Color.bright_yellow).withBold(),
+            .preview_style = Style.default().withFg(style.Color.bright_green),
+            .error_style = Style.default().withFg(style.Color.bright_red),
+            .success_style = Style.default().withFg(style.Color.bright_green),
         };
 
         // Initialize with base command
@@ -181,8 +181,7 @@ pub const CommandBuilder = struct {
 
     /// Remove the last command part
     pub fn removeLastPart(self: *CommandBuilder) void {
-        if (self.command_parts.items.len > 0) {
-            const last = self.command_parts.pop();
+        if (self.command_parts.pop()) |last| {
             self.allocator.free(last.text);
             if (last.value) |val| self.allocator.free(val);
             self.updatePreview() catch {};
@@ -225,12 +224,14 @@ pub const CommandBuilder = struct {
             }
             if (!found) {
                 self.command_valid = false;
+                if (self.validation_message) |old| self.allocator.free(old);
                 self.validation_message = std.fmt.allocPrint(self.allocator, "Missing required argument: {s}", .{required}) catch null;
                 return false;
             }
         }
 
         self.command_valid = true;
+        if (self.validation_message) |old| self.allocator.free(old);
         self.validation_message = null;
         return true;
     }
@@ -336,7 +337,7 @@ pub const CommandBuilder = struct {
                 defer self.allocator.free(display_text);
 
                 if (area.x + x_offset + display_text.len < area.x + area.width) {
-                    buffer.writeText(area.x + x_offset, y, display_text, part.arg_type.getIcon()[0] == '🏳' and true);
+                    buffer.writeText(area.x + x_offset, y, display_text, self.input_style);
                     x_offset += @as(u16, @intCast(display_text.len));
                 }
             }
@@ -395,7 +396,7 @@ pub const CommandBuilder = struct {
             if (self.input_focused and self.cursor_position < available_width) {
                 const cursor_x = input_x + @as(u16, @intCast(self.cursor_position));
                 const cursor_char: u21 = if (self.cursor_position < input_text.len) input_text[self.cursor_position] else ' ';
-                buffer.setCell(cursor_x, area.y, Cell.init(cursor_char, Style.withBg(style.Color.bright_white).withFg(style.Color.black)));
+                buffer.setCell(cursor_x, area.y, Cell.init(cursor_char, Style.default().withBg(style.Color.bright_white).withFg(style.Color.black)));
             }
         }
     }
@@ -452,7 +453,7 @@ pub const CommandBuilder = struct {
         if (area.height > 3) {
             const help_text = "Tab: autocomplete | Enter: execute | Esc: clear | Backspace: remove";
             const help_len = @min(help_text.len, area.width);
-            buffer.writeText(area.x, area.y + 3, help_text[0..help_len], Style.withFg(style.Color.bright_black));
+            buffer.writeText(area.x, area.y + 3, help_text[0..help_len], Style.default().withFg(style.Color.bright_black));
         }
     }
 
@@ -461,13 +462,13 @@ pub const CommandBuilder = struct {
 
         switch (event) {
             .key => |key_event| {
-                if (!key_event.pressed) return false;
-
-                switch (key_event.key) {
+                switch (key_event) {
                     .char => |char| {
-                        // Add character to input
-                        self.current_input.insert(self.cursor_position, char) catch return false;
-                        self.cursor_position += 1;
+                        // Add character to input (UTF-8 encoded)
+                        var char_buf: [4]u8 = undefined;
+                        const char_len = std.unicode.utf8Encode(char, &char_buf) catch return false;
+                        self.current_input.insertSlice(self.cursor_position, char_buf[0..char_len]) catch return false;
+                        self.cursor_position += char_len;
                         self.filterSuggestions();
                         self.updatePreview() catch {};
                         return true;

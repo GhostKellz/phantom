@@ -57,7 +57,7 @@ pub const RichText = struct {
         text.* = RichText{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .spans = .{},
+            .spans = .empty,
             .base_style = Style.default(),
             .word_wrap = true,
             .alignment = .left,
@@ -104,7 +104,7 @@ pub const RichText = struct {
     /// Parse markdown-style text
     pub fn parseMarkdown(self: *RichText, markdown: []const u8) !void {
         var i: usize = 0;
-        var current_text: std.ArrayList(u8) = .{};
+        var current_text: std.ArrayList(u8) = .empty;
         defer current_text.deinit(self.allocator);
 
         while (i < markdown.len) {

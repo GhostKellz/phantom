@@ -41,6 +41,9 @@ pub const Config = struct {
     backend: BackendPreference = .auto,
     merge_dirty_regions: bool = true,
     cursor_visible: bool = true,
+    /// Per-frame time budget used for diagnostics. A frame whose flush exceeds
+    /// this many nanoseconds is counted as over-budget. Set to 0 to disable.
+    frame_budget_ns: u64 = 16_666_667, // ~60 FPS
 };
 
 /// Runtime statistics for the renderer.
@@ -53,16 +56,49 @@ pub const Stats = struct {
     last_frame_ns: u64 = 0,
     last_dirty_regions: usize = 0,
     last_cells_covered: u64 = 0,
+    /// Dirty regions submitted for the last frame before merging.
+    last_input_regions: usize = 0,
     total_dirty_regions: u64 = 0,
     total_cells_covered: u64 = 0,
     max_dirty_regions: usize = 0,
     max_cells_covered: u64 = 0,
+    /// Frames whose flush exceeded the configured budget.
+    over_budget_frames: u64 = 0,
 
     /// Average cells touched per frame.
     pub fn averageCellsPerFrame(self: Stats) f64 {
         if (self.frames == 0) return 0.0;
         return @as(f64, @floatFromInt(self.total_cells_covered)) /
             @as(f64, @floatFromInt(self.frames));
+    }
+};
+
+/// Per-frame diagnostics explaining the last flush: how many dirty regions were
+/// submitted versus emitted after merging, how many were merged away, how many
+/// cells were covered, and whether the frame exceeded its time budget.
+pub const FrameDiagnostics = struct {
+    frame_ns: u64,
+    budget_ns: u64,
+    over_budget: bool,
+    input_regions: usize,
+    merged_regions: usize,
+    regions_merged_away: usize,
+    cells_covered: u64,
+
+    /// Write a human-readable one-line summary of the frame.
+    pub fn format(self: FrameDiagnostics, writer: anytype) !void {
+        try writer.print(
+            "frame {d}ns/{d}ns{s} | regions {d}->{d} ({d} merged) | cells {d}",
+            .{
+                self.frame_ns,
+                self.budget_ns,
+                if (self.over_budget) " OVER" else "",
+                self.input_regions,
+                self.merged_regions,
+                self.regions_merged_away,
+                self.cells_covered,
+            },
+        );
     }
 };
 
@@ -75,6 +111,8 @@ pub const BackendKind = enum {
 const MergeResult = struct {
     region_count: usize = 0,
     cells_covered: u64 = 0,
+    /// Dirty regions submitted before merging (>= region_count).
+    input_regions: usize = 0,
 
     fn empty() MergeResult {
         return MergeResult{};
@@ -85,7 +123,7 @@ const MergeResult = struct {
 pub const Renderer = struct {
     allocator: Allocator,
     config: Config,
-    grapheme_cache: GraphemeCache,
+    grapheme_cache: *GraphemeCache,
     cell_buffer: CellBuffer,
     merge_scratch: ArrayList(Rect),
     stats: Stats = .{},
@@ -98,12 +136,18 @@ pub const Renderer = struct {
             return error.InvalidSize;
         }
 
-        const merge_scratch = try ArrayList(Rect).init(allocator);
+        const merge_scratch = ArrayList(Rect).init(allocator);
+
+        // Heap-allocate the grapheme cache so its address stays stable when the
+        // Renderer is returned by value (CellBuffer holds a pointer to it).
+        const grapheme_cache = try allocator.create(GraphemeCache);
+        errdefer allocator.destroy(grapheme_cache);
+        grapheme_cache.* = GraphemeCache.init(allocator);
 
         var renderer = Renderer{
             .allocator = allocator,
             .config = config,
-            .grapheme_cache = GraphemeCache.init(allocator),
+            .grapheme_cache = grapheme_cache,
             .cell_buffer = undefined,
             .merge_scratch = merge_scratch,
         };
@@ -112,7 +156,7 @@ pub const Renderer = struct {
             allocator,
             config.size.width,
             config.size.height,
-            &renderer.grapheme_cache,
+            renderer.grapheme_cache,
         );
         renderer.cell_buffer.setCursorVisible(config.cursor_visible);
         try renderer.requestFullRedraw();
@@ -127,6 +171,7 @@ pub const Renderer = struct {
         self.merge_scratch.deinit();
         self.cell_buffer.deinit();
         self.grapheme_cache.deinit();
+        self.allocator.destroy(self.grapheme_cache);
     }
 
     /// Obtain the draw buffer for the current frame.
@@ -211,16 +256,24 @@ pub const Renderer = struct {
 
         switch (self.config.target) {
             .stdout => {
-                const writer = std.io.getStdOut().writer();
-                try self.cell_buffer.render(writer);
+                const io = std.Io.Threaded.global_single_threaded.io();
+                var buf: [4096]u8 = undefined;
+                var file_writer = std.Io.File.stdout().writerStreaming(io, &buf);
+                try self.cell_buffer.render(&file_writer.interface);
+                try file_writer.interface.flush();
             },
             .file => |file| {
-                const writer = file.writer();
-                try self.cell_buffer.render(writer);
+                const io = std.Io.Threaded.global_single_threaded.io();
+                var buf: [4096]u8 = undefined;
+                var file_writer = file.writerStreaming(io, &buf);
+                try self.cell_buffer.render(&file_writer.interface);
+                try file_writer.interface.flush();
             },
             .buffer => |buffer| {
-                const writer = buffer.writer();
-                try self.cell_buffer.render(writer);
+                var allocating = std.Io.Writer.Allocating.init(buffer.allocator);
+                defer allocating.deinit();
+                try self.cell_buffer.render(&allocating.writer);
+                try buffer.appendSlice(allocating.written());
             },
         }
 
@@ -232,12 +285,32 @@ pub const Renderer = struct {
         self.stats.last_frame_ns = duration;
         self.stats.last_dirty_regions = merge_result.region_count;
         self.stats.last_cells_covered = merge_result.cells_covered;
+        self.stats.last_input_regions = merge_result.input_regions;
         self.stats.total_dirty_regions += merge_result.region_count;
         self.stats.total_cells_covered += merge_result.cells_covered;
         self.stats.max_dirty_regions = @max(self.stats.max_dirty_regions, merge_result.region_count);
         self.stats.max_cells_covered = @max(self.stats.max_cells_covered, merge_result.cells_covered);
+        if (self.config.frame_budget_ns != 0 and duration > self.config.frame_budget_ns) {
+            self.stats.over_budget_frames += 1;
+        }
         self.stats.active_backend = .cpu;
         self.first_frame = false;
+    }
+
+    /// Diagnostics for the most recently flushed frame.
+    pub fn lastFrameDiagnostics(self: *const Renderer) FrameDiagnostics {
+        const input = self.stats.last_input_regions;
+        const merged = self.stats.last_dirty_regions;
+        const budget = self.config.frame_budget_ns;
+        return FrameDiagnostics{
+            .frame_ns = self.stats.last_frame_ns,
+            .budget_ns = budget,
+            .over_budget = budget != 0 and self.stats.last_frame_ns > budget,
+            .input_regions = input,
+            .merged_regions = merged,
+            .regions_merged_away = if (input > merged) input - merged else 0,
+            .cells_covered = self.stats.last_cells_covered,
+        };
     }
 
     fn prepareDirtyRegions(self: *Renderer) !MergeResult {
@@ -247,7 +320,7 @@ pub const Renderer = struct {
         if (dirty.len == 0 and self.first_frame) {
             // Ensure the very first frame paints the full surface.
             try self.cell_buffer.markDirty(Rect.init(0, 0, self.config.size.width, self.config.size.height));
-            return MergeResult{ .region_count = 1, .cells_covered = @as(u64, self.config.size.area()) };
+            return MergeResult{ .region_count = 1, .cells_covered = @as(u64, self.config.size.area()), .input_regions = 1 };
         } else if (dirty.len == 0) {
             return MergeResult.empty();
         }
@@ -261,6 +334,7 @@ pub const Renderer = struct {
             return MergeResult{
                 .region_count = dirty.len,
                 .cells_covered = total_cells,
+                .input_regions = dirty.len,
             };
         }
 
@@ -278,6 +352,7 @@ pub const Renderer = struct {
         return MergeResult{
             .region_count = self.merge_scratch.items.len,
             .cells_covered = total_cells,
+            .input_regions = dirty.len,
         };
     }
 
@@ -312,10 +387,10 @@ fn rectanglesMergeable(a: Rect, b: Rect) bool {
 }
 
 fn rectanglesOverlap(a: Rect, b: Rect) bool {
-    const left = std.math.max(@as(u32, a.x), @as(u32, b.x));
-    const right = std.math.min(@as(u32, a.x) + @as(u32, a.width), @as(u32, b.x) + @as(u32, b.width));
-    const top = std.math.max(@as(u32, a.y), @as(u32, b.y));
-    const bottom = std.math.min(@as(u32, a.y) + @as(u32, a.height), @as(u32, b.y) + @as(u32, b.height));
+    const left = @max(@as(u32, a.x), @as(u32, b.x));
+    const right = @min(@as(u32, a.x) + @as(u32, a.width), @as(u32, b.x) + @as(u32, b.width));
+    const top = @max(@as(u32, a.y), @as(u32, b.y));
+    const bottom = @min(@as(u32, a.y) + @as(u32, a.height), @as(u32, b.y) + @as(u32, b.height));
     return left < right and top < bottom;
 }
 
@@ -357,7 +432,7 @@ fn rangesOverlapOrTouch(a_start: u32, a_end: u32, b_start: u32, b_end: u32) bool
 
 test "renderer emits escape sequences for text" {
     const allocator = std.testing.allocator;
-    var output = try ArrayList(u8).init(allocator);
+    var output = ArrayList(u8).init(allocator);
     defer output.deinit();
 
     var renderer = try Renderer.init(allocator, .{
@@ -377,7 +452,7 @@ test "renderer emits escape sequences for text" {
 
 test "renderer merges adjacent dirty regions" {
     const allocator = std.testing.allocator;
-    var output = try ArrayList(u8).init(allocator);
+    var output = ArrayList(u8).init(allocator);
     defer output.deinit();
 
     var renderer = try Renderer.init(allocator, .{
@@ -386,6 +461,8 @@ test "renderer merges adjacent dirty regions" {
         .merge_dirty_regions = true,
     });
     defer renderer.deinit();
+
+    try renderer.flush(); // consume initial full redraw
 
     var frame = renderer.beginFrame();
     _ = try frame.writeText(0, 0, "AB", Style.default());
@@ -399,7 +476,7 @@ test "renderer merges adjacent dirty regions" {
 
 test "renderer resize triggers full redraw" {
     const allocator = std.testing.allocator;
-    var output = try ArrayList(u8).init(allocator);
+    var output = ArrayList(u8).init(allocator);
     defer output.deinit();
 
     var renderer = try Renderer.init(allocator, .{
@@ -416,4 +493,117 @@ test "renderer resize triggers full redraw" {
     try std.testing.expect(stats.last_cells_covered == 24);
     try std.testing.expect(stats.last_dirty_regions == 1);
     try std.testing.expect(stats.resizes == 1);
+}
+
+test "renderer golden: full-frame ascii output" {
+    const allocator = std.testing.allocator;
+    var output = ArrayList(u8).init(allocator);
+    defer output.deinit();
+
+    var renderer = try Renderer.init(allocator, .{
+        .size = Size.init(4, 1),
+        .target = .{ .buffer = &output },
+        .cursor_visible = false,
+    });
+    defer renderer.deinit();
+
+    var frame = renderer.beginFrame();
+    _ = try frame.writeText(0, 0, "Hi", Style.default());
+
+    try renderer.flush();
+
+    // Cursor position at line/col 1, a leading style reset, the two glyphs,
+    // two blank cells filling the row, and a trailing style reset.
+    try std.testing.expectEqualStrings("\x1b[1;1H\x1b[0mHi  \x1b[0m", output.items);
+}
+
+test "renderer golden: style reset between differing cells" {
+    const allocator = std.testing.allocator;
+    var output = ArrayList(u8).init(allocator);
+    defer output.deinit();
+
+    var renderer = try Renderer.init(allocator, .{
+        .size = Size.init(2, 1),
+        .target = .{ .buffer = &output },
+        .cursor_visible = false,
+    });
+    defer renderer.deinit();
+
+    var frame = renderer.beginFrame();
+    _ = try frame.writeText(0, 0, "A", Style.default().withBold());
+    _ = try frame.writeText(1, 0, "B", Style.default());
+
+    try renderer.flush();
+
+    // Bold cell emits reset+bold, the default cell re-resets before "B",
+    // and the row ends with a final reset.
+    try std.testing.expectEqualStrings("\x1b[1;1H\x1b[0m\x1b[1mA\x1b[0mB\x1b[0m", output.items);
+}
+
+test "renderer golden: wide grapheme is not duplicated" {
+    const allocator = std.testing.allocator;
+    var output = ArrayList(u8).init(allocator);
+    defer output.deinit();
+
+    var renderer = try Renderer.init(allocator, .{
+        .size = Size.init(4, 1),
+        .target = .{ .buffer = &output },
+        .cursor_visible = false,
+    });
+    defer renderer.deinit();
+
+    const needle = "世";
+    var frame = renderer.beginFrame();
+    _ = try frame.writeText(0, 0, needle, Style.default());
+
+    const first = frame.getCell(0, 0).?;
+    try std.testing.expectEqualStrings(needle, first.char.grapheme);
+
+    // A wide grapheme occupies a continuation cell that render must skip so the
+    // glyph is not written twice across the grapheme boundary.
+    if (first.width > 1) {
+        const cont = frame.getCell(1, 0).?;
+        try std.testing.expect(cont.char == .continuation);
+    }
+
+    try renderer.flush();
+
+    const idx = std.mem.indexOf(u8, output.items, needle).?;
+    try std.testing.expect(std.mem.indexOfPos(u8, output.items, idx + needle.len, needle) == null);
+}
+
+test "renderer diagnostics report merged regions and budget" {
+    const allocator = std.testing.allocator;
+    var output = ArrayList(u8).init(allocator);
+    defer output.deinit();
+
+    var renderer = try Renderer.init(allocator, .{
+        .size = Size.init(10, 3),
+        .target = .{ .buffer = &output },
+        .merge_dirty_regions = true,
+        .frame_budget_ns = 0, // disable over-budget accounting for determinism
+    });
+    defer renderer.deinit();
+
+    try renderer.flush(); // consume initial full redraw
+
+    var frame = renderer.beginFrame();
+    _ = try frame.writeText(0, 0, "AB", Style.default());
+    try renderer.flush();
+
+    const diag = renderer.lastFrameDiagnostics();
+    // Two per-cell dirty regions submitted, merged down to one emitted region.
+    try std.testing.expectEqual(@as(usize, 2), diag.input_regions);
+    try std.testing.expectEqual(@as(usize, 1), diag.merged_regions);
+    try std.testing.expectEqual(@as(usize, 1), diag.regions_merged_away);
+    try std.testing.expectEqual(@as(u64, 2), diag.cells_covered);
+    // Budget disabled, so no frame is ever flagged over-budget.
+    try std.testing.expect(!diag.over_budget);
+    try std.testing.expectEqual(@as(u64, 0), renderer.getStats().over_budget_frames);
+
+    // The formatted summary surfaces the region transition.
+    var allocating = std.Io.Writer.Allocating.init(allocator);
+    defer allocating.deinit();
+    try diag.format(&allocating.writer);
+    try std.testing.expect(std.mem.indexOf(u8, allocating.written(), "regions 2->1") != null);
 }

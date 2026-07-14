@@ -56,6 +56,14 @@ pub const Input = struct {
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
 
+    /// Serializable snapshot of cursor, selection, and scroll (see
+    /// `StatefulWidget`). Does not include the text buffer itself.
+    pub const State = struct {
+        cursor_pos: usize = 0,
+        selection_start: ?usize = null,
+        scroll_offset: usize = 0,
+    };
+
     const vtable = Widget.WidgetVTable{
         .render = render,
         .handleEvent = handleEvent,
@@ -194,6 +202,23 @@ pub const Input = struct {
     pub fn selectAll(self: *Input) void {
         self.selection_start = 0;
         self.cursor_pos = self.text.items.len;
+    }
+
+    /// Capture cursor, selection, and scroll offset.
+    pub fn state(self: *const Input) State {
+        return .{
+            .cursor_pos = self.cursor_pos,
+            .selection_start = self.selection_start,
+            .scroll_offset = self.scroll_offset,
+        };
+    }
+
+    /// Restore a snapshot, clamping cursor/selection to the current text length.
+    pub fn applyState(self: *Input, new_state: State) void {
+        const len = self.text.items.len;
+        self.cursor_pos = @min(new_state.cursor_pos, len);
+        self.selection_start = if (new_state.selection_start) |s| @min(s, len) else null;
+        self.scroll_offset = new_state.scroll_offset;
     }
 
     pub fn setClipboardManager(self: *Input, manager: *clipboard.ClipboardManager) void {
@@ -578,12 +603,12 @@ pub const Input = struct {
 // Example callback functions
 fn exampleOnChange(input: *Input, text: []const u8) void {
     _ = input;
-    std.debug.print("Input changed: '{}'\n", .{text});
+    std.debug.print("Input changed: '{s}'\n", .{text});
 }
 
 fn exampleOnSubmit(input: *Input, text: []const u8) void {
     _ = input;
-    std.debug.print("Input submitted: '{}'\n", .{text});
+    std.debug.print("Input submitted: '{s}'\n", .{text});
 }
 
 test "Input widget creation" {
@@ -629,4 +654,30 @@ test "Input widget cursor movement" {
 
     input.moveCursorRight();
     try std.testing.expect(input.cursor_pos == 5);
+}
+
+test "Input state round-trips and clamps cursor on restore" {
+    const allocator = std.testing.allocator;
+
+    const input = try Input.init(allocator);
+    defer input.widget.deinit();
+
+    try input.setText("Hello");
+    input.cursor_pos = 3;
+    input.selection_start = 1;
+
+    const snap = input.state();
+    try std.testing.expectEqual(@as(usize, 3), snap.cursor_pos);
+    try std.testing.expectEqual(@as(?usize, 1), snap.selection_start);
+
+    input.moveCursorHome();
+    input.selection_start = null;
+    input.applyState(snap);
+    try std.testing.expectEqual(@as(usize, 3), input.cursor_pos);
+    try std.testing.expectEqual(@as(?usize, 1), input.selection_start);
+
+    // Out-of-range snapshot clamps into the current text length ("Hello" = 5).
+    input.applyState(.{ .cursor_pos = 99, .selection_start = 99 });
+    try std.testing.expectEqual(@as(usize, 5), input.cursor_pos);
+    try std.testing.expectEqual(@as(?usize, 5), input.selection_start);
 }

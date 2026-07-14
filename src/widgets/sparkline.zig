@@ -10,6 +10,17 @@ const Style = phantom.Style;
 const Buffer = phantom.Buffer;
 const Cell = phantom.Cell;
 
+/// Glyph set used to render sample levels. Variants trade fidelity for terminal
+/// compatibility.
+pub const SparklineStyle = enum {
+    /// Eight-level Unicode block ramp: ▁▂▃▄▅▆▇█ (default, highest fidelity).
+    blocks,
+    /// Four-level Unicode shade ramp: ░▒▓█ (coarser, distinct texture).
+    shades,
+    /// ASCII-only ramp: ._-=+*#@ for terminals without Unicode support.
+    ascii,
+};
+
 /// Sparkline widget for compact trend visualization
 pub const Sparkline = struct {
     allocator: std.mem.Allocator,
@@ -18,6 +29,7 @@ pub const Sparkline = struct {
     style: Style,
     show_baseline: bool,
     baseline_char: u21,
+    render_style: SparklineStyle,
 
     /// Initialize Sparkline
     pub fn init(allocator: std.mem.Allocator, data: []f64) Sparkline {
@@ -28,6 +40,7 @@ pub const Sparkline = struct {
             .style = Style.default(),
             .show_baseline = false,
             .baseline_char = '─',
+            .render_style = .blocks,
         };
     }
 
@@ -51,6 +64,11 @@ pub const Sparkline = struct {
         self.style = self.style.withFg(color);
     }
 
+    /// Select the glyph ramp used to render samples.
+    pub fn setRenderStyle(self: *Sparkline, render_style: SparklineStyle) void {
+        self.render_style = render_style;
+    }
+
     /// Calculate maximum value from data
     fn calculateMaxValue(self: *const Sparkline) f64 {
         if (self.max_value) |max| return max;
@@ -66,25 +84,41 @@ pub const Sparkline = struct {
 
     /// Get sparkline character for value
     fn getSparkChar(self: *const Sparkline, value: f64, max_val: f64) u21 {
-        _ = self;
-
         if (max_val == 0.0 or value <= 0.0) return ' ';
 
         const normalized = value / max_val;
-        const level = @as(u8, @intFromFloat(normalized * 8.0));
 
-        // Unicode block characters from empty to full
-        return switch (level) {
-            0 => ' ',  // Empty
-            1 => '▁', // 1/8
-            2 => '▂', // 2/8
-            3 => '▃', // 3/8
-            4 => '▄', // 4/8
-            5 => '▅', // 5/8
-            6 => '▆', // 6/8
-            7 => '▇', // 7/8
-            else => '█', // Full
-        };
+        switch (self.render_style) {
+            .blocks => {
+                // Any positive value maps to at least the lowest block (level 1)
+                // so small-but-nonzero samples are visible rather than blank.
+                const level = @min(8, @max(1, @as(u8, @intFromFloat(@ceil(normalized * 8.0)))));
+                return switch (level) {
+                    1 => '▁', // 1/8
+                    2 => '▂', // 2/8
+                    3 => '▃', // 3/8
+                    4 => '▄', // 4/8
+                    5 => '▅', // 5/8
+                    6 => '▆', // 6/8
+                    7 => '▇', // 7/8
+                    else => '█', // Full
+                };
+            },
+            .shades => {
+                const level = @min(4, @max(1, @as(u8, @intFromFloat(@ceil(normalized * 4.0)))));
+                return switch (level) {
+                    1 => '░', // light
+                    2 => '▒', // medium
+                    3 => '▓', // dark
+                    else => '█', // full
+                };
+            },
+            .ascii => {
+                const ramp = [_]u21{ '.', '_', '-', '=', '+', '*', '#', '@' };
+                const level = @min(ramp.len, @max(1, @as(usize, @intFromFloat(@ceil(normalized * @as(f64, @floatFromInt(ramp.len)))))));
+                return ramp[level - 1];
+            },
+        }
     }
 
     /// Render the Sparkline
@@ -209,6 +243,30 @@ test "Sparkline character mapping" {
     try testing.expectEqual(@as(u21, '▁'), sparkline.getSparkChar(1.0, 10.0));
     try testing.expectEqual(@as(u21, '▄'), sparkline.getSparkChar(5.0, 10.0));
     try testing.expectEqual(@as(u21, '█'), sparkline.getSparkChar(10.0, 10.0));
+}
+
+test "Sparkline shade style character mapping" {
+    const testing = std.testing;
+
+    const data = [_]f64{0.0};
+    var sparkline = Sparkline.init(testing.allocator, @constCast(&data));
+    sparkline.setRenderStyle(.shades);
+
+    try testing.expectEqual(@as(u21, ' '), sparkline.getSparkChar(0.0, 10.0));
+    try testing.expectEqual(@as(u21, '░'), sparkline.getSparkChar(1.0, 10.0));
+    try testing.expectEqual(@as(u21, '█'), sparkline.getSparkChar(10.0, 10.0));
+}
+
+test "Sparkline ascii style character mapping" {
+    const testing = std.testing;
+
+    const data = [_]f64{0.0};
+    var sparkline = Sparkline.init(testing.allocator, @constCast(&data));
+    sparkline.setRenderStyle(.ascii);
+
+    try testing.expectEqual(@as(u21, ' '), sparkline.getSparkChar(0.0, 10.0));
+    try testing.expectEqual(@as(u21, '.'), sparkline.getSparkChar(1.0, 10.0));
+    try testing.expectEqual(@as(u21, '@'), sparkline.getSparkChar(10.0, 10.0));
 }
 
 test "Sparkline from window" {

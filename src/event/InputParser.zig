@@ -310,7 +310,7 @@ test "InputParser maps printable characters" {
 
     try testing.expectEqual(@as(usize, 1), queue.size());
     const queued = queue.popEvent().?;
-    try testing.expect(queued.event == Event.fromKey(Key{ .char = 'a' }));
+    try testing.expect(std.meta.eql(queued.event, Event.fromKey(Key{ .char = 'a' })));
 }
 
 test "InputParser parses arrow keys" {
@@ -323,7 +323,7 @@ test "InputParser parses arrow keys" {
 
     try testing.expectEqual(@as(usize, 1), queue.size());
     const queued = queue.popEvent().?;
-    try testing.expect(queued.event == Event.fromKey(Key.up));
+    try testing.expect(std.meta.eql(queued.event, Event.fromKey(Key.up)));
 }
 
 test "InputParser flushes standalone escape" {
@@ -340,5 +340,5 @@ test "InputParser flushes standalone escape" {
 
     try testing.expectEqual(@as(usize, 1), queue.size());
     const queued = queue.popEvent().?;
-    try testing.expect(queued.event == Event.fromKey(Key.escape));
+    try testing.expect(std.meta.eql(queued.event, Event.fromKey(Key.escape)));
 }

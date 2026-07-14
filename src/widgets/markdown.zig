@@ -16,10 +16,10 @@ const Color = phantom.Color;
 /// Markdown block type
 pub const MarkdownBlockKind = enum {
     paragraph,
-    heading,      // # Heading
-    code_block,   // ```code```
-    quote,        // > Quote
-    list_item,    // - Item or 1. Item
+    heading, // # Heading
+    code_block, // ```code```
+    quote, // > Quote
+    list_item, // - Item or 1. Item
     horizontal_rule, // ---
 };
 
@@ -27,7 +27,7 @@ pub const MarkdownBlockKind = enum {
 pub const InlineStyle = struct {
     bold: bool = false,
     italic: bool = false,
-    code: bool = false,       // `code`
+    code: bool = false, // `code`
     link: bool = false,
     strikethrough: bool = false,
 
@@ -46,9 +46,9 @@ pub const InlineStyle = struct {
 pub const MarkdownBlock = struct {
     kind: MarkdownBlockKind,
     content: []const u8,
-    level: usize = 0,         // Heading level (1-6) or list indent
+    level: usize = 0, // Heading level (1-6) or list indent
     language: ?[]const u8 = null, // Code block language
-    ordered: bool = false,    // Ordered vs unordered list
+    ordered: bool = false, // Ordered vs unordered list
 };
 
 /// Configuration for Markdown viewer
@@ -94,7 +94,7 @@ pub const Markdown = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
 
-    blocks: std.ArrayList(MarkdownBlock),
+    blocks: std.array_list.Managed(MarkdownBlock),
     scroll_offset: usize,
     viewport_height: u16,
 
@@ -112,7 +112,7 @@ pub const Markdown = struct {
         md.* = .{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .blocks = std.ArrayList(MarkdownBlock).init(allocator),
+            .blocks = std.array_list.Managed(MarkdownBlock).init(allocator),
             .scroll_offset = 0,
             .viewport_height = 10,
             .config = config,
@@ -133,7 +133,7 @@ pub const Markdown = struct {
 
         var in_code_block = false;
         var code_language: ?[]const u8 = null;
-        var code_lines = std.ArrayList(u8).init(self.allocator);
+        var code_lines = std.array_list.Managed(u8).init(self.allocator);
         defer code_lines.deinit();
 
         while (lines.next()) |line| {
@@ -365,10 +365,22 @@ pub const Markdown = struct {
         switch (event) {
             .key => |key| {
                 switch (key) {
-                    .up, .char => |c| {
-                        if (key == .up or (key == .char and c == 'k')) {
+                    .up => {
+                        if (self.scroll_offset > 0) {
+                            self.scroll_offset -= 1;
+                        }
+                        return true;
+                    },
+                    .char => |c| {
+                        if (c == 'k') {
                             if (self.scroll_offset > 0) {
                                 self.scroll_offset -= 1;
+                            }
+                            return true;
+                        }
+                        if (c == 'j') {
+                            if (self.scroll_offset + self.viewport_height < self.blocks.items.len) {
+                                self.scroll_offset += 1;
                             }
                             return true;
                         }
@@ -398,17 +410,7 @@ pub const Markdown = struct {
                         self.scroll_offset = self.blocks.items.len -| self.viewport_height;
                         return true;
                     },
-                    else => {
-                        if (key == .char) {
-                            const c = key.char;
-                            if (c == 'j') {
-                                if (self.scroll_offset + self.viewport_height < self.blocks.items.len) {
-                                    self.scroll_offset += 1;
-                                }
-                                return true;
-                            }
-                        }
-                    },
+                    else => {},
                 }
             },
             .mouse => |mouse| {

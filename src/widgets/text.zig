@@ -121,3 +121,33 @@ test "Text widget style setting" {
 
     try std.testing.expect(text.text_style.fg.? == style.Color.red);
 }
+
+const snapshot = @import("../testing/snapshot.zig");
+
+test "Text snapshot: left-aligned at normal size" {
+    const text = try Text.init(std.testing.allocator, "Hi");
+    defer text.widget.deinit();
+    try snapshot.expectRender(std.testing.allocator, &text.widget, 5, 1, "Hi");
+}
+
+test "Text snapshot: clipped at small width" {
+    const text = try Text.init(std.testing.allocator, "Hello");
+    defer text.widget.deinit();
+    // Only the first 3 codepoints fit in a width-3 area.
+    try snapshot.expectRender(std.testing.allocator, &text.widget, 3, 1, "Hel");
+}
+
+test "Text snapshot: centered leaves leading pad" {
+    const text = try Text.init(std.testing.allocator, "Hi");
+    defer text.widget.deinit();
+    text.setAlignment(.center);
+    // (6-2)/2 = 2 leading spaces; trailing spaces trimmed away.
+    try snapshot.expectRender(std.testing.allocator, &text.widget, 6, 1, "  Hi");
+}
+
+test "Text snapshot: oversized area leaves blank rows" {
+    const text = try Text.init(std.testing.allocator, "Hi");
+    defer text.widget.deinit();
+    // Content only on the first row; the rest trim to empty lines.
+    try snapshot.expectRender(std.testing.allocator, &text.widget, 6, 3, "Hi\n\n");
+}

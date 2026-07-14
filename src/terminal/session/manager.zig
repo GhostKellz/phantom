@@ -239,7 +239,12 @@ pub const Session = struct {
     }
 
     pub fn stop(self: *Session) void {
-        if (!self.running.swap(false, .acquire)) return;
+        // Always signal the loop to stop and tear down the reader task, even if
+        // the reader already cleared `running` on child exit. Gating cleanup on
+        // the previous `running` value would leak the reader task's future
+        // whenever the child exited before an explicit stop. Cleanup is
+        // idempotent: the handle and pty session are nulled after teardown.
+        self.running.store(false, .release);
 
         if (self.reader_task) |*task| {
             task.cancel();
@@ -316,7 +321,11 @@ fn readerLoop(sess: *Session) !void {
 
         const amount = child.read(&buffer) catch |err| switch (err) {
             else => {
-                const status = child.pollExit() catch {
+                // A read failure (e.g. EIO once the slave closes) means the child
+                // is gone. Block on wait() to reap the real exit status; a
+                // non-blocking poll here races the child becoming waitable and
+                // would spuriously report `.still_running`.
+                const status = child.wait() catch {
                     sess.notifyExit(.still_running);
                     sess.running.store(false, .release);
                     return;
@@ -564,4 +573,190 @@ test "Manager resize propagates to interactive PTY session" {
     }
 
     try testing.expect(std.mem.indexOf(u8, buffer.items, "33 91") != null);
+}
+
+test "Session reports non-zero exit status on command failure" {
+    if (builtin.os.tag == .windows) return;
+
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var runtime = try AsyncRuntime.init(allocator, .{ .worker_threads = 1 });
+    defer runtime.deinit();
+    try runtime.start();
+    defer runtime.shutdown();
+
+    var metrics = Metrics{};
+
+    var session = try Session.init(allocator, runtime, .{
+        .command = &.{ "/bin/sh", "-c", "exit 3" },
+        .columns = 80,
+        .rows = 24,
+    }, &metrics);
+    defer session.deinit();
+
+    try session.start();
+    const channel = session.channel();
+
+    var exit_status: ?types.ExitStatus = null;
+    var iterations: usize = 0;
+    while (exit_status == null and iterations < 400) : (iterations += 1) {
+        if (try channel.tryReceive()) |event| {
+            switch (event) {
+                .data => |payload| allocator.free(payload),
+                .exit => |status| exit_status = status,
+            }
+        } else {
+            time_utils.sleepMs(5);
+        }
+    }
+
+    try testing.expect(exit_status != null);
+    switch (exit_status.?) {
+        .exited => |code| try testing.expectEqual(@as(u8, 3), code),
+        else => try testing.expect(false),
+    }
+}
+
+test "Session round-trips written input through the PTY" {
+    if (builtin.os.tag == .windows) return;
+
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var runtime = try AsyncRuntime.init(allocator, .{ .worker_threads = 1 });
+    defer runtime.deinit();
+    try runtime.start();
+    defer runtime.shutdown();
+
+    var metrics = Metrics{};
+
+    // Read a line of pasted input and echo it back wrapped in markers, then exit.
+    var session = try Session.init(allocator, runtime, .{
+        .command = &.{ "/bin/sh", "-c", "read line; printf '[%s]' \"$line\"" },
+        .columns = 80,
+        .rows = 24,
+    }, &metrics);
+    defer session.deinit();
+
+    try session.start();
+    const channel = session.channel();
+
+    const written = try session.write("phantom-paste\n");
+    try testing.expect(written > 0);
+
+    var buffer = ArrayList(u8).init(allocator);
+    defer buffer.deinit();
+
+    var iterations: usize = 0;
+    while (std.mem.indexOf(u8, buffer.items, "[phantom-paste]") == null and iterations < 400) : (iterations += 1) {
+        if (try channel.tryReceive()) |event| {
+            switch (event) {
+                .data => |payload| {
+                    defer allocator.free(payload);
+                    try buffer.appendSlice(payload);
+                },
+                .exit => {},
+            }
+        } else {
+            time_utils.sleepMs(5);
+        }
+    }
+
+    try testing.expect(std.mem.indexOf(u8, buffer.items, "[phantom-paste]") != null);
+    try testing.expect(metrics.bytes_written.load(.acquire) >= written);
+}
+
+test "Session delivers large output without dropping the tail" {
+    if (builtin.os.tag == .windows) return;
+
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var runtime = try AsyncRuntime.init(allocator, .{ .worker_threads = 1 });
+    defer runtime.deinit();
+    try runtime.start();
+    defer runtime.shutdown();
+
+    var metrics = Metrics{};
+
+    // Emit a long, deterministic stream. The final marker proves the tail
+    // survived the channel round-trip.
+    var session = try Session.init(allocator, runtime, .{
+        .command = &.{ "/bin/sh", "-c", "i=1; while [ $i -le 500 ]; do echo line-$i; i=$((i+1)); done; echo DONE-MARKER" },
+        .columns = 80,
+        .rows = 24,
+    }, &metrics);
+    defer session.deinit();
+
+    try session.start();
+    const channel = session.channel();
+
+    var buffer = ArrayList(u8).init(allocator);
+    defer buffer.deinit();
+
+    var saw_exit = false;
+    var iterations: usize = 0;
+    while ((!saw_exit or std.mem.indexOf(u8, buffer.items, "DONE-MARKER") == null) and iterations < 2000) : (iterations += 1) {
+        if (try channel.tryReceive()) |event| {
+            switch (event) {
+                .data => |payload| {
+                    defer allocator.free(payload);
+                    try buffer.appendSlice(payload);
+                },
+                .exit => saw_exit = true,
+            }
+        } else {
+            time_utils.sleepMs(2);
+        }
+    }
+
+    try testing.expect(std.mem.indexOf(u8, buffer.items, "line-1\r") != null);
+    try testing.expect(std.mem.indexOf(u8, buffer.items, "line-500") != null);
+    try testing.expect(std.mem.indexOf(u8, buffer.items, "DONE-MARKER") != null);
+    try testing.expect(metrics.bytes_read.load(.acquire) > 0);
+}
+
+test "Session recycles data events without leaking payloads" {
+    if (builtin.os.tag == .windows) return;
+
+    const testing = std.testing;
+    const allocator = testing.allocator;
+
+    var runtime = try AsyncRuntime.init(allocator, .{ .worker_threads = 1 });
+    defer runtime.deinit();
+    try runtime.start();
+    defer runtime.shutdown();
+
+    var metrics = Metrics{};
+
+    var session = try Session.init(allocator, runtime, .{
+        .command = &.{ "/bin/sh", "-c", "i=1; while [ $i -le 50 ]; do echo chunk-$i; i=$((i+1)); done" },
+        .columns = 80,
+        .rows = 24,
+    }, &metrics);
+    defer session.deinit();
+
+    try session.start();
+    const channel = session.channel();
+
+    // Return every payload to the session via recycleEvent; the testing
+    // allocator asserts nothing is leaked once the loop drains.
+    var data_events: usize = 0;
+    var saw_exit = false;
+    var iterations: usize = 0;
+    while (!saw_exit and iterations < 1000) : (iterations += 1) {
+        if (try channel.tryReceive()) |event| {
+            switch (event) {
+                .data => data_events += 1,
+                .exit => saw_exit = true,
+            }
+            session.recycleEvent(event);
+        } else {
+            time_utils.sleepMs(2);
+        }
+    }
+
+    try testing.expect(saw_exit);
+    try testing.expect(data_events > 0);
 }

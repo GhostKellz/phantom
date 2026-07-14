@@ -677,7 +677,7 @@ fn expectRgb(color: Color, r: u8, g: u8, b: u8) !void {
 
 test "manifest parse and validate" {
     const json =
-        \\\{
+        \\{
         \\  "name": "Phantom Dark",
         \\  "description": "Default dark manifest prototype",
         \\  "variant": "dark",
@@ -747,7 +747,7 @@ test "manifest parse and validate" {
 
 test "manifest validation detects missing tokens" {
     const json =
-        \\\{
+        \\{
         \\  "name": "Incomplete",
         \\  "palette": {
         \\    "accent": "#ffffff"

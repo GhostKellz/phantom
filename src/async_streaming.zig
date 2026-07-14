@@ -11,7 +11,7 @@ const StreamingText = @import("widgets/streaming_text.zig").StreamingText;
 pub const AsyncStreamConsumer = struct {
     allocator: std.mem.Allocator,
     widget: *StreamingText,
-    channel: zsync.channels_mod.Channel([]const u8),
+    channel: zsync.Channel([]const u8),
     runtime: *async_mod.AsyncRuntime,
     running: std.atomic.Value(bool),
     consumer_task: ?ConsumerTaskHandle = null,
@@ -26,7 +26,7 @@ pub const AsyncStreamConsumer = struct {
         const self = try allocator.create(AsyncStreamConsumer);
 
         // Create unbounded channel for streaming chunks
-        const channel = try zsync.channels_mod.Channel([]const u8).init(allocator, default_channel_capacity);
+        const channel = try zsync.channels.bounded([]const u8, allocator, default_channel_capacity);
 
         self.* = AsyncStreamConsumer{
             .allocator = allocator,
@@ -46,7 +46,6 @@ pub const AsyncStreamConsumer = struct {
         while (consumer.running.load(.acquire)) {
             const chunk = consumer.channel.recv() catch |err| switch (err) {
                 error.ChannelClosed => break,
-                else => return err,
             };
 
             try consumer.widget.addChunk(chunk);
@@ -286,6 +285,18 @@ pub fn simulateAIChatResponse(
 }
 
 // Tests
+const StreamingTextWidget = @import("widgets/streaming_text.zig").StreamingText;
+
+var test_received_buf: [256]u8 = undefined;
+var test_received_len: usize = 0;
+
+fn testOnChunk(_: *StreamingTextWidget, chunk: []const u8) void {
+    const end = @min(test_received_len + chunk.len, test_received_buf.len);
+    const n = end - test_received_len;
+    @memcpy(test_received_buf[test_received_len..end], chunk[0..n]);
+    test_received_len = end;
+}
+
 test "AsyncStreamConsumer basic operation" {
     const testing = std.testing;
     const allocator = testing.allocator;
@@ -298,8 +309,13 @@ test "AsyncStreamConsumer basic operation" {
     defer rt.shutdown();
 
     // Create widget
-    var widget = try @import("widgets/streaming_text.zig").StreamingText.init(allocator);
-    defer widget.deinit();
+    var widget = try StreamingTextWidget.init(allocator);
+    defer widget.widget.deinit();
+
+    // Capture chunks as they are delivered (addChunk fires this synchronously,
+    // before stopStreaming clears the widget's internal buffer).
+    test_received_len = 0;
+    widget.setOnChunk(testOnChunk);
 
     // Create consumer
     var consumer = try AsyncStreamConsumer.init(allocator, rt, widget);
@@ -319,8 +335,8 @@ test "AsyncStreamConsumer basic operation" {
     // Stop
     consumer.stop();
 
-    // Verify text was received
-    const text = widget.getText();
+    // Verify text was received via the chunk callback.
+    const text = test_received_buf[0..test_received_len];
     try testing.expect(std.mem.indexOf(u8, text, "Hello") != null);
     try testing.expect(std.mem.indexOf(u8, text, "World") != null);
 }

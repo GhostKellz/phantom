@@ -170,6 +170,73 @@ pub const Widget = struct {
     }
 };
 
+/// Compile-time contract for widgets that expose a serializable snapshot of
+/// their navigation/view state (selection, cursor, scroll offset, ...).
+///
+/// A conforming widget `T` declares:
+///   - `pub const State = struct { ... }` — a plain-data snapshot
+///   - `pub fn state(self: *const T) T.State` — capture current state
+///   - `pub fn applyState(self: *T, new_state: T.State) void` — restore it
+///
+/// State is intentionally captured by concrete type (not type-erased through
+/// the `Widget` vtable): callers hold the concrete widget to save/restore its
+/// navigation, e.g. across data reloads or layout changes. `List`, `Table`,
+/// `Tabs`, `ScrollView`, `TextArea`, and `Input` all conform.
+pub const StatefulWidget = struct {
+    /// True if `T` satisfies the stateful-widget contract.
+    pub fn conforms(comptime T: type) bool {
+        if (!@hasDecl(T, "State") or !@hasDecl(T, "state") or !@hasDecl(T, "applyState")) return false;
+
+        const state_fn = switch (@typeInfo(@TypeOf(T.state))) {
+            .@"fn" => |f| f,
+            else => return false,
+        };
+        const ret = state_fn.return_type orelse return false;
+        if (ret != T.State) return false;
+
+        const apply_fn = switch (@typeInfo(@TypeOf(T.applyState))) {
+            .@"fn" => |f| f,
+            else => return false,
+        };
+        if (apply_fn.param_types.len != 2) return false;
+        const arg = apply_fn.param_types[1] orelse return false;
+        if (arg != T.State) return false;
+
+        return true;
+    }
+
+    /// Fail compilation with a precise message if `T` does not conform.
+    pub fn assert(comptime T: type) void {
+        if (!@hasDecl(T, "State"))
+            @compileError(@typeName(T) ++ " is not a StatefulWidget: missing `pub const State`");
+        if (!@hasDecl(T, "state"))
+            @compileError(@typeName(T) ++ " is not a StatefulWidget: missing `pub fn state()`");
+        if (!@hasDecl(T, "applyState"))
+            @compileError(@typeName(T) ++ " is not a StatefulWidget: missing `pub fn applyState()`");
+        if (!comptime conforms(T))
+            @compileError(@typeName(T) ++ " StatefulWidget signatures must be " ++
+                "`state(*const T) T.State` and `applyState(*T, T.State) void`");
+    }
+};
+
+test "StatefulWidget contract detects conforming and non-conforming types" {
+    const Good = struct {
+        pub const State = struct { x: u16 = 0 };
+        value: u16 = 0,
+        pub fn state(self: *const @This()) State {
+            return .{ .x = self.value };
+        }
+        pub fn applyState(self: *@This(), new_state: State) void {
+            self.value = new_state.x;
+        }
+    };
+    const Bad = struct { value: u16 = 0 };
+
+    comptime StatefulWidget.assert(Good);
+    try std.testing.expect(StatefulWidget.conforms(Good));
+    try std.testing.expect(!StatefulWidget.conforms(Bad));
+}
+
 test "SizeConstraints constructors" {
     const unconstrained = SizeConstraints.unconstrained();
     try std.testing.expect(unconstrained.min_width == 0);

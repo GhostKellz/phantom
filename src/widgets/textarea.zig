@@ -128,6 +128,17 @@ pub const TextArea = struct {
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
 
+    /// Serializable snapshot of cursor, selection, and scroll (see
+    /// `StatefulWidget`). Does not include the text buffer itself.
+    pub const State = struct {
+        cursor_line: usize = 0,
+        cursor_col: usize = 0,
+        selection_start_line: ?usize = null,
+        selection_start_col: ?usize = null,
+        scroll_offset_line: usize = 0,
+        scroll_offset_col: usize = 0,
+    };
+
     const vtable = Widget.WidgetVTable{
         .render = render,
         .handleEvent = handleEvent,
@@ -265,6 +276,29 @@ pub const TextArea = struct {
         }
 
         return .{ .start = cursor, .end = anchor };
+    }
+
+    /// Capture cursor, selection, and scroll offsets.
+    pub fn state(self: *const TextArea) State {
+        return .{
+            .cursor_line = self.cursor_line,
+            .cursor_col = self.cursor_col,
+            .selection_start_line = self.selection_start_line,
+            .selection_start_col = self.selection_start_col,
+            .scroll_offset_line = self.scroll_offset_line,
+            .scroll_offset_col = self.scroll_offset_col,
+        };
+    }
+
+    /// Restore a snapshot, clamping the cursor to the current buffer bounds.
+    pub fn applyState(self: *TextArea, new_state: State) void {
+        if (self.lines.items.len == 0) return;
+        self.cursor_line = @min(new_state.cursor_line, self.lines.items.len - 1);
+        self.cursor_col = @min(new_state.cursor_col, self.lines.items[self.cursor_line].content.items.len);
+        self.selection_start_line = new_state.selection_start_line;
+        self.selection_start_col = new_state.selection_start_col;
+        self.scroll_offset_line = new_state.scroll_offset_line;
+        self.scroll_offset_col = new_state.scroll_offset_col;
     }
 
     pub fn moveCursorTo(self: *TextArea, line: usize, column: usize) void {
@@ -581,6 +615,11 @@ pub const TextArea = struct {
         const visible_height = if (self.area.height > 2) self.area.height - 2 else 0;
         const visible_width = self.getTextWidth();
 
+        // Before the first layout the viewport is empty; scrolling math would
+        // divide the document against a zero-height window and wrongly advance
+        // the offset. Leave the offsets untouched until render assigns an area.
+        if (visible_height == 0 or visible_width == 0) return;
+
         // Vertical scrolling
         if (self.cursor_line < self.scroll_offset_line) {
             self.scroll_offset_line = self.cursor_line;
@@ -838,4 +877,30 @@ test "TextArea widget text manipulation" {
     const text = try textarea.getText();
     defer allocator.free(text);
     try std.testing.expectEqualStrings("Line 1\nLine 2\nLine 3", text);
+}
+
+test "TextArea state round-trips and clamps cursor on restore" {
+    const allocator = std.testing.allocator;
+
+    const textarea = try TextArea.init(allocator);
+    defer textarea.widget.deinit();
+
+    try textarea.setText("Line 1\nLine 2\nLine 3");
+    textarea.moveCursorTo(1, 4);
+    textarea.scroll_offset_line = 1;
+
+    const snap = textarea.state();
+    try std.testing.expectEqual(@as(usize, 1), snap.cursor_line);
+    try std.testing.expectEqual(@as(usize, 4), snap.cursor_col);
+
+    textarea.moveCursorTo(0, 0);
+    textarea.applyState(snap);
+    try std.testing.expectEqual(@as(usize, 1), textarea.cursor_line);
+    try std.testing.expectEqual(@as(usize, 4), textarea.cursor_col);
+    try std.testing.expectEqual(@as(usize, 1), textarea.scroll_offset_line);
+
+    // Out-of-range cursor clamps into the current buffer bounds.
+    textarea.applyState(.{ .cursor_line = 99, .cursor_col = 99 });
+    try std.testing.expectEqual(@as(usize, 2), textarea.cursor_line);
+    try std.testing.expectEqual(@as(usize, 6), textarea.cursor_col); // "Line 3".len
 }

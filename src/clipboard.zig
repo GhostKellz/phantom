@@ -94,116 +94,74 @@ pub const Clipboard = struct {
         };
     }
     
+    /// Spawn a process, feed `text` to its stdin, and wait for success.
+    fn feedProcess(self: *Clipboard, argv: []const []const u8, text: []const u8) ClipboardError!void {
+        _ = self;
+        const io = std.Io.Threaded.global_single_threaded.io();
+        var child = std.process.spawn(io, .{
+            .argv = argv,
+            .stdin = .pipe,
+            .stdout = .ignore,
+            .stderr = .ignore,
+        }) catch return ClipboardError.SystemError;
+        defer child.kill(io);
+
+        if (child.stdin) |stdin| {
+            var write_buf: [256]u8 = undefined;
+            var writer = stdin.writer(io, &write_buf);
+            writer.interface.writeAll(text) catch {};
+            writer.interface.flush() catch {};
+            stdin.close(io);
+            child.stdin = null;
+        }
+
+        const term = child.wait(io) catch return ClipboardError.SystemError;
+        if (term != .exited or term.exited != 0) return ClipboardError.SystemError;
+    }
+
+    /// Spawn a process and capture its stdout, returning an owned copy.
+    fn captureProcess(self: *Clipboard, argv: []const []const u8) ClipboardError![]u8 {
+        const io = std.Io.Threaded.global_single_threaded.io();
+        var child = std.process.spawn(io, .{
+            .argv = argv,
+            .stdout = .pipe,
+            .stderr = .ignore,
+        }) catch return ClipboardError.SystemError;
+        defer child.kill(io);
+
+        var buffer: [8192]u8 = undefined;
+        var reader_buf: [256]u8 = undefined;
+        var reader = child.stdout.?.reader(io, &reader_buf);
+        const bytes_read = reader.interface.readSliceShort(&buffer) catch
+            return ClipboardError.SystemError;
+
+        const term = child.wait(io) catch return ClipboardError.SystemError;
+        if (term != .exited or term.exited != 0) return ClipboardError.SystemError;
+
+        return self.allocator.dupe(u8, buffer[0..bytes_read]) catch ClipboardError.OutOfMemory;
+    }
+
     // Linux implementation using xclip/xsel
     fn copyTextLinux(self: *Clipboard, text: []const u8) ClipboardError!void {
-        // Try xclip first
-        var xclip_child = std.process.Child.init(&[_][]const u8{ "xclip", "-selection", "clipboard" }, self.allocator);
-        xclip_child.stdin_behavior = .Pipe;
-        xclip_child.stdout_behavior = .Pipe;
-        xclip_child.stderr_behavior = .Pipe;
-        const xclip_result = xclip_child.spawnAndWait();
-        
-        if (xclip_result) |term| {
-            if (term == .Exited and term.Exited == 0) {
-                if (xclip_child.stdin) |stdin| {
-                    _ = stdin.writeAll(text) catch {};
-                    stdin.close();
-                }
-                return;
-            }
+        if (self.feedProcess(&[_][]const u8{ "xclip", "-selection", "clipboard" }, text)) |_| {
+            return;
         } else |_| {}
-        
-        // Fallback to xsel
-        var xsel_child = std.process.Child.init(&[_][]const u8{ "xsel", "--clipboard", "--input" }, self.allocator);
-        xsel_child.stdin_behavior = .Pipe;
-        xsel_child.stdout_behavior = .Pipe;
-        xsel_child.stderr_behavior = .Pipe;
-        const xsel_result = xsel_child.spawnAndWait();
-        
-        if (xsel_result) |term| {
-            if (term == .Exited and term.Exited == 0) {
-                if (xsel_child.stdin) |stdin| {
-                    _ = stdin.writeAll(text) catch {};
-                    stdin.close();
-                }
-                return;
-            }
+
+        if (self.feedProcess(&[_][]const u8{ "xsel", "--clipboard", "--input" }, text)) |_| {
+            return;
         } else |_| {}
-        
-        // If both fail, try using /proc/self/fd/0 approach
-        const escaped_text = ClipboardUtils.escapeForShell(self.allocator, text) catch return ClipboardError.OutOfMemory;
-        defer self.allocator.free(escaped_text);
-        const cmd = std.fmt.allocPrint(self.allocator, "echo -n '{s}' | xclip -selection clipboard", .{escaped_text}) catch return ClipboardError.OutOfMemory;
-        defer self.allocator.free(cmd);
-        
-        var proc_child = std.process.Child.init(&[_][]const u8{ "sh", "-c", cmd }, self.allocator);
-        proc_child.stdout_behavior = .Pipe;
-        proc_child.stderr_behavior = .Pipe;
-        const proc_result = proc_child.spawnAndWait();
-        
-        if (proc_result) |term| {
-            if (term == .Exited and term.Exited == 0) {
-                return;
-            }
-        } else |_| {}
-        
+
         return ClipboardError.SystemError;
     }
-    
+
     fn pasteTextLinux(self: *Clipboard) ClipboardError![]u8 {
-        // Try xclip first
-        var xclip_child = std.process.Child.init(&[_][]const u8{ "xclip", "-selection", "clipboard", "-o" }, self.allocator);
-        xclip_child.stdout_behavior = .Pipe;
-        xclip_child.stderr_behavior = .Pipe;
-        
-        const xclip_result = xclip_child.spawnAndWait();
-        
-        if (xclip_result) |term| {
-            if (term == .Exited and term.Exited == 0) {
-                if (xclip_child.stdout) |stdout| {
-                    var buffer: [8192]u8 = undefined;
-                    // Zig 0.16.0-dev: readAll removed, use reader pattern
-                    var io_threaded = std.Io.Threaded.init_single_threaded;
-                    const io = io_threaded.io();
-                    var reader_buf: [256]u8 = undefined;
-                    var reader = stdout.reader(io, &reader_buf);
-                    const bytes_read = reader.interface.readSliceShort(&buffer) catch {
-                        return ClipboardError.SystemError;
-                    };
-                    const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
-                    return output;
-                }
-            }
+        if (self.captureProcess(&[_][]const u8{ "xclip", "-selection", "clipboard", "-o" })) |output| {
+            return output;
         } else |_| {}
-        
-        // Fallback to xsel
-        var xsel_child = std.process.Child.init(&[_][]const u8{ "xsel", "--clipboard", "--output" }, self.allocator);
-        xsel_child.stdout_behavior = .Pipe;
-        xsel_child.stderr_behavior = .Pipe;
-        
-        const xsel_result = xsel_child.spawnAndWait();
-        
-        if (xsel_result) |term| {
-            if (term == .Exited and term.Exited == 0) {
-                if (xsel_child.stdout) |stdout| {
-                    var buffer: [8192]u8 = undefined;
-                    // Zig 0.16.0-dev: readAll removed, use reader pattern
-                    var io_threaded = std.Io.Threaded.init_single_threaded;
-                    const io = io_threaded.io();
-                    var reader_buf: [256]u8 = undefined;
-                    var reader = stdout.reader(io, &reader_buf);
-                    const bytes_read = reader.interface.readSliceShort(&buffer) catch {
-                        return ClipboardError.SystemError;
-                    };
-                    const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
-                    return output;
-                }
-            }
-        } else |_| {}
-        
-        return ClipboardError.SystemError;
+
+        return self.captureProcess(&[_][]const u8{ "xsel", "--clipboard", "--output" });
     }
-    
+
     fn hasTextLinux(self: *Clipboard) bool {
         const result = self.pasteTextLinux();
         if (result) |text| {
@@ -220,70 +178,13 @@ pub const Clipboard = struct {
     
     // macOS implementation using pbcopy/pbpaste
     fn copyTextMacOS(self: *Clipboard, text: []const u8) ClipboardError!void {
-        var child = std.process.Child.init(&[_][]const u8{"pbcopy"}, self.allocator);
-        child.stdin_behavior = .Pipe;
-        child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Pipe;
-        
-        const result = child.spawnAndWait();
-        
-        if (result) |term| {
-            if (term == .Exited and term.Exited == 0) {
-                if (child.stdin) |stdin| {
-                    _ = stdin.writeAll(text) catch {};
-                    stdin.close();
-                }
-                return;
-            }
-        } else |_| {}
-        
-        // Fallback using echo
-        const echo_cmd = try std.fmt.allocPrint(self.allocator, "echo -n '{s}' | pbcopy", .{text});
-        defer self.allocator.free(echo_cmd);
-        
-        var echo_child = std.process.Child.init(&[_][]const u8{ "sh", "-c", echo_cmd }, self.allocator);
-        echo_child.stdout_behavior = .Pipe;
-        echo_child.stderr_behavior = .Pipe;
-        
-        const echo_result = echo_child.spawnAndWait();
-        
-        if (echo_result) |term| {
-            if (term == .Exited and term.Exited == 0) {
-                return;
-            }
-        } else |_| {}
-        
-        return ClipboardError.SystemError;
+        return self.feedProcess(&[_][]const u8{"pbcopy"}, text);
     }
-    
+
     fn pasteTextMacOS(self: *Clipboard) ClipboardError![]u8 {
-        var child = std.process.Child.init(&[_][]const u8{"pbpaste"}, self.allocator);
-        child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Pipe;
-
-        const result = child.spawnAndWait();
-
-        if (result) |term| {
-            if (term == .Exited and term.Exited == 0) {
-                if (child.stdout) |stdout| {
-                    var buffer: [8192]u8 = undefined;
-                    // Zig 0.16.0-dev: readAll removed, use reader pattern
-                    var io_threaded = std.Io.Threaded.init_single_threaded;
-                    const io = io_threaded.io();
-                    var reader_buf: [256]u8 = undefined;
-                    var reader = stdout.reader(io, &reader_buf);
-                    const bytes_read = reader.interface.readSliceShort(&buffer) catch {
-                        return ClipboardError.SystemError;
-                    };
-                    const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
-                    return output;
-                }
-            }
-        } else |_| {}
-        
-        return ClipboardError.SystemError;
+        return self.captureProcess(&[_][]const u8{"pbpaste"});
     }
-    
+
     fn hasTextMacOS(self: *Clipboard) bool {
         const result = self.pasteTextMacOS();
         if (result) |text| {
@@ -300,52 +201,13 @@ pub const Clipboard = struct {
     
     // Windows implementation using clip.exe and powershell
     fn copyTextWindows(self: *Clipboard, text: []const u8) ClipboardError!void {
-        const cmd = try std.fmt.allocPrint(self.allocator, "echo {s} | clip", .{text});
-        defer self.allocator.free(cmd);
-        
-        var child = std.process.Child.init(&[_][]const u8{ "cmd", "/c", cmd }, self.allocator);
-        child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Pipe;
-        
-        const result = child.spawnAndWait();
-        
-        if (result) |term| {
-            if (term == .Exited and term.Exited == 0) {
-                return;
-            }
-        } else |_| {}
-        
-        return ClipboardError.SystemError;
+        return self.feedProcess(&[_][]const u8{"clip"}, text);
     }
-    
+
     fn pasteTextWindows(self: *Clipboard) ClipboardError![]u8 {
-        var child = std.process.Child.init(&[_][]const u8{ "powershell", "-Command", "Get-Clipboard" }, self.allocator);
-        child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Pipe;
-
-        const result = child.spawnAndWait();
-
-        if (result) |term| {
-            if (term == .Exited and term.Exited == 0) {
-                if (child.stdout) |stdout| {
-                    var buffer: [8192]u8 = undefined;
-                    // Zig 0.16.0-dev: readAll removed, use reader pattern
-                    var io_threaded = std.Io.Threaded.init_single_threaded;
-                    const io = io_threaded.io();
-                    var reader_buf: [256]u8 = undefined;
-                    var reader = stdout.reader(io, &reader_buf);
-                    const bytes_read = reader.interface.readSliceShort(&buffer) catch {
-                        return ClipboardError.SystemError;
-                    };
-                    const output = try self.allocator.dupe(u8, buffer[0..bytes_read]);
-                    return output;
-                }
-            }
-        } else |_| {}
-        
-        return ClipboardError.SystemError;
+        return self.captureProcess(&[_][]const u8{ "powershell", "-Command", "Get-Clipboard" });
     }
-    
+
     fn hasTextWindows(self: *Clipboard) bool {
         const result = self.pasteTextWindows();
         if (result) |text| {
@@ -483,7 +345,7 @@ pub const ClipboardEvent = struct {
 pub const ClipboardUtils = struct {
     /// Sanitize text for clipboard (remove null bytes, etc.)
     pub fn sanitizeText(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
-        var sanitized = std.ArrayList(u8){};
+        var sanitized: std.ArrayList(u8) = .empty;
         defer sanitized.deinit(allocator);
         
         for (text) |char| {
@@ -502,7 +364,7 @@ pub const ClipboardUtils = struct {
             else => "\n",
         };
         
-        var result = std.ArrayList(u8){};
+        var result: std.ArrayList(u8) = .empty;
         defer result.deinit(allocator);
         
         var i: usize = 0;
@@ -528,7 +390,7 @@ pub const ClipboardUtils = struct {
     
     /// Escape special characters for shell commands
     pub fn escapeForShell(allocator: std.mem.Allocator, text: []const u8) ![]u8 {
-        var result = std.ArrayList(u8){};
+        var result: std.ArrayList(u8) = .empty;
         defer result.deinit(allocator);
         
         for (text) |char| {

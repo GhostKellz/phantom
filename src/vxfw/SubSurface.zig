@@ -25,9 +25,10 @@ pub fn init(origin: Point, surface: vxfw.Surface) SubSurface {
 
 /// Get the bounds of this subsurface in parent coordinates
 pub fn bounds(self: *const SubSurface) Rect {
+    const pos = self.origin.toPosition();
     return Rect.init(
-        self.origin.x,
-        self.origin.y,
+        pos.x,
+        pos.y,
         self.surface.size.width,
         self.surface.size.height
     );
@@ -35,7 +36,7 @@ pub fn bounds(self: *const SubSurface) Rect {
 
 /// Check if a point (in parent coordinates) is within this subsurface
 pub fn contains(self: *const SubSurface, point: Point) bool {
-    return self.bounds().contains(point);
+    return self.bounds().containsPoint(point);
 }
 
 /// Convert parent coordinates to local subsurface coordinates

@@ -102,7 +102,7 @@ pub const CellBuffer = struct {
 
     /// Clear a specific region
     pub fn clearRegion(self: *CellBuffer, region: Rect) !void {
-        const clipped = region.intersect(Rect.init(0, 0, self.width, self.height));
+        const clipped = region.intersect(Rect.init(0, 0, self.width, self.height)) orelse return;
 
         var y: u16 = clipped.y;
         while (y < clipped.y + clipped.height) : (y += 1) {
@@ -145,11 +145,13 @@ pub const CellBuffer = struct {
                 break;
             }
 
-            const cell = Cell{
+            var cell = Cell{
                 .char = .{ .grapheme = try self.allocator.dupe(u8, cluster.bytes) },
                 .style = text_style,
                 .width = cluster.width,
             };
+            // writeCell clones the cell, so free our local copy each iteration.
+            defer cell.deinit(self.allocator);
 
             try self.writeCell(current_x, y, cell);
 
@@ -171,7 +173,7 @@ pub const CellBuffer = struct {
 
     /// Fill a region with a character and style
     pub fn fillRegion(self: *CellBuffer, region: Rect, char: u8, fill_style: Style) !void {
-        const clipped = region.intersect(Rect.init(0, 0, self.width, self.height));
+        const clipped = region.intersect(Rect.init(0, 0, self.width, self.height)) orelse return;
 
         const cell = Cell{
             .char = .{ .ascii = char },
@@ -192,7 +194,7 @@ pub const CellBuffer = struct {
     pub fn drawBorder(self: *CellBuffer, region: Rect, border_style: Style, border_chars: BorderChars) !void {
         if (region.width < 2 or region.height < 2) return;
 
-        const clipped = region.intersect(Rect.init(0, 0, self.width, self.height));
+        const clipped = region.intersect(Rect.init(0, 0, self.width, self.height)) orelse return;
 
         // Top and bottom borders
         var x: u16 = clipped.x;
@@ -285,7 +287,7 @@ pub const CellBuffer = struct {
     }
 
     /// Get and clear dirty regions
-    pub fn getDirtyRegions(self: *CellBuffer) []Rect {
+    pub fn getDirtyRegions(self: *CellBuffer) []const Rect {
         const regions = self.dirty_regions.toOwnedSlice() catch &[_]Rect{};
         self.dirty_regions = std.array_list.AlignedManaged(Rect, null).init(self.allocator);
         return regions;
@@ -339,7 +341,7 @@ pub const CellBuffer = struct {
 
     /// Render a specific region
     fn renderRegion(self: *CellBuffer, writer: anytype, region: Rect) !void {
-        const clipped = region.intersect(Rect.init(0, 0, self.width, self.height));
+        const clipped = region.intersect(Rect.init(0, 0, self.width, self.height)) orelse return;
 
         var y: u16 = clipped.y;
         while (y < clipped.y + clipped.height) : (y += 1) {
@@ -390,25 +392,25 @@ pub const CellBuffer = struct {
         if (cell_style.fg) |fg| {
             switch (fg) {
                 .rgb => |rgb| try writer.print("\x1b[38;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b }),
-                .palette => |idx| try writer.print("\x1b[38;5;{d}m", .{idx}),
-                .ansi => |ansi| try writer.print("\x1b[{d}m", .{30 + @as(u8, @intFromEnum(ansi))}),
+                .indexed => |idx| try writer.print("\x1b[38;5;{d}m", .{idx}),
+                else => try writer.writeAll(fg.ansiCode(false)),
             }
         }
 
         if (cell_style.bg) |bg| {
             switch (bg) {
                 .rgb => |rgb| try writer.print("\x1b[48;2;{d};{d};{d}m", .{ rgb.r, rgb.g, rgb.b }),
-                .palette => |idx| try writer.print("\x1b[48;5;{d}m", .{idx}),
-                .ansi => |ansi| try writer.print("\x1b[{d}m", .{40 + @as(u8, @intFromEnum(ansi))}),
+                .indexed => |idx| try writer.print("\x1b[48;5;{d}m", .{idx}),
+                else => try writer.writeAll(bg.ansiCode(true)),
             }
         }
 
         // Apply attributes
-        if (cell_style.bold) try writer.writeAll("\x1b[1m");
-        if (cell_style.italic) try writer.writeAll("\x1b[3m");
-        if (cell_style.underline) try writer.writeAll("\x1b[4m");
-        if (cell_style.strikethrough) try writer.writeAll("\x1b[9m");
-        if (cell_style.reverse) try writer.writeAll("\x1b[7m");
+        if (cell_style.attributes.bold) try writer.writeAll("\x1b[1m");
+        if (cell_style.attributes.italic) try writer.writeAll("\x1b[3m");
+        if (cell_style.attributes.underline) try writer.writeAll("\x1b[4m");
+        if (cell_style.attributes.strikethrough) try writer.writeAll("\x1b[9m");
+        if (cell_style.attributes.reverse) try writer.writeAll("\x1b[7m");
     }
 };
 
@@ -600,7 +602,7 @@ test "CellBuffer basic operations" {
 
     // Test getting cell
     const cell = buffer.getCell(0, 0).?;
-    try std.testing.expectEqual(@as(u8, 'H'), cell.char.ascii);
+    try std.testing.expectEqualStrings("H", cell.char.grapheme);
 
     // Test dirty regions
     try std.testing.expect(buffer.isDirty());

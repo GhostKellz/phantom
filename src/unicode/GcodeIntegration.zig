@@ -17,7 +17,7 @@ pub const GcodeGraphemeCache = struct {
     const HashContext = struct {
         pub fn hash(self: @This(), key: u32) u64 {
             _ = self;
-            return std.hash_map.hashInt(key);
+            return std.hash.int(@as(u64, key));
         }
 
         pub fn eql(self: @This(), a: u32, b: u32) bool {
@@ -44,7 +44,7 @@ pub const GcodeGraphemeCache = struct {
 
     /// Get grapheme clusters from a string using gcode
     pub fn getGraphemes(self: *GcodeGraphemeCache, text: []const u8) ![]GraphemeCluster {
-        var clusters = std.ArrayList(GraphemeCluster).init(self.allocator);
+        var clusters = std.array_list.Managed(GraphemeCluster).init(self.allocator);
 
         var iterator = gcode.graphemeIterator(text);
         while (iterator.next()) |cluster_bytes| {
@@ -87,7 +87,7 @@ pub const GcodeGraphemeCache = struct {
 
     /// Get or create a cached grapheme cluster
     fn getOrCreateCluster(self: *GcodeGraphemeCache, cluster_bytes: []const u8) !GraphemeCluster {
-        const hash = std.hash_map.hashString(cluster_bytes);
+        const hash: u32 = @truncate(std.hash_map.hashString(cluster_bytes));
 
         if (self.cache.get(hash)) |info| {
             return GraphemeCluster{
@@ -116,7 +116,7 @@ pub const GcodeGraphemeCache = struct {
 
     /// Analyze a grapheme cluster using gcode
     fn analyzeCluster(self: *GcodeGraphemeCache, cluster_bytes: []const u8) !GraphemeInfo {
-        var codepoints = std.ArrayList(u21).init(self.allocator);
+        var codepoints = std.array_list.Managed(u21).init(self.allocator);
         defer codepoints.deinit();
 
         // Decode UTF-8 to get codepoints using gcode utilities
@@ -175,7 +175,7 @@ pub const GcodeGraphemeCache = struct {
         var removed_count: usize = 0;
 
         var iterator = self.cache.iterator();
-        var keys_to_remove = std.ArrayList(u32).init(self.allocator);
+        var keys_to_remove = std.array_list.Managed(u32).init(self.allocator);
         defer keys_to_remove.deinit();
 
         while (iterator.next()) |entry| {
@@ -529,4 +529,99 @@ test "gcode case conversion" {
     try std.testing.expectEqual(@as(u21, 'H'), toUpper('h'));
     try std.testing.expectEqual(@as(u21, 'z'), toLower('Z'));
     try std.testing.expectEqual(@as(u21, 'A'), toTitle('a'));
+}
+
+test "gcode East Asian width: CJK is double-width" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var cache = GcodeGraphemeCache.init(arena.allocator());
+    defer cache.deinit();
+
+    // U+4E16 (世) is East Asian Wide and occupies two terminal columns.
+    try std.testing.expect(isWideCharacter(0x4E16));
+    try std.testing.expectEqual(@as(u8, 2), getCodepointWidth(0x4E16));
+
+    // A two-character CJK string therefore spans four columns.
+    try std.testing.expectEqual(@as(u32, 4), try cache.getTextWidth("世界"));
+
+    const clusters = try cache.getGraphemes("世界");
+    defer arena.allocator().free(clusters);
+    try std.testing.expectEqual(@as(usize, 2), clusters.len);
+    try std.testing.expectEqual(@as(u8, 2), clusters[0].width);
+}
+
+test "gcode combining marks form a single width-1 grapheme" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var cache = GcodeGraphemeCache.init(arena.allocator());
+    defer cache.deinit();
+
+    // "e" + U+0301 (combining acute) is one grapheme rendered in one column.
+    const text = "e\u{0301}";
+    try std.testing.expect(isZeroWidth(0x0301));
+
+    const clusters = try cache.getGraphemes(text);
+    defer arena.allocator().free(clusters);
+
+    try std.testing.expectEqual(@as(usize, 1), clusters.len);
+    try std.testing.expectEqual(@as(u8, 1), clusters[0].width);
+    try std.testing.expectEqual(@as(usize, 2), clusters[0].codepoints.len);
+    try std.testing.expectEqual(@as(u32, 1), try cache.getTextWidth(text));
+}
+
+test "gcode emoji is a single double-width grapheme" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var cache = GcodeGraphemeCache.init(arena.allocator());
+    defer cache.deinit();
+
+    // U+1F600 (😀) is a wide emoji.
+    try std.testing.expect(isWideCharacter(0x1F600));
+
+    const clusters = try cache.getGraphemes("😀");
+    defer arena.allocator().free(clusters);
+
+    try std.testing.expectEqual(@as(usize, 1), clusters.len);
+    try std.testing.expectEqual(@as(u8, 2), clusters[0].width);
+}
+
+test "gcode ZWJ sequence collapses to one grapheme" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var cache = GcodeGraphemeCache.init(arena.allocator());
+    defer cache.deinit();
+
+    // Family emoji: man ZWJ woman ZWJ girl ZWJ boy is one grapheme cluster.
+    const family = "👨‍👩‍👧‍👦";
+
+    const clusters = try cache.getGraphemes(family);
+    defer arena.allocator().free(clusters);
+
+    try std.testing.expectEqual(@as(usize, 1), clusters.len);
+    // The joined emoji occupies one wide cell rather than summing each member.
+    try std.testing.expectEqual(@as(u8, 2), clusters[0].width);
+}
+
+test "gcode width stays internally consistent across mixed text" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    var cache = GcodeGraphemeCache.init(arena.allocator());
+    defer cache.deinit();
+
+    // Terminals disagree on some widths (emoji presentation, ambiguous CJK),
+    // but Phantom must stay self-consistent: the sum of per-grapheme widths
+    // equals the reported string width so layout and rendering never drift.
+    const text = "A世b😀c";
+    const clusters = try cache.getGraphemes(text);
+    defer arena.allocator().free(clusters);
+
+    var sum: u32 = 0;
+    for (clusters) |cluster| sum += cluster.width;
+
+    try std.testing.expectEqual(try cache.getTextWidth(text), sum);
 }

@@ -532,8 +532,8 @@ pub const Canvas = struct {
     fn plotCirclePoints(self: *Canvas, buffer: *Buffer, cx: u16, cy: u16, x: i32, y: i32, style: Style) void {
         _ = self;
         const points = [_][2]i32{
-            .{ x, y },   .{ -x, y },  .{ x, -y },  .{ -x, -y },
-            .{ y, x },   .{ -y, x },  .{ y, -x },  .{ -y, -x },
+            .{ x, y }, .{ -x, y }, .{ x, -y }, .{ -x, -y },
+            .{ y, x }, .{ -y, x }, .{ y, -x }, .{ -y, -x },
         };
 
         for (points) |p| {
@@ -607,7 +607,7 @@ pub const Canvas = struct {
 test "Canvas initialization" {
     const testing = std.testing;
 
-    var canvas = Canvas.init(testing.allocator, 80, 24);
+    var canvas = try Canvas.init(testing.allocator, CanvasConfig.default(80, 24));
     defer canvas.deinit();
 
     try testing.expectEqual(@as(usize, 80), canvas.width);
@@ -618,7 +618,7 @@ test "Canvas initialization" {
 test "Canvas draw shapes" {
     const testing = std.testing;
 
-    var canvas = Canvas.init(testing.allocator, 80, 24);
+    var canvas = try Canvas.init(testing.allocator, CanvasConfig.default(80, 24));
     defer canvas.deinit();
 
     try canvas.drawLine(0.0, 0.0, 10.0, 10.0, Color.red);
@@ -631,7 +631,7 @@ test "Canvas draw shapes" {
 test "Canvas coordinate transformation" {
     const testing = std.testing;
 
-    var canvas = Canvas.init(testing.allocator, 100, 100);
+    var canvas = try Canvas.init(testing.allocator, CanvasConfig.default(100, 100));
     defer canvas.deinit();
 
     canvas.setScale(2.0, 2.0);
@@ -649,7 +649,7 @@ test "Canvas coordinate transformation" {
 test "Canvas clear" {
     const testing = std.testing;
 
-    var canvas = Canvas.init(testing.allocator, 80, 24);
+    var canvas = try Canvas.init(testing.allocator, CanvasConfig.default(80, 24));
     defer canvas.deinit();
 
     try canvas.drawLine(0.0, 0.0, 10.0, 10.0, Color.red);

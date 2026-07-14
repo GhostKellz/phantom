@@ -378,3 +378,99 @@ test "Layout with max constraint" {
     try testing.expectEqual(@as(usize, 1), rects.len);
     try testing.expectEqual(@as(u16, 50), rects[0].width); // Capped at max
 }
+
+test "Layout zero-size area returns empty slice" {
+    const testing = std.testing;
+
+    const constraints = [_]Constraint{
+        .{ .percentage = 50 },
+        .{ .percentage = 50 },
+    };
+
+    const layout = Layout.init(.horizontal, &constraints);
+    const area = Rect{ .x = 0, .y = 0, .width = 0, .height = 0 };
+
+    const rects = try layout.split(testing.allocator, area);
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 0), rects.len);
+}
+
+test "Layout length constraints overflow area without clamping" {
+    const testing = std.testing;
+
+    const constraints = [_]Constraint{
+        .{ .length = 60 },
+        .{ .length = 60 },
+    };
+
+    const layout = Layout.init(.horizontal, &constraints);
+    const area = Rect{ .x = 0, .y = 0, .width = 100, .height = 10 };
+
+    const rects = try layout.split(testing.allocator, area);
+    defer testing.allocator.free(rects);
+
+    // Lengths are honored even when their sum exceeds the area; the split API
+    // does not clamp the trailing rect back inside the parent.
+    try testing.expectEqual(@as(u16, 60), rects[0].width);
+    try testing.expectEqual(@as(u16, 60), rects[1].width);
+    try testing.expectEqual(@as(u16, 60), rects[1].x);
+    try testing.expect(rects[1].x + rects[1].width > area.width);
+}
+
+test "Layout multiple min constraints share remaining space equally" {
+    const testing = std.testing;
+
+    const constraints = [_]Constraint{
+        .{ .min = 10 },
+        .{ .min = 10 },
+    };
+
+    const layout = Layout.init(.horizontal, &constraints);
+    const area = Rect{ .x = 0, .y = 0, .width = 100, .height = 10 };
+
+    const rects = try layout.split(testing.allocator, area);
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 2), rects.len);
+    try testing.expectEqual(@as(u16, 40), rects[0].width);
+    try testing.expectEqual(@as(u16, 40), rects[1].width);
+    try testing.expect(rects[0].width >= 10);
+    try testing.expect(rects[1].width >= 10);
+}
+
+test "Layout max constraint larger than area is capped by area" {
+    const testing = std.testing;
+
+    const constraints = [_]Constraint{
+        .{ .max = 200 },
+    };
+
+    const layout = Layout.init(.horizontal, &constraints);
+    const area = Rect{ .x = 0, .y = 0, .width = 80, .height = 10 };
+
+    const rects = try layout.split(testing.allocator, area);
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 1), rects.len);
+    try testing.expectEqual(@as(u16, 80), rects[0].width);
+}
+
+test "Layout fill priorities distribute proportionally" {
+    const testing = std.testing;
+
+    const constraints = [_]Constraint{
+        .{ .fill = 1 },
+        .{ .fill = 3 },
+    };
+
+    const layout = Layout.init(.horizontal, &constraints);
+    const area = Rect{ .x = 0, .y = 0, .width = 100, .height = 10 };
+
+    const rects = try layout.split(testing.allocator, area);
+    defer testing.allocator.free(rects);
+
+    try testing.expectEqual(@as(usize, 2), rects.len);
+    try testing.expectEqual(@as(u16, 25), rects[0].width); // 1/4 of 100
+    try testing.expectEqual(@as(u16, 75), rects[1].width); // 3/4 of 100
+}

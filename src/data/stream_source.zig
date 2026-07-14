@@ -17,7 +17,7 @@ const data = @import("list_source.zig");
 pub fn StreamingListSource(comptime Item: type) type {
     const SourceType = data.ListDataSource(Item);
     const BaseType = data.InMemoryListSource(Item);
-    const ChannelType = zsync.channels_mod.Channel(Item);
+    const ChannelType = zsync.Channel(Item);
 
     return struct {
         const Self = @This();
@@ -153,10 +153,6 @@ pub fn StreamingListSource(comptime Item: type) type {
             while (true) {
                 const item = self.channel.recv() catch |err| switch (err) {
                     error.ChannelClosed => break,
-                    else => {
-                        self.base.fail(err);
-                        return err;
-                    },
                 };
 
                 const single = [_]Item{item};

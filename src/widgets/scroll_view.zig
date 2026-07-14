@@ -44,6 +44,12 @@ pub const ScrollView = struct {
     scroll_step_x: u16,
     scroll_step_y: u16,
 
+    /// Serializable snapshot of the scroll position (see `StatefulWidget`).
+    pub const State = struct {
+        scroll_x: u16 = 0,
+        scroll_y: u16 = 0,
+    };
+
     const vtable = Widget.WidgetVTable{
         .render = render,
         .handleEvent = handleEvent,
@@ -186,6 +192,18 @@ pub const ScrollView = struct {
     pub fn setScrollbars(self: *ScrollView, horizontal: bool, vertical: bool) void {
         self.show_horizontal_scrollbar = horizontal;
         self.show_vertical_scrollbar = vertical;
+    }
+
+    /// Capture the current scroll position.
+    pub fn state(self: *const ScrollView) State {
+        return .{ .scroll_x = self.scroll_x, .scroll_y = self.scroll_y };
+    }
+
+    /// Restore a scroll position, clamped to the current content/viewport.
+    pub fn applyState(self: *ScrollView, new_state: State) void {
+        self.scroll_x = new_state.scroll_x;
+        self.scroll_y = new_state.scroll_y;
+        self.clampScroll();
     }
 
     fn render(widget: *Widget, buffer: *Buffer, area: Rect) void {
@@ -446,6 +464,32 @@ test "ScrollView scrolling" {
 
     view.scrollToTop();
     try std.testing.expect(view.scroll_y == 0);
+}
+
+test "ScrollView state round-trips and clamps on restore" {
+    const allocator = std.testing.allocator;
+
+    const view = try ScrollView.init(allocator);
+    defer view.widget.vtable.deinit(&view.widget);
+
+    view.setContentSize(100, 100);
+    view.viewport_width = 10;
+    view.viewport_height = 10;
+
+    view.scrollTo(20, 30);
+    const snap = view.state();
+    try std.testing.expectEqual(@as(u16, 20), snap.scroll_x);
+    try std.testing.expectEqual(@as(u16, 30), snap.scroll_y);
+
+    view.scrollTo(0, 0);
+    view.applyState(snap);
+    try std.testing.expectEqual(@as(u16, 20), view.scroll_x);
+    try std.testing.expectEqual(@as(u16, 30), view.scroll_y);
+
+    // Restoring an out-of-range snapshot clamps to max scroll (content-viewport).
+    view.applyState(.{ .scroll_x = 999, .scroll_y = 999 });
+    try std.testing.expectEqual(@as(u16, 90), view.scroll_x);
+    try std.testing.expectEqual(@as(u16, 90), view.scroll_y);
 }
 
 test "ScrollView ensure visible" {

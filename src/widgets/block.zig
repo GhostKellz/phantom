@@ -251,3 +251,48 @@ test "Block widget with title" {
     try block.withTitle("Test Block");
     try std.testing.expectEqualStrings("Test Block", block.title.?);
 }
+
+const snapshot = @import("../testing/snapshot.zig");
+
+test "Block snapshot: bordered box at normal size" {
+    const block = try Block.init(std.testing.allocator);
+    defer block.widget.deinit();
+    try snapshot.expectRender(std.testing.allocator, &block.widget, 4, 3,
+        \\┌──┐
+        \\│  │
+        \\└──┘
+    );
+}
+
+test "Block snapshot: title on top border" {
+    const block = try Block.init(std.testing.allocator);
+    defer block.widget.deinit();
+    try block.withTitle("Hi");
+    // Title starts one column in from the left corner.
+    try snapshot.expectRender(std.testing.allocator, &block.widget, 6, 3,
+        \\┌Hi──┐
+        \\│    │
+        \\└────┘
+    );
+}
+
+test "Block snapshot: minimal 2x2 box" {
+    const block = try Block.init(std.testing.allocator);
+    defer block.widget.deinit();
+    // Smallest area that still renders all four corners.
+    try snapshot.expectRender(std.testing.allocator, &block.widget, 2, 2,
+        \\┌┐
+        \\└┘
+    );
+}
+
+test "Block snapshot: oversized area keeps border on the edges" {
+    const block = try Block.init(std.testing.allocator);
+    defer block.widget.deinit();
+    try snapshot.expectRender(std.testing.allocator, &block.widget, 6, 4,
+        \\┌────┐
+        \\│    │
+        \\│    │
+        \\└────┘
+    );
+}

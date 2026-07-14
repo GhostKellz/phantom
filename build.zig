@@ -292,9 +292,7 @@ pub fn build(b: *std.Build) void {
 
     // This allows the user to pass arguments to the application in the build
     // command itself, like this: `zig build run -- arg1 arg2 etc`
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
-    }
+    run_cmd.addPassthruArgs();
 
     // Creates an executable that will run `test` blocks from the provided module.
     // Here `mod` needs to define a target, which is why earlier we made sure to
@@ -338,6 +336,24 @@ pub fn build(b: *std.Build) void {
     const run_memory_tests = b.addRunArtifact(memory_tests);
     const memory_test_step = b.step("test-memory", "Run comprehensive memory leak tests");
     memory_test_step.dependOn(&run_memory_tests.step);
+
+    // Windows ConPTY smoke test: spawns a child through a pseudoconsole, captures
+    // its rendered output, and asserts the exit code propagates. Windows-only; on
+    // Windows the PTY backend is pure Win32 (no translate-C module), so it builds
+    // as a bare test. Kept out of the default `test` step because it cannot run on
+    // this project's Linux host. Run on Windows with `zig build test-conpty`.
+    if (target.result.os.tag == .windows) {
+        const conpty_tests = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/conpty_smoke_test.zig"),
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        const run_conpty_tests = b.addRunArtifact(conpty_tests);
+        const conpty_test_step = b.step("test-conpty", "Run the Windows ConPTY smoke test (Windows only)");
+        conpty_test_step.dependOn(&run_conpty_tests.step);
+    }
 
     // Package Manager Demo - requires package-mgmt widgets
     if (features.package_mgmt) {

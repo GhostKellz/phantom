@@ -21,7 +21,9 @@ Terminal user interface framework for Zig, inspired by Ratatui.
 
 ## Recommended Surface
 
-**Canonical widgets:** Text, Block, List, Button, Input, TextArea, ProgressBar, Table
+**Canonical widgets:** Text, Paragraph, Block, List, Button, Input, TextArea, ProgressBar, Table
+
+**Rich text primitives:** `phantom.text.{Span, Line, Text}` back the `Paragraph` widget for styled, wrapped, multi-line content
 
 **Canonical composition path:** Container, ScrollView, ListView, `layout.engine`
 

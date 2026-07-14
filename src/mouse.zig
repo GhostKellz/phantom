@@ -80,8 +80,8 @@ pub const MouseState = struct {
         return MouseState{
             .current_pos = Position.init(0, 0),
             .last_pos = Position.init(0, 0),
-            .buttons_pressed = std.EnumSet(MouseButton).initEmpty(),
-            .hover_areas = .{},
+            .buttons_pressed = std.EnumSet(MouseButton).empty,
+            .hover_areas = .empty,
             .double_click_tracker = DoubleClickTracker{},
             .allocator = allocator,
         };

@@ -69,12 +69,12 @@ pub const PackageStatus = enum {
 
     pub fn getStyle(self: PackageStatus) Style {
         return switch (self) {
-            .installed => Style.withFg(style.Color.bright_green),
-            .available => Style.withFg(style.Color.white),
-            .missing => Style.withFg(style.Color.bright_red),
-            .outdated => Style.withFg(style.Color.bright_yellow),
-            .building => Style.withFg(style.Color.bright_cyan),
-            .failed => Style.withFg(style.Color.bright_red).withBold(),
+            .installed => Style.default().withFg(style.Color.bright_green),
+            .available => Style.default().withFg(style.Color.white),
+            .missing => Style.default().withFg(style.Color.bright_red),
+            .outdated => Style.default().withFg(style.Color.bright_yellow),
+            .building => Style.default().withFg(style.Color.bright_cyan),
+            .failed => Style.default().withFg(style.Color.bright_red).withBold(),
         };
     }
 };
@@ -199,11 +199,11 @@ pub const AURDependencies = struct {
             .expanded_nodes = ArrayList(bool).init(allocator),
             .search_query = ArrayList(u8).init(allocator),
             .filtered_dependencies = ArrayList(usize).init(allocator),
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
-            .package_style = Style.withFg(style.Color.bright_white).withBold(),
-            .dependency_style = Style.withFg(style.Color.white),
-            .selected_style = Style.withFg(style.Color.bright_yellow).withBold(),
-            .info_style = Style.withFg(style.Color.bright_black),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
+            .package_style = Style.default().withFg(style.Color.bright_white).withBold(),
+            .dependency_style = Style.default().withFg(style.Color.white),
+            .selected_style = Style.default().withFg(style.Color.bright_yellow).withBold(),
+            .info_style = Style.default().withFg(style.Color.bright_black),
         };
 
         return widget;
@@ -497,7 +497,7 @@ pub const AURDependencies = struct {
         const type_icon = dep.dependency_type.getIcon();
         buffer.writeText(current_x, y, status_icon, dep.status.getStyle());
         current_x += 2;
-        buffer.writeText(current_x, y, type_icon, Style.withFg(dep.dependency_type.getColor()));
+        buffer.writeText(current_x, y, type_icon, Style.default().withFg(dep.dependency_type.getColor()));
         current_x += 2;
 
         // Package name and version
@@ -527,9 +527,7 @@ pub const AURDependencies = struct {
 
         switch (event) {
             .key => |key_event| {
-                if (!key_event.pressed) return false;
-
-                switch (key_event.key) {
+                switch (key_event) {
                     .up => {
                         if (self.selected_dependency > 0) {
                             self.selected_dependency -= 1;

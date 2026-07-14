@@ -485,5 +485,5 @@ test "StatusBar manages segments and renders" {
     const area = Rect.init(0, 0, 80, 1);
     status_bar.widget.render(&buffer, area);
 
-    try expectTextAt(&buffer, 0, 0, "Monitor");
+    try expectTextAt(&buffer, 0, 0, "Mode: Monitor");
 }

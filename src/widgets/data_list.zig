@@ -473,10 +473,10 @@ test "DataListView virtualizes large sources" {
     defer source.deinit();
 
     var items: [128][]const u8 = undefined;
-    for (items, 0..) |*slot, idx| {
+    for (items[0..], 0..) |*slot, idx| {
         var buf: [24]u8 = undefined;
-        const len = std.fmt.bufPrint(&buf, "item {d}", .{idx}) catch 0;
-        slot.* = try testing.allocator.dupe(u8, buf[0..len]);
+        const printed = std.fmt.bufPrint(&buf, "item {d}", .{idx}) catch unreachable;
+        slot.* = try testing.allocator.dupe(u8, printed);
     }
     defer {
         for (items) |text| {
@@ -509,8 +509,8 @@ test "DataListView virtualizes large sources" {
     try testing.expect(local_index < widget.list_view.items.items.len);
 
     var expect_buf: [24]u8 = undefined;
-    const expect_len = std.fmt.bufPrint(&expect_buf, "item {d}", .{widget.list_view.scroll_offset}) catch 0;
-    try testing.expectEqualStrings(expect_buf[0..expect_len], widget.list_view.items.items[local_index].text);
+    const expected = std.fmt.bufPrint(&expect_buf, "item {d}", .{widget.list_view.scroll_offset}) catch unreachable;
+    try testing.expectEqualStrings(expected, widget.list_view.items.items[local_index].text);
 
     try testing.expectEqual(widget.list_view.virtual_window_start, widget.virtualization.window_start);
 }

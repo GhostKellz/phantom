@@ -5,6 +5,14 @@ const config = @import("phantom_config");
 // Core widget types - always available
 pub const Widget = @import("../widget.zig").Widget;
 
+// Shared interaction-state styling conventions (focus ring, hover, disabled,
+// validation-error). Always available so any widget can adopt them.
+pub const widget_state = @import("widget_state.zig");
+pub const StateFlags = @import("widget_state.zig").StateFlags;
+pub const VisualState = @import("widget_state.zig").VisualState;
+pub const StateStyles = @import("widget_state.zig").StateStyles;
+pub const drawFocusRing = @import("widget_state.zig").drawFocusRing;
+
 // Basic widgets - conditionally exported
 pub const Text = if (config.enable_basic_widgets) @import("text.zig").Text else void;
 pub const Block = if (config.enable_basic_widgets) @import("block.zig").Block else void;
@@ -63,6 +71,11 @@ pub const RichText = if (config.enable_advanced) @import("rich_text.zig").RichTe
 pub const Border = if (config.enable_basic_widgets) @import("border.zig").Border else void;
 pub const Spinner = if (config.enable_basic_widgets) @import("spinner.zig").Spinner else void;
 
+// Rich block text composition over text.Span/Line/Text
+pub const Paragraph = if (config.enable_basic_widgets) @import("paragraph.zig").Paragraph else void;
+pub const WrapMode = if (config.enable_basic_widgets) @import("paragraph.zig").WrapMode else void;
+pub const Padding = if (config.enable_basic_widgets) @import("paragraph.zig").Padding else void;
+
 // Flexible layout system
 pub const flex = if (config.enable_advanced) @import("flex.zig") else void;
 pub const FlexRow = if (config.enable_advanced) @import("flex.zig").FlexRow else void;
@@ -78,13 +91,25 @@ pub const Tabs = if (config.enable_advanced) @import("tabs.zig").Tabs else void;
 // Data visualization widgets
 pub const BarChart = if (config.enable_data_widgets) @import("bar_chart.zig").BarChart else void;
 pub const Chart = if (config.enable_data_widgets) @import("chart.zig").Chart else void;
+pub const ChartType = if (config.enable_data_widgets) @import("chart.zig").ChartType else void;
 pub const Gauge = if (config.enable_data_widgets) @import("gauge.zig").Gauge else void;
 pub const Sparkline = if (config.enable_data_widgets) @import("sparkline.zig").Sparkline else void;
+pub const SparklineStyle = if (config.enable_data_widgets) @import("sparkline.zig").SparklineStyle else void;
+pub const PieChart = if (config.enable_data_widgets) @import("pie_chart.zig").PieChart else void;
+pub const PieSlice = if (config.enable_data_widgets) @import("pie_chart.zig").Slice else void;
+pub const Histogram = if (config.enable_data_widgets) @import("histogram.zig").Histogram else void;
 pub const Scrollbar = if (config.enable_basic_widgets) @import("scrollbar.zig").Scrollbar else void;
 pub const ScrollbarState = if (config.enable_basic_widgets) @import("scrollbar.zig").ScrollbarState else void;
 pub const ScrollbarOrientation = if (config.enable_basic_widgets) @import("scrollbar.zig").ScrollbarOrientation else void;
 pub const Calendar = if (config.enable_advanced) @import("calendar.zig").Calendar else void;
 pub const Canvas = if (config.enable_advanced) @import("canvas.zig").Canvas else void;
+
+// Input picker widgets
+pub const DateTimePicker = if (config.enable_advanced) @import("datetime_picker.zig").DateTimePicker else void;
+pub const DateTime = if (config.enable_advanced) @import("datetime_picker.zig").DateTime else void;
+pub const DateTimePickerMode = if (config.enable_advanced) @import("datetime_picker.zig").Mode else void;
+pub const ColorPicker = if (config.enable_advanced) @import("color_picker.zig").ColorPicker else void;
+pub const ColorChannel = if (config.enable_advanced) @import("color_picker.zig").Channel else void;
 
 // Widget presets for common use cases
 pub const presets = if (config.enable_data_widgets or config.enable_advanced) @import("presets.zig") else void;
@@ -106,6 +131,32 @@ pub const DiffLine = if (config.enable_advanced) @import("diff.zig").DiffLine el
 // Document viewers
 pub const Markdown = if (config.enable_advanced) @import("markdown.zig").Markdown else void;
 
+// Widgets that expose a serializable navigation/view snapshot must all satisfy
+// the `StatefulWidget` contract. This fails to compile if any drifts.
+test "stateful widgets satisfy the StatefulWidget contract" {
+    const StatefulWidget = @import("../widget.zig").StatefulWidget;
+    if (config.enable_basic_widgets) {
+        StatefulWidget.assert(@import("list.zig").List);
+        StatefulWidget.assert(@import("input.zig").Input);
+        StatefulWidget.assert(@import("textarea.zig").TextArea);
+    }
+    if (config.enable_data_widgets) {
+        StatefulWidget.assert(@import("table.zig").Table);
+        StatefulWidget.assert(@import("task_monitor.zig").TaskMonitor);
+    }
+    if (config.enable_advanced) {
+        StatefulWidget.assert(@import("tabs.zig").Tabs);
+        StatefulWidget.assert(@import("scroll_view.zig").ScrollView);
+        StatefulWidget.assert(@import("editor/CodeEditor.zig").CodeEditor);
+    }
+    if (config.enable_system) {
+        StatefulWidget.assert(@import("system_monitor.zig").SystemMonitor);
+    }
+    if (config.enable_terminal_widget) {
+        StatefulWidget.assert(@import("terminal.zig").Terminal);
+    }
+}
+
 test {
     if (config.enable_basic_widgets) {
         _ = @import("text.zig");
@@ -117,7 +168,10 @@ test {
         _ = @import("border.zig");
         _ = @import("spinner.zig");
         _ = @import("scrollbar.zig");
+        _ = @import("paragraph.zig");
     }
+
+    _ = @import("widget_state.zig");
 
     if (config.enable_data_widgets) {
         _ = @import("progress.zig");
@@ -130,6 +184,8 @@ test {
         _ = @import("chart.zig");
         _ = @import("gauge.zig");
         _ = @import("sparkline.zig");
+        _ = @import("pie_chart.zig");
+        _ = @import("histogram.zig");
         _ = @import("presets.zig");
     }
 
@@ -163,6 +219,8 @@ test {
         _ = @import("popover.zig");
         _ = @import("calendar.zig");
         _ = @import("canvas.zig");
+        _ = @import("datetime_picker.zig");
+        _ = @import("color_picker.zig");
         _ = @import("tree.zig");
         _ = @import("diff.zig");
         _ = @import("markdown.zig");

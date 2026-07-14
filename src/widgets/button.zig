@@ -215,8 +215,12 @@ pub const Button = struct {
             .key => |key| {
                 if (self.is_focused) {
                     switch (key) {
-                        .enter, .char => |c| {
-                            if (key == .enter or c == ' ') {
+                        .enter => {
+                            self.click();
+                            return true;
+                        },
+                        .char => |c| {
+                            if (c == ' ') {
                                 self.click();
                                 return true;
                             }
@@ -284,7 +288,7 @@ pub const Button = struct {
 
 // Example callback function
 fn exampleCallback(button: *Button) void {
-    std.debug.print("Button '{}' clicked!\n", .{button.text});
+    std.debug.print("Button '{s}' clicked!\n", .{button.text});
 }
 
 test "Button widget creation" {
@@ -319,4 +323,35 @@ test "Button widget state management" {
 
     button.setDisabled(false);
     try std.testing.expect(!button.is_disabled);
+}
+
+const snapshot = @import("../testing/snapshot.zig");
+
+test "Button snapshot: bordered with centered label at normal size" {
+    const button = try Button.init(std.testing.allocator, "OK");
+    defer button.widget.deinit();
+    try snapshot.expectRender(std.testing.allocator, &button.widget, 6, 3,
+        \\┌────┐
+        \\│ OK │
+        \\└────┘
+    );
+}
+
+test "Button snapshot: label only at small size (no border)" {
+    const button = try Button.init(std.testing.allocator, "OK");
+    defer button.widget.deinit();
+    // Height <= 2 and width <= 2: label renders without a border box.
+    try snapshot.expectRender(std.testing.allocator, &button.widget, 2, 1, "OK");
+}
+
+test "Button snapshot: centered label in oversized area" {
+    const button = try Button.init(std.testing.allocator, "Hi");
+    defer button.widget.deinit();
+    try snapshot.expectRender(std.testing.allocator, &button.widget, 8, 5,
+        \\┌──────┐
+        \\│      │
+        \\│  Hi  │
+        \\│      │
+        \\└──────┘
+    );
 }

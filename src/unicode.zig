@@ -146,8 +146,8 @@ pub const UnicodeWidth = struct {
 pub const TextWrap = struct {
     /// Wrap text to fit within a given width
     pub fn wrapText(allocator: std.mem.Allocator, text: []const u8, width: u16) !std.ArrayList([]const u8) {
-        var lines = std.ArrayList([]const u8).init(allocator);
-        
+        var lines: std.ArrayList([]const u8) = .empty;
+
         if (width == 0) {
             try lines.append(allocator, try allocator.dupe(u8, ""));
             return lines;
@@ -162,55 +162,48 @@ pub const TextWrap = struct {
     }
     
     fn wrapLine(allocator: std.mem.Allocator, lines: *std.ArrayList([]const u8), line: []const u8, width: u16) !void {
-        var start: usize = 0;
+        if (line.len == 0) {
+            try lines.append(allocator, try allocator.dupe(u8, ""));
+            return;
+        }
+
+        var start: usize = 0; // byte index where the current visual line begins
+        var current_width: u16 = 0; // display width of line[start..iter.i]
+        var last_space: ?usize = null; // byte index OF the most recent space
         var iter = std.unicode.Utf8Iterator{ .bytes = line, .i = 0 };
-        var current_width: u16 = 0;
-        var last_space: ?usize = null;
-        var last_space_width: u16 = 0;
-        
+
         while (iter.nextCodepoint()) |codepoint| {
+            const seq_len: usize = std.unicode.utf8CodepointSequenceLength(codepoint) catch 1;
+            const cp_start = iter.i - seq_len; // byte index of this codepoint
             const char_width = UnicodeWidth.codepointWidth(codepoint);
-            
-            // Check if adding this character would exceed the width
-            if (current_width + char_width > width) {
-                // Try to break at the last space
+
+            if (codepoint == ' ') {
+                // Spaces never force a break; just remember the position.
+                last_space = cp_start;
+                current_width += char_width;
+                continue;
+            }
+
+            if (current_width + char_width > width and cp_start > start) {
                 if (last_space) |space_pos| {
-                    const wrapped_line = try allocator.dupe(u8, line[start..space_pos]);
-                    try lines.append(allocator, wrapped_line);
-                    start = space_pos + 1; // Skip the space
-                    current_width = try UnicodeWidth.stringWidth(line[start..iter.i]);
-                    last_space = null;
+                    // Break at the space: emit the words before it, skip the space.
+                    try lines.append(allocator, try allocator.dupe(u8, line[start..space_pos]));
+                    start = space_pos + 1;
                 } else {
-                    // No space to break at, force break
-                    const prev_i = iter.i - std.unicode.utf8ByteSequenceLength(codepoint) catch 1;
-                    if (prev_i > start) {
-                        const wrapped_line = try allocator.dupe(u8, line[start..prev_i]);
-                        try lines.append(allocator, wrapped_line);
-                        start = prev_i;
-                        current_width = char_width;
-                    } else {
-                        // Single character is too wide, include it anyway
-                        current_width += char_width;
-                    }
+                    // No space available: hard break right before this codepoint.
+                    try lines.append(allocator, try allocator.dupe(u8, line[start..cp_start]));
+                    start = cp_start;
                 }
+                last_space = null;
+                current_width = try UnicodeWidth.stringWidth(line[start..iter.i]);
             } else {
                 current_width += char_width;
             }
-            
-            // Track the last space for word wrapping
-            if (codepoint == ' ') {
-                last_space = iter.i;
-                last_space_width = current_width;
-            }
         }
-        
-        // Add the remaining text
+
+        // Add any remaining text on the final visual line.
         if (start < line.len) {
-            const wrapped_line = try allocator.dupe(u8, line[start..]);
-            try lines.append(allocator, wrapped_line);
-        } else if (line.len == 0) {
-            // Empty line
-            try lines.append(allocator, try allocator.dupe(u8, ""));
+            try lines.append(allocator, try allocator.dupe(u8, line[start..]));
         }
     }
 };
@@ -343,12 +336,12 @@ test "Unicode width calculation" {
 test "Text wrapping" {
     const allocator = std.testing.allocator;
     
-    const wrapped = try TextWrap.wrapText(allocator, "hello world", 5);
+    var wrapped = try TextWrap.wrapText(allocator, "hello world", 5);
     defer {
         for (wrapped.items) |line| {
             allocator.free(line);
         }
-        wrapped.deinit();
+        wrapped.deinit(allocator);
     }
     
     try std.testing.expect(wrapped.items.len == 2);

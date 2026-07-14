@@ -17,7 +17,7 @@ pub const NetworkStats = struct {
     bytes_received: u64 = 0,
     packets_sent: u64 = 0,
     packets_received: u64 = 0,
-    
+
     pub fn getThroughputMbps(self: *const NetworkStats, elapsed_seconds: f64) f64 {
         const total_bytes = self.bytes_sent + self.bytes_received;
         return (@as(f64, @floatFromInt(total_bytes)) * 8.0) / (elapsed_seconds * 1_000_000.0);
@@ -32,7 +32,7 @@ pub const GPUStats = struct {
     temperature_c: f64 = 0.0,
     power_usage_w: f64 = 0.0,
     clock_speed_mhz: u64 = 0,
-    
+
     pub fn getMemoryUsagePercent(self: *const GPUStats) f64 {
         if (self.memory_total_mb == 0) return 0.0;
         return (@as(f64, @floatFromInt(self.memory_used_mb)) / @as(f64, @floatFromInt(self.memory_total_mb))) * 100.0;
@@ -43,25 +43,25 @@ pub const GPUStats = struct {
 pub const SystemMonitor = struct {
     widget: Widget,
     allocator: std.mem.Allocator,
-    
+
     // CPU stats
     cpu_usage: f64 = 0.0,
     cpu_cores: u32 = 0,
-    
+
     // Memory stats
     memory_used_mb: u64 = 0,
     memory_total_mb: u64 = 0,
-    
+
     // GPU stats (NVIDIA optimized)
     gpu_stats: GPUStats = GPUStats{},
-    
+
     // Network stats
     network_stats: NetworkStats = NetworkStats{},
-    
+
     // Terminal-specific stats
     render_fps: f64 = 0.0,
     frame_time_ms: f64 = 0.0,
-    
+
     // Display options
     show_cpu: bool = true,
     show_memory: bool = true,
@@ -69,15 +69,47 @@ pub const SystemMonitor = struct {
     show_network: bool = true,
     show_terminal_stats: bool = true,
     compact_mode: bool = false,
-    
+
     // Styling
     header_style: Style,
     normal_style: Style,
     warning_style: Style,
     critical_style: Style,
-    
+
     // Layout
     area: Rect = Rect.init(0, 0, 0, 0),
+
+    /// View-config snapshot. SystemMonitor's live metrics are sampled from the
+    /// host, so the snapshot captures only the display toggles that a caller
+    /// would want to persist and restore.
+    pub const State = struct {
+        show_cpu: bool = true,
+        show_memory: bool = true,
+        show_gpu: bool = true,
+        show_network: bool = true,
+        show_terminal_stats: bool = true,
+        compact_mode: bool = false,
+    };
+
+    pub fn state(self: *const SystemMonitor) State {
+        return .{
+            .show_cpu = self.show_cpu,
+            .show_memory = self.show_memory,
+            .show_gpu = self.show_gpu,
+            .show_network = self.show_network,
+            .show_terminal_stats = self.show_terminal_stats,
+            .compact_mode = self.compact_mode,
+        };
+    }
+
+    pub fn applyState(self: *SystemMonitor, new_state: State) void {
+        self.show_cpu = new_state.show_cpu;
+        self.show_memory = new_state.show_memory;
+        self.show_gpu = new_state.show_gpu;
+        self.show_network = new_state.show_network;
+        self.show_terminal_stats = new_state.show_terminal_stats;
+        self.compact_mode = new_state.compact_mode;
+    }
 
     const vtable = Widget.WidgetVTable{
         .render = render,
@@ -91,15 +123,15 @@ pub const SystemMonitor = struct {
         monitor.* = SystemMonitor{
             .widget = Widget{ .vtable = &vtable },
             .allocator = allocator,
-            .header_style = Style.withFg(style.Color.bright_cyan).withBold(),
-            .normal_style = Style.withFg(style.Color.white),
-            .warning_style = Style.withFg(style.Color.bright_yellow),
-            .critical_style = Style.withFg(style.Color.bright_red),
+            .header_style = Style.default().withFg(style.Color.bright_cyan).withBold(),
+            .normal_style = Style.default().withFg(style.Color.white),
+            .warning_style = Style.default().withFg(style.Color.bright_yellow),
+            .critical_style = Style.default().withFg(style.Color.bright_red),
         };
-        
+
         // Initialize system info
         monitor.detectSystemInfo() catch {};
-        
+
         return monitor;
     }
 
@@ -153,7 +185,7 @@ pub const SystemMonitor = struct {
     fn detectSystemInfo(self: *SystemMonitor) !void {
         // Detect CPU cores
         self.cpu_cores = @as(u32, @intCast(std.Thread.getCpuCount() catch 1));
-        
+
         // TODO: Detect GPU info via nvidia-smi or similar
         // For now, set reasonable defaults
         self.gpu_stats.memory_total_mb = 8192; // 8GB default
@@ -165,9 +197,7 @@ pub const SystemMonitor = struct {
     }
 
     fn getStyleForUsage(self: *const SystemMonitor, usage_percent: f64) Style {
-        return if (usage_percent >= 90.0) self.critical_style
-        else if (usage_percent >= 75.0) self.warning_style
-        else self.normal_style;
+        return if (usage_percent >= 90.0) self.critical_style else if (usage_percent >= 75.0) self.warning_style else self.normal_style;
     }
 
     fn render(widget: *Widget, buffer: *Buffer, area: Rect) void {
@@ -177,7 +207,7 @@ pub const SystemMonitor = struct {
         if (area.height == 0 or area.width == 0) return;
 
         var y: u16 = area.y;
-        
+
         // Header
         if (y < area.y + area.height) {
             buffer.fill(Rect.init(area.x, y, area.width, 1), Cell.withStyle(self.header_style));
@@ -232,13 +262,13 @@ pub const SystemMonitor = struct {
 
     fn renderCPUStats(self: *SystemMonitor, buffer: *Buffer, x: u16, y: u16, width: u16) void {
         buffer.fill(Rect.init(x, y, width, 1), Cell.withStyle(self.normal_style));
-        
+
         const cpu_text = if (self.compact_mode)
             std.fmt.allocPrint(self.allocator, "⚡ CPU: {d:.1}%", .{self.cpu_usage}) catch return
         else
             std.fmt.allocPrint(self.allocator, "⚡ CPU ({d} cores): {d:.1}%", .{ self.cpu_cores, self.cpu_usage }) catch return;
         defer self.allocator.free(cpu_text);
-        
+
         const text_len = @min(cpu_text.len, width);
         const text_style = self.getStyleForUsage(self.cpu_usage);
         buffer.writeText(x, y, cpu_text[0..text_len], text_style);
@@ -246,13 +276,13 @@ pub const SystemMonitor = struct {
 
     fn renderMemoryStats(self: *SystemMonitor, buffer: *Buffer, x: u16, y: u16, width: u16, percent: f64) void {
         buffer.fill(Rect.init(x, y, width, 1), Cell.withStyle(self.normal_style));
-        
+
         const mem_text = if (self.compact_mode)
             std.fmt.allocPrint(self.allocator, "🧠 RAM: {d:.1}%", .{percent}) catch return
         else
             std.fmt.allocPrint(self.allocator, "🧠 Memory: {d}MB/{d}MB ({d:.1}%)", .{ self.memory_used_mb, self.memory_total_mb, percent }) catch return;
         defer self.allocator.free(mem_text);
-        
+
         const text_len = @min(mem_text.len, width);
         const text_style = self.getStyleForUsage(percent);
         buffer.writeText(x, y, mem_text[0..text_len], text_style);
@@ -260,14 +290,14 @@ pub const SystemMonitor = struct {
 
     fn renderGPUStats(self: *SystemMonitor, buffer: *Buffer, x: u16, y: u16, width: u16) void {
         buffer.fill(Rect.init(x, y, width, 1), Cell.withStyle(self.normal_style));
-        
+
         const gpu_mem_percent = self.gpu_stats.getMemoryUsagePercent();
         const gpu_text = if (self.compact_mode)
             std.fmt.allocPrint(self.allocator, "🎮 GPU: {d:.1}%", .{self.gpu_stats.usage_percent}) catch return
         else
             std.fmt.allocPrint(self.allocator, "🎮 NVIDIA GPU: {d:.1}% | VRAM: {d:.1}% | {d:.0}°C", .{ self.gpu_stats.usage_percent, gpu_mem_percent, self.gpu_stats.temperature_c }) catch return;
         defer self.allocator.free(gpu_text);
-        
+
         const text_len = @min(gpu_text.len, width);
         const text_style = self.getStyleForUsage(self.gpu_stats.usage_percent);
         buffer.writeText(x, y, gpu_text[0..text_len], text_style);
@@ -275,39 +305,37 @@ pub const SystemMonitor = struct {
 
     fn renderNetworkStats(self: *SystemMonitor, buffer: *Buffer, x: u16, y: u16, width: u16) void {
         buffer.fill(Rect.init(x, y, width, 1), Cell.withStyle(self.normal_style));
-        
+
         const throughput_mbps = self.network_stats.getThroughputMbps(1.0); // Assume 1 second interval
         const net_text = if (self.compact_mode)
             std.fmt.allocPrint(self.allocator, "🌐 Net: {d:.1}Mbps", .{throughput_mbps}) catch return
         else
             std.fmt.allocPrint(self.allocator, "🌐 Network: ↑{d}KB ↓{d}KB ({d:.1}Mbps)", .{ self.network_stats.bytes_sent / 1024, self.network_stats.bytes_received / 1024, throughput_mbps }) catch return;
         defer self.allocator.free(net_text);
-        
+
         const text_len = @min(net_text.len, width);
         buffer.writeText(x, y, net_text[0..text_len], self.normal_style);
     }
 
     fn renderTerminalStats(self: *SystemMonitor, buffer: *Buffer, x: u16, y: u16, width: u16) void {
         buffer.fill(Rect.init(x, y, width, 1), Cell.withStyle(self.normal_style));
-        
+
         const term_text = if (self.compact_mode)
             std.fmt.allocPrint(self.allocator, "👻 Term: {d:.0}fps", .{self.render_fps}) catch return
         else
             std.fmt.allocPrint(self.allocator, "👻 Ghostty: {d:.0}fps | {d:.1}ms frame time", .{ self.render_fps, self.frame_time_ms }) catch return;
         defer self.allocator.free(term_text);
-        
+
         const text_len = @min(term_text.len, width);
-        const fps_style = if (self.render_fps >= 60.0) Style.withFg(style.Color.bright_green)
-        else if (self.render_fps >= 30.0) self.warning_style
-        else self.critical_style;
+        const fps_style = if (self.render_fps >= 60.0) Style.default().withFg(style.Color.bright_green) else if (self.render_fps >= 30.0) self.warning_style else self.critical_style;
         buffer.writeText(x, y, term_text[0..text_len], fps_style);
     }
 
     fn renderProgressBar(self: *SystemMonitor, buffer: *Buffer, x: u16, y: u16, width: u16, percentage: f64, bar_style: Style) void {
         if (width == 0) return;
-        
+
         const fill_width = @as(u16, @intFromFloat(@as(f64, @floatFromInt(width)) * (percentage / 100.0)));
-        
+
         for (0..width) |i| {
             const char: u21 = if (i < fill_width) '█' else '░';
             const cell_style = if (i < fill_width) bar_style else self.normal_style;
@@ -340,7 +368,7 @@ test "SystemMonitor widget creation" {
 
     monitor.updateCPU(45.5);
     monitor.updateMemory(4096, 8192);
-    
+
     const gpu_stats = GPUStats{
         .usage_percent = 78.3,
         .memory_used_mb = 3072,
@@ -348,7 +376,7 @@ test "SystemMonitor widget creation" {
         .temperature_c = 67.5,
     };
     monitor.updateGPU(gpu_stats);
-    
+
     try std.testing.expect(monitor.cpu_usage == 45.5);
     try std.testing.expect(monitor.getMemoryUsagePercent() == 50.0);
     try std.testing.expect(monitor.gpu_stats.getMemoryUsagePercent() == 37.5);
